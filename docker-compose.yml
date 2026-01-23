@@ -1,0 +1,26 @@
+services:
+  my-agent-loop-db:
+    image: postgres:18.1
+    container_name: my-agent-loop-db
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=my_agent_loop
+      - POSTGRES_USER=my_agent_loop
+      - POSTGRES_PASSWORD=my_agent_loop
+    volumes:
+      - ./.devloop/volumes/my_agent_loop/data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # http://localhost:8010/?pgsql=my-agent-loop-db&username=my_agent_loop&db=my_agent_loop&ns=public
+  adminer:
+    image: adminer
+    container_name: my-agent-loop-db-admin
+    restart: unless-stopped
+    ports:
+      - 8010:8080

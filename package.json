@@ -1,0 +1,27 @@
+{
+  "name": "my-agent-loop",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "check": "biome check .",
+    "check:fix": "biome check . --write",
+    "dev": "moon :dev",
+    "drizzle": "pnpm run --filter @mono/server drizzle",
+    "docker:build": "docker build -t my-agent-loop .",
+    "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
+    "sync": "moon sync",
+    "typecheck": "tsc --build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cerato": "0.0.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.11",
+    "typescript": "5.9.3"
+  }
+}

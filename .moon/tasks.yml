@@ -1,0 +1,7 @@
+$schema: "https://moonrepo.dev/schemas/tasks.json"
+tasks:
+  dev:
+    command: pnpm run dev
+    options:
+      cache: false
+    preset: server

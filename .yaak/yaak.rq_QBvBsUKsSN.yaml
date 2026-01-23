@@ -1,0 +1,22 @@
+type: http_request
+model: http_request
+id: rq_QBvBsUKsSN
+createdAt: 2026-01-21T22:23:08.558831
+updatedAt: 2026-01-21T22:24:39.589719
+workspaceId: wk_SXpdiKYU85
+folderId: null
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: aAJxen6PwQ
+method: POST
+name: Create Project
+sortPriority: 0.0
+url: http://localhost:3000/api/projects
+urlParameters: []

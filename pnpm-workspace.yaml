@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - cpu-features
+  - esbuild
+  - msw
+  - protobufjs
+  - ssh2
+
+linkWorkspacePackages: true

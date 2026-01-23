@@ -1,0 +1,35 @@
+type: http_request
+model: http_request
+id: rq_hxCfPwQ2J2
+createdAt: 2026-01-19T22:35:14.071738
+updatedAt: 2026-01-21T23:15:45.956361
+workspaceId: wk_SXpdiKYU85
+folderId: null
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "title": "Example task",
+      "description": "Some example task"
+    }
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: xupWPCjdeX
+method: POST
+name: Create Task
+sortPriority: 2000.0
+url: http://localhost:3000/api/projects/:projectId/tasks
+urlParameters:
+- enabled: true
+  name: :projectId
+  value: ${[ CURRENT_PROJECT_ID ]}
+  id: t0D7cbfsXW
+- enabled: true
+  name: ''
+  value: ''
+  id: S20erXM749

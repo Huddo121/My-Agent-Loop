@@ -1,0 +1,26 @@
+type: http_request
+model: http_request
+id: rq_xskvFfkzXw
+createdAt: 2026-01-19T22:31:29.591121
+updatedAt: 2026-01-21T23:15:37.642043
+workspaceId: wk_SXpdiKYU85
+folderId: null
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: ''
+headers: []
+method: GET
+name: Get Tasks in Project
+sortPriority: 1000.0
+url: http://localhost:3000/api/projects/:projectId/tasks
+urlParameters:
+- enabled: true
+  name: :projectId
+  value: ${[ CURRENT_PROJECT_ID ]}
+  id: 8s3rSI0f5I
+- enabled: true
+  name: ''
+  value: ''
+  id: akQuJWjQne

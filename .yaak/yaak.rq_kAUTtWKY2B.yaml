@@ -1,0 +1,23 @@
+type: http_request
+model: http_request
+id: rq_kAUTtWKY2B
+createdAt: 2026-01-21T22:22:38.038857
+updatedAt: 2026-01-22T02:06:49.598423
+workspaceId: wk_SXpdiKYU85
+folderId: null
+authentication: {}
+authenticationType: null
+body:
+  text: ''
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: eheWNjJECJ
+method: GET
+name: Get Projects
+sortPriority: 0.0
+url: http://localhost:3000/api/projects
+urlParameters: []

@@ -1,0 +1,16 @@
+{
+  "include": ["./src"],
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "./dist",
+    "paths": {
+      "@mono/api": ["../../packages/api/src/index.ts"]
+    }
+  },
+  "references": [
+    {
+      "path": "../../packages/api"
+    }
+  ]
+}

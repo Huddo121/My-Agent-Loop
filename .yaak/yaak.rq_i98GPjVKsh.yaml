@@ -1,0 +1,30 @@
+type: http_request
+model: http_request
+id: rq_i98GPjVKsh
+createdAt: 2026-01-22T03:09:28.600140
+updatedAt: 2026-01-22T03:12:50.427505
+workspaceId: wk_SXpdiKYU85
+folderId: null
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: ''
+headers: []
+method: GET
+name: Get Task
+sortPriority: 0.0
+url: http://localhost:3000/api/projects/:projectId/tasks/:taskId
+urlParameters:
+- enabled: true
+  name: :projectId
+  value: ${[ CURRENT_PROJECT_ID ]}
+  id: knHY2E2sEA
+- enabled: true
+  name: :taskId
+  value: ${[ CURRENT_TASK_ID ]}
+  id: nyizrpQtCP
+- enabled: true
+  name: ''
+  value: ''
+  id: ybG2qdr0un

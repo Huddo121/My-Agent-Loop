@@ -1,0 +1,4 @@
+tasks:
+  dev:
+    command: noop
+    local: true

@@ -1,0 +1,14 @@
+type: workspace
+model: workspace
+id: wk_SXpdiKYU85
+createdAt: 2026-01-19T22:31:11.742563
+updatedAt: 2026-01-19T22:31:11.742565
+authentication: {}
+authenticationType: null
+description: ''
+headers: []
+name: my-agent-loop
+encryptionKeyChallenge: null
+settingValidateCertificates: true
+settingFollowRedirects: true
+settingRequestTimeout: 0

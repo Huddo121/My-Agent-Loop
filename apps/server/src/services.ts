@@ -14,7 +14,7 @@ import {
 } from "./sandbox/SandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
-import { WorkflowService } from "./workflow/WorkflowService";
+import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
 import { WorkflowQueues } from "./workflow/workflow-queues";
 
 export interface Services {
@@ -23,7 +23,7 @@ export interface Services {
   sandboxService: SandboxService;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
-  workflowService: WorkflowService;
+  workflowExecutionService: WorkflowExecutionService;
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
 }
@@ -44,14 +44,8 @@ const fileSystemService = new LocalFileSystemService(
 const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
-const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
-  workflowQueues,
-  taskQueue,
-  runsService,
-  db,
-);
 
-const workflowService = new WorkflowService(
+const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   projectsService,
   gitService,
@@ -59,12 +53,22 @@ const workflowService = new WorkflowService(
   fileSystemService,
 );
 
+const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
+  workflowQueues,
+  taskQueue,
+  runsService,
+  projectsService,
+  workflowExecutionService,
+  gitService,
+  db,
+);
+
 export const services: Services = {
   db,
   taskQueue,
   sandboxService,
   gitService,
-  workflowService,
+  workflowExecutionService,
   projectsService,
   workflowQueues,
   backgroundWorkflowProcessor,

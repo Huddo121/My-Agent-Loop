@@ -1,6 +1,8 @@
 import type { ProjectId } from "@mono/api";
 import { type Job, Worker } from "bullmq";
 import type { Database } from "../db";
+import type { GitService } from "../git/GitService";
+import type { ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type {
   Run,
@@ -11,6 +13,8 @@ import type { RunMode } from "../runs/runs-model";
 import type { TaskQueue } from "../task-queue";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
+import { realiseWorkflowConfig, type WorkflowKind } from "./Workflow";
+import type { WorkflowExecutionService } from "./WorkflowExecutionService";
 import {
   RUN_QUEUE,
   type RunQueueJobPayload,
@@ -28,6 +32,9 @@ export class BackgroundWorkflowProcessor {
     private readonly workflowQueues: WorkflowQueues,
     private readonly taskQueue: TaskQueue,
     private readonly runsService: RunsService,
+    private readonly projectsService: ProjectsService,
+    private readonly workflowExecutionService: WorkflowExecutionService,
+    /* Just passed through */ private readonly gitService: GitService,
     private readonly db: Database,
   ) {
     new Worker(RUN_QUEUE, (job) => this.processRun(job));
@@ -58,11 +65,45 @@ export class BackgroundWorkflowProcessor {
     try {
       const result = await withNewTransaction(
         this.db,
-        async (): Promise<Result<RunId, { reason: "task-not-found" }>> => {
+        async (): Promise<
+          Result<
+            RunId,
+            | { reason: "task-not-found" }
+            | { reason: "project-not-found" }
+            | { reason: "execution-failed" }
+          >
+        > => {
           // Get the all the data we need for the run
           const task = await this.taskQueue.getTask(job.data.taskId);
           if (task === undefined) {
             return { success: false, error: { reason: "task-not-found" } };
+          }
+
+          const project = await this.projectsService.getProject(
+            job.data.projectId,
+          );
+
+          if (project === undefined) {
+            return { success: false, error: { reason: "project-not-found" } };
+          }
+
+          // TODO: Pick this up from the project
+          const workflowKind: WorkflowKind = "review";
+
+          const workflow = realiseWorkflowConfig(workflowKind, {
+            gitService: this.gitService,
+          });
+
+          const executionResult =
+            await this.workflowExecutionService.executeWorkflow(
+              runId,
+              task,
+              project,
+              workflow,
+            );
+
+          if (executionResult.success === false) {
+            return { success: false, error: { reason: "execution-failed" } };
           }
 
           return { success: true, value: runId };
@@ -97,6 +138,7 @@ export class BackgroundWorkflowProcessor {
         });
       }
     } catch (error) {
+      // Catching the error here so that BullMQ doesn't retry the job for the same Run
       console.error("Error occurred while processing run", {
         ...loggingContext,
         error,

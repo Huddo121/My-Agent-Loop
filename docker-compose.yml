@@ -24,3 +24,11 @@ services:
     restart: unless-stopped
     ports:
       - 8010:8080
+
+  my-agent-loop-redis:
+    image: redis:8.2.0
+    container_name: my-agent-loop-redis
+    ports:
+      - 6379:6379
+    volumes:
+      - ./.devloop/volumes/redis:/data

@@ -1,5 +1,5 @@
 import type { ProjectId, TaskId } from "@mono/api";
-import { Queue } from "bullmq";
+import { type ConnectionOptions, Queue } from "bullmq";
 import type { RunId } from "../runs/RunId";
 import type { RunMode } from "../runs/runs-model";
 
@@ -13,8 +13,13 @@ export type RunQueueJobPayload = {
 
 export class WorkflowQueues {
   public readonly runQueue: Queue;
+  public readonly redisConnectionOptions: ConnectionOptions;
+
   constructor(redisHost: string) {
-    const redisConnection = { connection: { host: redisHost } } as const;
+    this.redisConnectionOptions = { host: redisHost };
+    const redisConnection = {
+      connection: this.redisConnectionOptions,
+    } as const;
     this.runQueue = new Queue(RUN_QUEUE, redisConnection);
   }
 }

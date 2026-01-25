@@ -37,7 +37,9 @@ export class BackgroundWorkflowProcessor {
     /* Just passed through */ private readonly gitService: GitService,
     private readonly db: Database,
   ) {
-    new Worker(RUN_QUEUE, (job) => this.processRun(job));
+    new Worker(RUN_QUEUE, (job) => this.processRun(job), {
+      connection: workflowQueues.redisConnectionOptions,
+    });
   }
 
   /**

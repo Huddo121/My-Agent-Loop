@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path, { isAbsolute } from "node:path";
-import type { RunId } from "../common/RunId";
+import type { RunId } from "../runs/RunId";
 import type { AbsoluteFilePath, RelativeFilePath } from "./FilePath";
 
 export interface FileSystemService {

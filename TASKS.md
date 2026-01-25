@@ -12,6 +12,7 @@
 - [ ] See if Opus can generate a PromiseEither<E, A> class which can be used with async/await
 - [ ] Allow agents to interrogate the task queue and add new tasks
 - [ ] Add ability to use custom base container for the agent
+- [ ] Be a little better about not using API types throughout the application (e.g. TaskId, ProjectId)
 
 ## Big features
 

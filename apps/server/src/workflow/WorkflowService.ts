@@ -1,17 +1,21 @@
 import fs from "node:fs";
 import type { ProjectId, TaskId } from "@mono/api";
-import type { RunId } from "../common/RunId";
-import { generateRunId } from "../common/RunId";
+import { type Job, Queue, Worker } from "bullmq";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { GitService } from "../git/GitService";
 import type { ProjectsService } from "../projects/ProjectsService";
+import type { RunId } from "../runs/RunId";
+import { generateRunId } from "../runs/RunId";
+import type { RunsService } from "../runs/RunsService";
+import type { RunMode } from "../runs/runs-model";
 import type { SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { absolutePath } from "../utils/absolutePath";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
+import { RUN_QUEUE, type RunQueueJobPayload } from "./workflow-queues";
 
 const formatTaskFile = (task: Task): string => {
   return `# ${task.title}

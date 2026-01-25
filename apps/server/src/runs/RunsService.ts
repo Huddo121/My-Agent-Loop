@@ -99,7 +99,7 @@ export class DatabaseRunsService implements RunsService {
 
   // TODO: This will need to be implemented using Redis streams, and this method will be used
   //         to stream the logs back to the caller if the stream is still running.
-  getRunLogs(runId: RunId): AsyncGenerator<RunLogLine> {
+  getRunLogs(_runId: RunId): AsyncGenerator<RunLogLine> {
     throw new Error("Method not implemented.");
   }
 }

@@ -13,13 +13,29 @@ import { tasksHandlers } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import type { BeginWorkflowError } from "../workflow/BackgroundWorkflowProcessor";
-import type { WorkflowConfiguration } from "../workflow/Workflow";
 
 export const projectsHandlers: HonoHandlersFor<
   ["projects"],
   MyAgentLoopApi["projects"],
   Services
 > = {
+  GET: async (ctx) => {
+    return withNewTransaction(ctx.services.db, async () => {
+      const projects = await ctx.services.projectsService.getAllProjects();
+      return ok(projects);
+    });
+  },
+  POST: async (ctx) => {
+    return withNewTransaction(ctx.services.db, async () => {
+      const project = await ctx.services.projectsService.createProject({
+        name: ctx.body.name,
+        shortCode: ctx.body.shortCode,
+        repositoryUrl: ctx.body.repositoryUrl,
+        workflowConfiguration: ctx.body.workflowConfiguration,
+      });
+      return ok(project);
+    });
+  },
   ":projectId": {
     GET: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
@@ -108,28 +124,5 @@ export const projectsHandlers: HonoHandlersFor<
         })
         .exhaustive();
     },
-  },
-  GET: async (ctx) => {
-    return withNewTransaction(ctx.services.db, async () => {
-      const projects = await ctx.services.projectsService.getAllProjects();
-      return ok(projects);
-    });
-  },
-  POST: async (ctx) => {
-    return withNewTransaction(ctx.services.db, async () => {
-      const defaultWorkflowConfiguration: WorkflowConfiguration = {
-        version: "1",
-        onTaskCompleted: "push-branch",
-      };
-
-      const project = await ctx.services.projectsService.createProject({
-        name: ctx.body.name,
-        shortCode: ctx.body.shortCode,
-        repositoryUrl: ctx.body.repositoryUrl,
-        workflowConfiguration:
-          ctx.body.workflowConfiguration ?? defaultWorkflowConfiguration,
-      });
-      return ok(project);
-    });
   },
 };

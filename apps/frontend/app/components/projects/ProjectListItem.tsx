@@ -1,5 +1,11 @@
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, PlayIcon, RepeatIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { useStartRun } from "~/hooks";
 import { cn } from "~/lib/utils";
 import type { Project } from "~/types";
 
@@ -16,6 +22,19 @@ export function ProjectListItem({
   onSelect,
   onSave,
 }: ProjectListItemProps) {
+  const startRunMutation = useStartRun();
+
+  const handleStartRun = (mode: "single" | "loop") => {
+    startRunMutation.mutate(
+      { projectId: project.id, mode },
+      {
+        onError: (error) => {
+          console.error("Failed to start run:", error);
+        },
+      },
+    );
+  };
+
   return (
     <div
       className={cn(
@@ -38,10 +57,40 @@ export function ProjectListItem({
           </span>
         </div>
       </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+            onClick={() => handleStartRun("single")}
+            disabled={startRunMutation.isPending}
+          >
+            <PlayIcon className="size-4" />
+            <span className="sr-only">Start single run</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Start single run</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+            onClick={() => handleStartRun("loop")}
+            disabled={startRunMutation.isPending}
+          >
+            <RepeatIcon className="size-4" />
+            <span className="sr-only">Start loop run</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Start loop run</TooltipContent>
+      </Tooltip>
       <Button
         variant="ghost"
         size="icon-sm"
-        className="inset-0 opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+        className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
         onClick={() => onSave(project)}
       >
         <PencilIcon className="size-4" />

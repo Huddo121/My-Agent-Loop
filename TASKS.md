@@ -16,6 +16,7 @@
 
 ## Big features
 
+- [ ] Figure out a better strategy for handling authenticated processes (e.g. Git, Docker)
 - [ ] Add a verification step at the end of a task
 - [ ] Add the ability for agents to ask for input from a human or other agent
 - [ ] Add a management and orchestrator agent

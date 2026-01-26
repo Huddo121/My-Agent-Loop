@@ -135,9 +135,11 @@ export class BackgroundWorkflowProcessor {
         }
 
         // Finished processing the run, queue up the next task
-        await withNewTransaction(this.db, async () => {
-          return await this.queueNextTask(job.data.projectId, job.data.mode);
-        });
+        if (job.data.mode === "loop") {
+          await withNewTransaction(this.db, async () => {
+            return await this.queueNextTask(job.data.projectId, job.data.mode);
+          });
+        }
       }
     } catch (error) {
       // Catching the error here so that BullMQ doesn't retry the job for the same Run

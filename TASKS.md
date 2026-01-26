@@ -1,5 +1,13 @@
 # TODO
 
+## Clean up the UI
+
+- [ ] The Sidebar is hideous, does not fit the project names any more
+- [ ] Make the sidebar resizable
+- [ ] Make the sidebar collapse to icons
+- [ ] Task cards don't shrink down, make them more like regular Kanban cards
+- [ ] Add tooltips to icon-only buttons
+
 ## Smaller features
 
 - [ ] Actually use the Projects and Runs APIs/Models
@@ -21,6 +29,7 @@
 - [ ] Split the create/update dialogs for tasks and projects, or at least wrap them with create/update wrappers to improve typesafety (i.e. remove optional fields from the 'update' variant)
 - [ ] Add sonner for error signaling when request fail
 - [ ] Give TsGo a try, it might make the typecheck loop in watch mode more enjoyable
+- [ ] Add a command palette
 
 ## Big features
 

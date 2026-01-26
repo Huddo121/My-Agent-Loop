@@ -79,6 +79,7 @@ export class DatabaseProjectService implements ProjectsService {
         name: project.name,
         shortCode: project.shortCode,
         repositoryUrl: project.repositoryUrl,
+        workflowConfiguration: project.workflowConfiguration,
       })
       .where(eq(projectsTable.id, project.id))
       .returning();

@@ -73,7 +73,11 @@ export class DatabaseProjectService implements ProjectsService {
     const tx = getTransaction();
     const [updatedProject] = await tx
       .update(projectsTable)
-      .set({ name: project.name, shortCode: project.shortCode })
+      .set({
+        name: project.name,
+        shortCode: project.shortCode,
+        repositoryUrl: project.repositoryUrl,
+      })
       .where(eq(projectsTable.id, project.id))
       .returning();
 

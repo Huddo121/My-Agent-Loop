@@ -1,22 +1,16 @@
 import fs from "node:fs";
-import type { ProjectId, TaskId } from "@mono/api";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { GitService } from "../git/GitService";
 import type { Project, ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
-import { generateRunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { absolutePath } from "../utils/absolutePath";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
-import {
-  realiseWorkflowConfig,
-  type Workflow,
-  type WorkflowKind,
-} from "./Workflow";
+import { type Workflow } from "./Workflow";
 
 const formatTaskFile = (task: Task): string => {
   return `# ${task.title}
@@ -24,9 +18,6 @@ const formatTaskFile = (task: Task): string => {
 ${task.description}
 `;
 };
-
-// TODO: Rip this out and get the Repo URL from the Project
-const repositoryUrl = "git@gitlab.com:huddo121/dog-scraper.git";
 
 /**
  * This class is responsible for the runtime execution of a workflow.
@@ -45,10 +36,10 @@ export class WorkflowExecutionService {
   async executeWorkflow(
     runId: RunId,
     task: Task,
-    _project: Project,
+    project: Project,
     workflow: Workflow,
   ): Promise<Result<void, Error>> {
-    const e = await this.processTask(task, runId, workflow);
+    const e = await this.processTask(project, task, runId, workflow);
 
     if (e.success === true) {
       return { success: true, value: undefined };
@@ -57,90 +48,8 @@ export class WorkflowExecutionService {
     }
   }
 
-  async processNextTask(
-    projectId: ProjectId,
-  ): Promise<Result<TaskId | undefined, Error>> {
-    const project = await this.projectsService.getProject(projectId);
-    if (project === undefined) {
-      return {
-        success: false,
-        error: new Error(`Project ${projectId} not found`),
-      };
-    }
-
-    // const workflowKind = project.workflowKind;
-    const workflowKind = "review" as WorkflowKind;
-
-    const workflow = realiseWorkflowConfig(workflowKind, {
-      gitService: this.gitService,
-    });
-
-    const task = await this.taskQueue.getNextTask(projectId);
-    if (task) {
-      const runId = generateRunId();
-      console.log(
-        `Processing task ${task.id} (run: ${runId})\n${task.description}`,
-      );
-      const result = await this.processTask(task, runId, workflow);
-      if (result.success === true) {
-        return { success: true, value: task.id };
-      } else {
-        return result;
-      }
-    } else {
-      console.info("No tasks available to process", {
-        projectId,
-        workflowKind,
-      });
-      return { success: true, value: undefined };
-    }
-  }
-
-  /** Start processing tasks, and running a sub-agent for each task until a run fails or all tasks are completed */
-  async startProcessing(projectId: ProjectId) {
-    const project = await this.projectsService.getProject(projectId);
-    if (project === undefined) {
-      return {
-        success: false,
-        error: new Error(`Project ${projectId} not found`),
-      };
-    }
-
-    // const workflowKind = project.workflowKind;
-    const workflowKind = "review" as WorkflowKind;
-
-    const workflow = realiseWorkflowConfig(workflowKind, {
-      gitService: this.gitService,
-    });
-
-    while (!(await this.taskQueue.isEmpty(projectId))) {
-      const task = await this.taskQueue.getNextTask(projectId);
-      if (task) {
-        // Generate a unique run ID for this task processing attempt
-        const runId = generateRunId();
-        console.log(
-          `Processing task ${task.id} (run: ${runId})\n${task.description}`,
-        );
-        const result = await this.processTask(task, runId, workflow);
-        if (result.success === false) {
-          console.error(
-            `Failed to process task ${task.id}:`,
-            result.error.message,
-          );
-          return;
-        }
-      } else {
-        console.info("No tasks available to process", {
-          projectId,
-          workflowKind,
-        });
-        break;
-      }
-    }
-    console.log("Processed all tasks");
-  }
-
   private async prepare(
+    project: Project,
     runId: RunId,
     task: Task,
   ): Promise<Result<{ repository: GitRepository; sandbox: Sandbox }, Error>> {
@@ -153,7 +62,7 @@ export class WorkflowExecutionService {
 
     // Check out code to temporary folder
     const checkoutResult = await this.gitService.checkoutRepository({
-      repositoryUrl,
+      repositoryUrl: project.repositoryUrl,
       targetDirectory: repositoryPath,
       branch: `tasks/task-${task.id}-${runId}` as GitBranch,
     });
@@ -192,11 +101,12 @@ export class WorkflowExecutionService {
   }
 
   private async processTask(
+    project: Project,
     task: Task,
     runId: RunId,
     workflow: Workflow,
   ): Promise<Result<void, Error>> {
-    const perpareResult = await this.prepare(runId, task);
+    const perpareResult = await this.prepare(project, runId, task);
     if (perpareResult.success === false) {
       return { success: false, error: perpareResult.error };
     }

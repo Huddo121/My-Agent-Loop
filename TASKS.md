@@ -16,6 +16,7 @@
 - [ ] Clean up old checkouts
 - [ ] Clean up pending runs that are too old
 - [ ] Surface run state to the frontend (and actually track it somewhere usable)
+- [ ] Streamed results for task updates
 
 ## Big features
 

@@ -1,11 +1,20 @@
 #!/bin/bash
-set -e -x
+
+# Save current shell options and flags
+SAVED_SHELL_OPTIONS=$(set +o)
+SAVED_FLAGS="$-"
 
 # Run setup script if it exists
 if [ -f /code/.agent-loop/setup.sh ]; then
   echo "Running setup script..."
-  bash /code/.agent-loop/setup.sh
+  source /code/.agent-loop/setup.sh
+
+  # Restore shell options and flags, preventing the `setup.sh` from modifying the runtime behaviour of this script (somewhat)
+  eval "$SAVED_SHELL_OPTIONS"
+  set -$SAVED_FLAGS
 fi
+
+set -e -x
 
 # Read task message from file
 TASK_MESSAGE=""

@@ -1,3 +1,5 @@
 # Notes for AI Agents
 
 Follow the guidance in the AGENTS.md file closely.
+Whenever you are working within an app or package in this monorepo, you must also read the `AGENTS.md` file for that package.
+Information and guidance in the package-specific AGENTS.md trumps general guidance in the top-leve AGENTS.md or anything in the `docs` folder.

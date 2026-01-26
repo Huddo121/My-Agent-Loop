@@ -14,6 +14,13 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 export type ProjectDialogMode = "create" | "update";
 
@@ -28,6 +35,11 @@ export type ProjectDialogProps = {
   onSubmit: (createProjectRequest: CreateProjectRequest) => void;
 };
 
+const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
+  version: "1",
+  onTaskCompleted: "push-branch",
+};
+
 export function ProjectDialog({
   open,
   onOpenChange,
@@ -35,10 +47,7 @@ export function ProjectDialog({
   initialName = "",
   initialShortCode = "",
   initialRepositoryUrl = "",
-  initialWorkflowConfiguration = {
-    version: "1",
-    onTaskCompleted: "push-branch",
-  },
+  initialWorkflowConfiguration = defaultWorkflowConfiguration,
   onSubmit,
 }: ProjectDialogProps) {
   // TODO: Switch to using react-hook-form
@@ -53,8 +62,15 @@ export function ProjectDialog({
       setName(initialName);
       setShortCode(initialShortCode);
       setRepositoryUrl(initialRepositoryUrl);
+      setWorkflowConfiguration(initialWorkflowConfiguration);
     }
-  }, [open, initialName, initialShortCode, initialRepositoryUrl]);
+  }, [
+    open,
+    initialName,
+    initialShortCode,
+    initialRepositoryUrl,
+    initialWorkflowConfiguration,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +139,9 @@ export function ProjectDialog({
               >
                 Short Code
               </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Letters only (A-Z). Will be converted to uppercase.
+              </p>
               <Input
                 id="short-code"
                 placeholder="ABC"
@@ -131,9 +150,36 @@ export function ProjectDialog({
                 maxLength={10}
                 className="mt-1 font-mono"
               />
+            </div>
+            <div>
+              <label
+                htmlFor="on-task-completed"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                On Task Completed
+              </label>
               <p className="text-xs text-muted-foreground mt-1">
-                Letters only (A-Z). Will be converted to uppercase.
+                What action to take when a task is completed.
               </p>
+              <Select
+                value={workflowConfiguration.onTaskCompleted}
+                onValueChange={(value: "push-branch" | "merge-immediately") =>
+                  setWorkflowConfiguration({
+                    ...workflowConfiguration,
+                    onTaskCompleted: value,
+                  })
+                }
+              >
+                <SelectTrigger id="on-task-completed" className="mt-1 w-full">
+                  <SelectValue placeholder="Select action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="push-branch">Push Branch</SelectItem>
+                  <SelectItem value="merge-immediately">
+                    Merge Immediately
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

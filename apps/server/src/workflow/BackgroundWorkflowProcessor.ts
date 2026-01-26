@@ -37,8 +37,28 @@ export class BackgroundWorkflowProcessor {
     /* Just passed through */ private readonly gitService: GitService,
     private readonly db: Database,
   ) {
-    new Worker(RUN_QUEUE, (job) => this.processRun(job), {
+    const runWorker = new Worker(RUN_QUEUE, (job) => this.processRun(job), {
       connection: workflowQueues.redisConnectionOptions,
+    });
+
+    runWorker.on("error", (reason) => {
+      console.error("Run worker errored", {
+        reason: reason.message,
+      });
+    });
+
+    runWorker.on("failed", (job?: Job<RunQueueJobPayload>) => {
+      console.error("Run worker failed", {
+        reason: job?.failedReason ?? "no reason given",
+        hasJob: job !== undefined,
+        jobId: String(job?.id),
+      });
+
+      if (job) {
+        withNewTransaction(db, async () => {
+          return await this.markRunAsFailed(job.data.runId);
+        });
+      }
     });
   }
 
@@ -46,7 +66,7 @@ export class BackgroundWorkflowProcessor {
    * Async job processer that handles Jobs from BullMQ.
    * This should not be called by any other services.
    */
-  async processRun(job: Job<RunQueueJobPayload>): Promise<void> {
+  private async processRun(job: Job<RunQueueJobPayload>): Promise<void> {
     // Explicitly updating run state updates outside of the transaction so other parts of the codebase can pick up on the change ASAP
     const runId = job.data.runId;
     const loggingContext = {
@@ -185,18 +205,24 @@ export class BackgroundWorkflowProcessor {
   private async markRunAsInProgress(
     runId: RunId,
   ): Promise<Result<Run, UpdateRunStateError>> {
-    return await this.runsService.updateRunState(runId, "in_progress");
+    return await withNewTransaction(this.db, () =>
+      this.runsService.updateRunState(runId, "in_progress"),
+    );
   }
 
   private async markRunAsCompleted(
     runId: RunId,
   ): Promise<Result<Run, UpdateRunStateError>> {
-    return await this.runsService.updateRunState(runId, "completed");
+    return await withNewTransaction(this.db, () =>
+      this.runsService.updateRunState(runId, "completed"),
+    );
   }
 
   private async markRunAsFailed(
     runId: RunId,
   ): Promise<Result<Run, UpdateRunStateError>> {
-    return await this.runsService.updateRunState(runId, "failed");
+    return await withNewTransaction(this.db, () =>
+      this.runsService.updateRunState(runId, "failed"),
+    );
   }
 }

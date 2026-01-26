@@ -13,6 +13,9 @@
 - [ ] Allow agents to interrogate the task queue and add new tasks
 - [ ] Add ability to use custom base container for the agent
 - [ ] Be a little better about not using API types throughout the application (e.g. TaskId, ProjectId)
+- [ ] Clean up old checkouts
+- [ ] Clean up pending runs that are too old
+- [ ] Surface run state to the frontend (and actually track it somewhere usable)
 
 ## Big features
 

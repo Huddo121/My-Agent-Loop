@@ -11,7 +11,7 @@ export const getCurrentProjectMcpHandler = {
   execute: async () => {
     const services = getMcpServices();
     // TODO: Currently stubbing this out, need to get the project ID in to the MCP connections somehow
-    const projectId = "84fdb710-db1c-4fa9-89e3-2d4b1c528e26" as ProjectId;
+    const projectId = "019bf786-95b5-7bbb-bb57-25f0d87684bd" as ProjectId;
 
     const project = await withNewTransaction(
       services.db,

@@ -26,7 +26,7 @@ ${task.description}
 };
 
 // TODO: Rip this out and get the Repo URL from the Project
-const repositoryUrl = "git@gitlab.com:huddo121/my-agent-loop.git";
+const repositoryUrl = "git@gitlab.com:huddo121/dog-scraper.git";
 
 /**
  * This class is responsible for the runtime execution of a workflow.

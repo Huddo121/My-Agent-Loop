@@ -3,6 +3,7 @@
 > [!CAUTION]
 > This project isn't actually ready to be used, there's still some jank in how it is run, but it's good enough (with some setup) to have the loop improve itself.
 > In many ways this is just my playground for getting more comfortable with heavier use of agents during development.
+> For more serious projects you should consider [Vibe-Kanban](https://www.vibekanban.com/), [Auto-Claude](https://github.com/AndyMik90/Auto-Claude), or [Automaker](https://automaker.app/)
 
 Tool that will repeatedly call an LLM, letting it work on a sandboxed instance of a codebase in order to complete a series of tasks.
 

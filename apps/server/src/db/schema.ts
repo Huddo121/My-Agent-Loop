@@ -1,6 +1,7 @@
-import type { ProjectId, RunId, TaskId } from "@mono/api";
+import type { ProjectId, TaskId } from "@mono/api";
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
+import type { RunId } from "../runs/RunId";
 
 export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
@@ -20,6 +21,13 @@ export const tasksTable = pg.pgTable("tasks", {
   completedOn: pg.timestamp(),
 });
 
+export const runStateEnum = pg.pgEnum("run_state", [
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+]);
+
 export const runsTable = pg.pgTable("runs", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<RunId>(),
   taskId: pg
@@ -27,5 +35,6 @@ export const runsTable = pg.pgTable("runs", {
     .references(() => tasksTable.id)
     .notNull(),
   startedAt: pg.timestamp().notNull().defaultNow(),
+  state: runStateEnum().notNull().default("pending"),
   completedAt: pg.timestamp(),
 });

@@ -92,3 +92,30 @@ export function useRenameProject() {
     },
   });
 }
+
+/**
+ * Hook to start a run for a project.
+ */
+export function useStartRun() {
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      mode,
+    }: {
+      projectId: ProjectId;
+      mode: "single" | "loop";
+    }): Promise<{ runId: string }> => {
+      const response = await apiClient.projects[":projectId"].run.POST({
+        pathParams: { projectId },
+        body: { mode },
+      });
+      if (response.status === 200) {
+        return response.responseBody;
+      }
+      if (response.status === 404) {
+        throw new Error("Project not found or no tasks available");
+      }
+      throw new Error("Failed to start run");
+    },
+  });
+}

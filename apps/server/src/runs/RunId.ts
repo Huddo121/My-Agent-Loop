@@ -1,3 +1,7 @@
+import {
+  type RunId as RunIdDto,
+  runIdSchema as runIdDtoSchema,
+} from "@mono/api";
 import type { Branded } from "../utils/Branded";
 
 /**
@@ -5,6 +9,9 @@ import type { Branded } from "../utils/Branded";
  * Every time a workflow is started, it will get a new, random `RunId`.
  */
 export type RunId = Branded<string, "RunId">;
+
+export const asRunIdDto = (runId: RunId): RunIdDto =>
+  runIdDtoSchema.parse(runId);
 
 /**
  * Generates a new random RunId.

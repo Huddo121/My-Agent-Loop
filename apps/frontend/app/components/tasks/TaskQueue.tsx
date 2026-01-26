@@ -13,10 +13,16 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { LoaderIcon, PlusIcon } from "lucide-react";
+import { LoaderIcon, PlayIcon, PlusIcon, RepeatIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { useStartRun } from "~/hooks";
 import type { NewTask, Project, Task, UpdateTask } from "~/types";
 import { SortableTaskCard } from "./SortableTaskCard";
 import { TaskDialog } from "./TaskDialog";
@@ -40,6 +46,18 @@ export function TaskQueue({
 }: TaskQueueProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const startRunMutation = useStartRun();
+
+  const handleStartRun = (mode: "single" | "loop") => {
+    startRunMutation.mutate(
+      { projectId: project.id, mode },
+      {
+        onError: (error) => {
+          console.error("Failed to start run:", error);
+        },
+      },
+    );
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -75,11 +93,43 @@ export function TaskQueue({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b px-6 py-4">
-        <div>
-          <h1 className="text-xl font-semibold">{project.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {tasks.length} {tasks.length === 1 ? "task" : "tasks"} in queue
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">{project.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {tasks.length} {tasks.length === 1 ? "task" : "tasks"} in queue
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleStartRun("single")}
+                  disabled={startRunMutation.isPending}
+                >
+                  <PlayIcon className="size-4" />
+                  <span className="sr-only">Start single run</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Start single run</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleStartRun("loop")}
+                  disabled={startRunMutation.isPending}
+                >
+                  <RepeatIcon className="size-4" />
+                  <span className="sr-only">Start loop run</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Start loop run</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <PlusIcon className="size-4" />

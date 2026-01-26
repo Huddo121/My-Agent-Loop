@@ -29,6 +29,7 @@
     "@hono/node-server": "1.19.9",
     "@mono/api": "workspace:*",
     "@types/pg": "8.16.0",
+    "bullmq": "5.67.1",
     "cerato": "0.0.2",
     "dockerode": "4.0.9",
     "dotenv": "17.2.3",
@@ -38,6 +39,7 @@
     "hono": "4.11.4",
     "pg": "8.17.1",
     "simple-git": "3.30.0",
+    "ts-pattern": "5.9.0",
     "zod": "4.3.5"
   }
 }

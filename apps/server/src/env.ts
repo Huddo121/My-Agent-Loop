@@ -4,6 +4,8 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().nonempty(),
 
+  REDIS_HOST: z.string().nonempty(),
+
   // Server
   PORT: z
     .string()

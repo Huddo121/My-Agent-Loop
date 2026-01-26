@@ -1,17 +1,22 @@
 import fs from "node:fs";
 import type { ProjectId, TaskId } from "@mono/api";
-import type { RunId } from "../common/RunId";
-import { generateRunId } from "../common/RunId";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { GitService } from "../git/GitService";
-import type { ProjectsService } from "../projects/ProjectsService";
-import type { SandboxService } from "../sandbox/SandboxService";
+import type { Project, ProjectsService } from "../projects/ProjectsService";
+import type { RunId } from "../runs/RunId";
+import { generateRunId } from "../runs/RunId";
+import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { absolutePath } from "../utils/absolutePath";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
+import {
+  realiseWorkflowConfig,
+  type Workflow,
+  type WorkflowKind,
+} from "./Workflow";
 
 const formatTaskFile = (task: Task): string => {
   return `# ${task.title}
@@ -20,97 +25,15 @@ ${task.description}
 `;
 };
 
-const commitAndPushThenMergeToMaster =
-  (gitService: GitService) =>
-  async (
-    task: Task,
-    repository: GitRepository,
-  ): Promise<Result<void, Error>> => {
-    const workBranch = repository.branch;
-    const commitResult = await gitService.commitRepository(
-      repository,
-      `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
-    );
-    if (commitResult.success === false) {
-      console.error(
-        `Failed to commit task ${task.id}:`,
-        commitResult.error.message,
-      );
-      return { success: false, error: commitResult.error };
-    }
+// TODO: Rip this out and get the Repo URL from the Project
+const repositoryUrl = "git@gitlab.com:huddo121/dog-scraper.git";
 
-    await gitService.pushRepository(repository);
-    const mainBranch = await gitService.detectMainBranch(repository);
-    if (mainBranch.success === false) {
-      return { success: false, error: mainBranch.error };
-    }
-
-    const checkoutResult = await gitService.checkoutBranch(
-      repository,
-      mainBranch.value,
-    );
-    if (checkoutResult.success === false) {
-      return { success: false, error: checkoutResult.error };
-    }
-
-    const mergeResult = await gitService.mergeBranchInToCurrentBranch(
-      repository,
-      workBranch,
-    );
-    if (mergeResult.success === false) {
-      return { success: false, error: mergeResult.error };
-    }
-
-    const pushResult = await gitService.pushRepository(repository);
-
-    if (pushResult.success === false) {
-      console.error(
-        `Failed to merge and push task ${task.id}:`,
-        pushResult.error.message,
-      );
-      return {
-        success: false,
-        error: new Error(
-          `Could not merge code change: ${pushResult.error.message}`,
-        ),
-      };
-    }
-
-    return { success: true, value: undefined };
-  };
-
-interface Workflow {
-  onTaskCompleted(
-    task: Task,
-    repository: GitRepository,
-  ): Promise<Result<void, Error>>;
-}
-
-const yoloWorkflow = (gitService: GitService): Workflow => ({
-  onTaskCompleted: commitAndPushThenMergeToMaster(gitService),
-});
-
-const reviewWorkflow = (gitService: GitService): Workflow => ({
-  async onTaskCompleted(task, repository) {
-    // Commit the work
-    const commitResult = await gitService.commitRepository(
-      repository,
-      `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
-    );
-    if (commitResult.success === false) {
-      return { success: false, error: commitResult.error };
-    }
-    // Push it
-    const pushResult = await gitService.pushRepository(repository);
-    return pushResult;
-  },
-});
-
-type WorkflowKind = "yolo" | "review";
-
-const repositoryUrl = "git@gitlab.com:huddo121/my-agent-loop.git";
-
-export class WorkflowService {
+/**
+ * This class is responsible for the runtime execution of a workflow.
+ * It will manage the lifecycle of the sandbox and ensures that all of the files necessary
+ *   for the agent to execute are available (i.e. the code, the task, opencode config).
+ */
+export class WorkflowExecutionService {
   constructor(
     private readonly taskQueue: TaskQueue,
     private readonly projectsService: ProjectsService,
@@ -118,6 +41,21 @@ export class WorkflowService {
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
   ) {}
+
+  async executeWorkflow(
+    runId: RunId,
+    task: Task,
+    _project: Project,
+    workflow: Workflow,
+  ): Promise<Result<void, Error>> {
+    const e = await this.processTask(task, runId, workflow);
+
+    if (e.success === true) {
+      return { success: true, value: undefined };
+    } else {
+      return { success: false, error: e.error };
+    }
+  }
 
   async processNextTask(
     projectId: ProjectId,
@@ -133,10 +71,9 @@ export class WorkflowService {
     // const workflowKind = project.workflowKind;
     const workflowKind = "review" as WorkflowKind;
 
-    const workflow =
-      workflowKind === "yolo"
-        ? yoloWorkflow(this.gitService)
-        : reviewWorkflow(this.gitService);
+    const workflow = realiseWorkflowConfig(workflowKind, {
+      gitService: this.gitService,
+    });
 
     const task = await this.taskQueue.getNextTask(projectId);
     if (task) {
@@ -172,10 +109,10 @@ export class WorkflowService {
     // const workflowKind = project.workflowKind;
     const workflowKind = "review" as WorkflowKind;
 
-    const workflow =
-      workflowKind === "yolo"
-        ? yoloWorkflow(this.gitService)
-        : reviewWorkflow(this.gitService);
+    const workflow = realiseWorkflowConfig(workflowKind, {
+      gitService: this.gitService,
+    });
+
     while (!(await this.taskQueue.isEmpty(projectId))) {
       const task = await this.taskQueue.getNextTask(projectId);
       if (task) {
@@ -203,11 +140,10 @@ export class WorkflowService {
     console.log("Processed all tasks");
   }
 
-  private async processTask(
-    task: Task,
+  private async prepare(
     runId: RunId,
-    workflow: Workflow,
-  ): Promise<Result<void, Error>> {
+    task: Task,
+  ): Promise<Result<{ repository: GitRepository; sandbox: Sandbox }, Error>> {
     // Prepare files
     // Create a temporary folder for the run
     const taskTempDirectory =
@@ -251,6 +187,20 @@ export class WorkflowService {
         },
       ],
     });
+
+    return { success: true, value: { repository, sandbox } };
+  }
+
+  private async processTask(
+    task: Task,
+    runId: RunId,
+    workflow: Workflow,
+  ): Promise<Result<void, Error>> {
+    const perpareResult = await this.prepare(runId, task);
+    if (perpareResult.success === false) {
+      return { success: false, error: perpareResult.error };
+    }
+    const { repository, sandbox } = perpareResult.value;
 
     await this.sandboxService.startSandbox(sandbox.id);
 

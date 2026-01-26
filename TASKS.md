@@ -12,9 +12,16 @@
 - [ ] See if Opus can generate a PromiseEither<E, A> class which can be used with async/await
 - [ ] Allow agents to interrogate the task queue and add new tasks
 - [ ] Add ability to use custom base container for the agent
+- [ ] Be a little better about not using API types throughout the application (e.g. TaskId, ProjectId)
+- [ ] Clean up old checkouts
+- [ ] Clean up pending runs that are too old
+- [ ] Surface run state to the frontend (and actually track it somewhere usable)
+- [ ] Streamed results for task updates
+- [ ] Add other agent runtimes (Claude Code, Cursor CLI)
 
 ## Big features
 
+- [ ] Figure out a better strategy for handling authenticated processes (e.g. Git, Docker)
 - [ ] Add a verification step at the end of a task
 - [ ] Add the ability for agents to ask for input from a human or other agent
 - [ ] Add a management and orchestrator agent

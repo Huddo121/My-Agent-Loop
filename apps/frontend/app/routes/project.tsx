@@ -49,7 +49,7 @@ export default function ProjectRoute() {
 
   // Mutations for projects
   const createProjectMutation = useCreateProject();
-  const renameProjectMutation = useUpdateProject();
+  const updateProjectMutation = useUpdateProject();
 
   // Fetch tasks for the selected project
   const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
@@ -88,11 +88,11 @@ export default function ProjectRoute() {
 
   const handleUpdateProject = useCallback(
     (projectId: ProjectId, updateProjectRequest: UpdateProjectRequest) => {
-      renameProjectMutation.mutate(
+      updateProjectMutation.mutate(
         { projectId, updateProjectRequest },
         {
           onSuccess: (updatedProject) => {
-            // Navigate to same project ID (the ID doesn't change on rename)
+            // Navigate to same project ID (the ID doesn't change on update)
             if (selectedProject?.id === updatedProject.id) {
               navigate(`/projects/${updatedProject.id}`, { replace: true });
             }
@@ -100,7 +100,7 @@ export default function ProjectRoute() {
         },
       );
     },
-    [renameProjectMutation, selectedProject, navigate],
+    [updateProjectMutation, selectedProject, navigate],
   );
 
   const handleTasksReorder = useCallback((tasks: Task[]) => {

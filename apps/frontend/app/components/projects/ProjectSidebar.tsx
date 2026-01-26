@@ -50,8 +50,8 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleOpenRenameDialog = (project: Project) => {
-    setDialogMode("rename");
+  const handleOpenUpdateDialog = (project: Project) => {
+    setDialogMode("update");
     setProjectToEdit(project);
     setDialogOpen(true);
   };
@@ -91,7 +91,7 @@ export const ProjectSidebar = ({
                   project={project}
                   isSelected={selectedProject?.id === project.id}
                   onSelect={onSelectProject}
-                  onSave={handleOpenRenameDialog}
+                  onSave={handleOpenUpdateDialog}
                 />
               ))
             )}

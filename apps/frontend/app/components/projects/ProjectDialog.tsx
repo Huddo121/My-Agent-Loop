@@ -15,7 +15,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 
-export type ProjectDialogMode = "create" | "rename";
+export type ProjectDialogMode = "create" | "update";
 
 export type ProjectDialogProps = {
   open: boolean;
@@ -69,12 +69,12 @@ export function ProjectDialog({
     }
   };
 
-  const title = mode === "create" ? "Create Project" : "Rename Project";
+  const title = mode === "create" ? "Create Project" : "Update Project";
   const description =
     mode === "create"
       ? "Enter a name and short code for your new project."
       : "Enter a new name and short code for this project.";
-  const submitLabel = mode === "create" ? "Create" : "Rename";
+  const submitLabel = mode === "create" ? "Create" : "Update";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

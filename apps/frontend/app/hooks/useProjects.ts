@@ -53,9 +53,6 @@ export function useCreateProject() {
   });
 }
 
-/**
- * Hook to rename an existing project.
- */
 export function useUpdateProject() {
   const queryClient = useQueryClient();
 
@@ -77,10 +74,10 @@ export function useUpdateProject() {
       if (response.status === 404) {
         throw new Error("Project not found");
       }
-      throw new Error("Failed to rename project");
+      throw new Error("Failed to update project");
     },
     onSuccess: (updatedProject) => {
-      // Update the projects cache with the renamed project
+      // Update the projects cache with the updated project
       queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
         if (!old) return [updatedProject];
         return old.map((p) =>

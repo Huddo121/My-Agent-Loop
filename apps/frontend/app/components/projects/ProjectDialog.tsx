@@ -1,4 +1,8 @@
-import { type ProjectShortCode, shortCodeCodec } from "@mono/api";
+import {
+  type CreateProjectRequest,
+  shortCodeCodec,
+  type WorkflowConfigurationDto,
+} from "@mono/api";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -10,8 +14,15 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
-export type ProjectDialogMode = "create" | "rename";
+export type ProjectDialogMode = "create" | "update";
 
 export type ProjectDialogProps = {
   open: boolean;
@@ -19,7 +30,14 @@ export type ProjectDialogProps = {
   mode: ProjectDialogMode;
   initialName?: string;
   initialShortCode?: string;
-  onSubmit: (name: string, shortCode: ProjectShortCode) => void;
+  initialRepositoryUrl?: string;
+  initialWorkflowConfiguration?: WorkflowConfigurationDto;
+  onSubmit: (createProjectRequest: CreateProjectRequest) => void;
+};
+
+const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
+  version: "1",
+  onTaskCompleted: "push-branch",
 };
 
 export function ProjectDialog({
@@ -28,35 +46,51 @@ export function ProjectDialog({
   mode,
   initialName = "",
   initialShortCode = "",
+  initialRepositoryUrl = "",
+  initialWorkflowConfiguration = defaultWorkflowConfiguration,
   onSubmit,
 }: ProjectDialogProps) {
+  // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
+  const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
+  const [workflowConfiguration, setWorkflowConfiguration] =
+    useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
 
   useEffect(() => {
     if (open) {
       setName(initialName);
       setShortCode(initialShortCode);
+      setRepositoryUrl(initialRepositoryUrl);
+      setWorkflowConfiguration(initialWorkflowConfiguration);
     }
-  }, [open, initialName, initialShortCode]);
+  }, [
+    open,
+    initialName,
+    initialShortCode,
+    initialRepositoryUrl,
+    initialWorkflowConfiguration,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && shortCode.trim()) {
-      onSubmit(
-        name.trim(),
-        shortCodeCodec.decode(shortCode.trim().toUpperCase()),
-      );
+    if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
+      onSubmit({
+        name: name.trim(),
+        shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+        repositoryUrl,
+        workflowConfiguration,
+      });
       onOpenChange(false);
     }
   };
 
-  const title = mode === "create" ? "Create Project" : "Rename Project";
+  const title = mode === "create" ? "Create Project" : "Update Project";
   const description =
     mode === "create"
       ? "Enter a name and short code for your new project."
       : "Enter a new name and short code for this project.";
-  const submitLabel = mode === "create" ? "Create" : "Rename";
+  const submitLabel = mode === "create" ? "Create" : "Update";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,11 +119,29 @@ export function ProjectDialog({
             </div>
             <div>
               <label
+                htmlFor="repository-url"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Repository URL
+              </label>
+              <Input
+                id="repository-url"
+                placeholder="git@github.com/something/amazing.git"
+                value={repositoryUrl}
+                onChange={(e) => setRepositoryUrl(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label
                 htmlFor="short-code"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
                 Short Code
               </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Letters only (A-Z). Will be converted to uppercase.
+              </p>
               <Input
                 id="short-code"
                 placeholder="ABC"
@@ -98,12 +150,43 @@ export function ProjectDialog({
                 maxLength={10}
                 className="mt-1 font-mono"
               />
+            </div>
+            <hr />
+            <h2 className="text-lg font-medium mb-1">Workflow Configuration</h2>
+            <div>
+              <label
+                htmlFor="on-task-completed"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Task Completed
+              </label>
               <p className="text-xs text-muted-foreground mt-1">
-                Letters only (A-Z). Will be converted to uppercase.
+                What action to take when an agent completes a task.
               </p>
+              <Select
+                value={workflowConfiguration.onTaskCompleted}
+                onValueChange={(value: "push-branch" | "merge-immediately") =>
+                  setWorkflowConfiguration({
+                    ...workflowConfiguration,
+                    onTaskCompleted: value,
+                  })
+                }
+              >
+                <SelectTrigger id="on-task-completed" className="mt-1 w-full">
+                  <SelectValue placeholder="Select action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="push-branch">
+                    <p>Push task branch for review</p>
+                  </SelectItem>
+                  <SelectItem value="merge-immediately">
+                    <p>Merge task branch immediately</p>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button
               type="button"
               variant="outline"

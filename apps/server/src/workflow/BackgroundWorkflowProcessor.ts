@@ -13,7 +13,7 @@ import type { RunMode } from "../runs/runs-model";
 import type { TaskQueue } from "../task-queue";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
-import { realiseWorkflowConfig, type WorkflowKind } from "./Workflow";
+import { realiseWorkflowConfiguration } from "./Workflow";
 import type { WorkflowExecutionService } from "./WorkflowExecutionService";
 import {
   RUN_QUEUE,
@@ -109,12 +109,12 @@ export class BackgroundWorkflowProcessor {
             return { success: false, error: { reason: "project-not-found" } };
           }
 
-          // TODO: Pick this up from the project
-          const workflowKind: WorkflowKind = "review";
-
-          const workflow = realiseWorkflowConfig(workflowKind, {
-            gitService: this.gitService,
-          });
+          const workflow = realiseWorkflowConfiguration(
+            project.workflowConfiguration,
+            {
+              gitService: this.gitService,
+            },
+          );
 
           const executionResult =
             await this.workflowExecutionService.executeWorkflow(

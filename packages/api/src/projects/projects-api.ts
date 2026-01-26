@@ -5,23 +5,28 @@ import { runIdSchema } from "../runs/runs-model";
 import { tasksApi } from "../tasks/tasks-api";
 import { projectIdSchema, shortCodeCodec } from "./projects-model";
 
+export const workflowConfigurationDtoSchema = z.object({
+  version: z.literal("1"),
+  onTaskCompleted: z.enum(["push-branch", "merge-immediately"]),
+});
+export type WorkflowConfigurationDto = z.infer<
+  typeof workflowConfigurationDtoSchema
+>;
+
 export const projectDtoSchema = z.object({
   id: projectIdSchema,
   name: z.string(),
   shortCode: shortCodeCodec,
+  repositoryUrl: z.string(),
+  workflowConfiguration: workflowConfigurationDtoSchema,
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
 
-export const createProjectRequestSchema = z.object({
-  name: z.string(),
-  shortCode: shortCodeCodec,
-});
+export const createProjectRequestSchema = projectDtoSchema.omit({ id: true });
+
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
-export const updateProjectRequestSchema = z.object({
-  name: z.string(),
-  shortCode: shortCodeCodec,
-});
+export const updateProjectRequestSchema = createProjectRequestSchema;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 
 const runModeSchema = z.enum(["single", "loop"]);

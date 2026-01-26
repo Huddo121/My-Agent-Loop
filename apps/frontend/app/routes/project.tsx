@@ -1,4 +1,9 @@
-import type { ProjectId, ProjectShortCode, TaskId } from "@mono/api";
+import type {
+  CreateProjectRequest,
+  ProjectId,
+  TaskId,
+  UpdateProjectRequest,
+} from "@mono/api";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AppLayout } from "~/components/layout";
@@ -8,8 +13,8 @@ import {
   useCreateProject,
   useCreateTask,
   useProjects,
-  useRenameProject,
   useTasks,
+  useUpdateProject,
 } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
 import type { NewTask, Project, Task } from "~/types";
@@ -44,7 +49,7 @@ export default function ProjectRoute() {
 
   // Mutations for projects
   const createProjectMutation = useCreateProject();
-  const renameProjectMutation = useRenameProject();
+  const updateProjectMutation = useUpdateProject();
 
   // Fetch tasks for the selected project
   const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
@@ -70,35 +75,24 @@ export default function ProjectRoute() {
   );
 
   const handleCreateProject = useCallback(
-    ({ name, shortCode }: { name: string; shortCode: ProjectShortCode }) => {
-      createProjectMutation.mutate(
-        { name, shortCode },
-        {
-          onSuccess: (newProject) => {
-            navigate(`/projects/${newProject.id}`);
-            setLocalTaskOrder(null);
-          },
+    (createProjectRequest: CreateProjectRequest) => {
+      createProjectMutation.mutate(createProjectRequest, {
+        onSuccess: (newProject) => {
+          navigate(`/projects/${newProject.id}`);
+          setLocalTaskOrder(null);
         },
-      );
+      });
     },
     [createProjectMutation, navigate],
   );
 
-  const handleRenameProject = useCallback(
-    ({
-      projectId,
-      name,
-      shortCode,
-    }: {
-      projectId: string;
-      name: string;
-      shortCode: string;
-    }) => {
-      renameProjectMutation.mutate(
-        { projectId: projectId as ProjectId, name, shortCode },
+  const handleUpdateProject = useCallback(
+    (projectId: ProjectId, updateProjectRequest: UpdateProjectRequest) => {
+      updateProjectMutation.mutate(
+        { projectId, updateProjectRequest },
         {
           onSuccess: (updatedProject) => {
-            // Navigate to same project ID (the ID doesn't change on rename)
+            // Navigate to same project ID (the ID doesn't change on update)
             if (selectedProject?.id === updatedProject.id) {
               navigate(`/projects/${updatedProject.id}`, { replace: true });
             }
@@ -106,7 +100,7 @@ export default function ProjectRoute() {
         },
       );
     },
-    [renameProjectMutation, selectedProject, navigate],
+    [updateProjectMutation, selectedProject, navigate],
   );
 
   const handleTasksReorder = useCallback((tasks: Task[]) => {
@@ -149,7 +143,7 @@ export default function ProjectRoute() {
           selectedProject={selectedProject}
           onSelectProject={handleSelectProject}
           onCreateProject={handleCreateProject}
-          onUpdateProject={handleRenameProject}
+          onUpdateProject={handleUpdateProject}
           isLoading={isLoadingProjects}
         />
       }

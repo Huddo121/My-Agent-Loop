@@ -9,7 +9,7 @@
 - [ ] Add startup checks for things like Docker socket being usable, git existing, etc
 - [ ] Record each run of the workflow, its state, and the logs associated with the run
 - [ ] Allow a choice of model per-task
-- [ ] See if Opus can generate a PromiseEither<E, A> class which can be used with async/await
+- [X] See if Opus can generate a PromiseEither<E, A> class which can be used with async/await (NB: It did not do a good job here)
 - [ ] Allow agents to interrogate the task queue and add new tasks
 - [ ] Add ability to use custom base container for the agent
 - [ ] Be a little better about not using API types throughout the application (e.g. TaskId, ProjectId)
@@ -18,6 +18,9 @@
 - [ ] Surface run state to the frontend (and actually track it somewhere usable)
 - [ ] Streamed results for task updates
 - [ ] Add other agent runtimes (Claude Code, Cursor CLI)
+- [ ] Split the create/update dialogs for tasks and projects, or at least wrap them with create/update wrappers to improve typesafety (i.e. remove optional fields from the 'update' variant)
+- [ ] Add sonner for error signaling when request fail
+- [ ] Give TsGo a try, it might make the typecheck loop in watch mode more enjoyable
 
 ## Big features
 

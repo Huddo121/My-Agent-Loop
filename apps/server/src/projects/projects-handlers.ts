@@ -19,6 +19,23 @@ export const projectsHandlers: HonoHandlersFor<
   MyAgentLoopApi["projects"],
   Services
 > = {
+  GET: async (ctx) => {
+    return withNewTransaction(ctx.services.db, async () => {
+      const projects = await ctx.services.projectsService.getAllProjects();
+      return ok(projects);
+    });
+  },
+  POST: async (ctx) => {
+    return withNewTransaction(ctx.services.db, async () => {
+      const project = await ctx.services.projectsService.createProject({
+        name: ctx.body.name,
+        shortCode: ctx.body.shortCode,
+        repositoryUrl: ctx.body.repositoryUrl,
+        workflowConfiguration: ctx.body.workflowConfiguration,
+      });
+      return ok(project);
+    });
+  },
   ":projectId": {
     GET: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
@@ -33,12 +50,15 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     PATCH: async (ctx) => {
+      // TODO: This isn't operating as a proper patch endpoint, update to take a Partial<Project>
       const { projectId } = ctx.hono.req.param();
       return withNewTransaction(ctx.services.db, async () => {
         const project = await ctx.services.projectsService.updateProject({
           id: projectId as ProjectId,
           name: ctx.body.name,
           shortCode: ctx.body.shortCode,
+          repositoryUrl: ctx.body.repositoryUrl,
+          workflowConfiguration: ctx.body.workflowConfiguration,
         });
         if (project === undefined) {
           return notFound();
@@ -104,21 +124,5 @@ export const projectsHandlers: HonoHandlersFor<
         })
         .exhaustive();
     },
-  },
-  GET: async (ctx) => {
-    return withNewTransaction(ctx.services.db, async () => {
-      const projects = await ctx.services.projectsService.getAllProjects();
-      return ok(projects);
-    });
-  },
-  POST: async (ctx) => {
-    return withNewTransaction(ctx.services.db, async () => {
-      const project = await ctx.services.projectsService.createProject({
-        id: crypto.randomUUID() as ProjectId,
-        name: ctx.body.name,
-        shortCode: ctx.body.shortCode,
-      });
-      return ok(project);
-    });
   },
 };

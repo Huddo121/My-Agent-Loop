@@ -1,4 +1,8 @@
-import type { ProjectId, ProjectShortCode } from "@mono/api";
+import type {
+  CreateProjectRequest,
+  ProjectId,
+  UpdateProjectRequest,
+} from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { Project } from "~/types";
@@ -28,15 +32,11 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      name,
-      shortCode,
-    }: {
-      name: string;
-      shortCode: ProjectShortCode;
-    }): Promise<Project> => {
+    mutationFn: async (
+      createProjectRequest: CreateProjectRequest,
+    ): Promise<Project> => {
       const response = await apiClient.projects.POST({
-        body: { name, shortCode },
+        body: createProjectRequest,
       });
       if (response.status === 200) {
         return response.responseBody;
@@ -53,25 +53,20 @@ export function useCreateProject() {
   });
 }
 
-/**
- * Hook to rename an existing project.
- */
-export function useRenameProject() {
+export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       projectId,
-      name,
-      shortCode,
+      updateProjectRequest,
     }: {
       projectId: ProjectId;
-      name: string;
-      shortCode: string;
+      updateProjectRequest: UpdateProjectRequest;
     }): Promise<Project> => {
       const response = await apiClient.projects[":projectId"].PATCH({
         pathParams: { projectId },
-        body: { name, shortCode: shortCode as ProjectShortCode },
+        body: updateProjectRequest,
       });
       if (response.status === 200) {
         return response.responseBody as Project;
@@ -79,10 +74,10 @@ export function useRenameProject() {
       if (response.status === 404) {
         throw new Error("Project not found");
       }
-      throw new Error("Failed to rename project");
+      throw new Error("Failed to update project");
     },
     onSuccess: (updatedProject) => {
-      // Update the projects cache with the renamed project
+      // Update the projects cache with the updated project
       queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
         if (!old) return [updatedProject];
         return old.map((p) =>

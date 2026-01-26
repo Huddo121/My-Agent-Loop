@@ -4,6 +4,14 @@ import type { GitService } from "../git/GitService";
 import type { Task } from "../task-queue";
 import type { Result } from "../utils/Result";
 
+export type OnTaskCompletedAction = "push-branch" | "merge-immediately";
+
+/** This should always be the latest version of the workflow config */
+export type WorkflowConfiguration = {
+  version: "1";
+  onTaskCompleted: OnTaskCompletedAction;
+};
+
 const commitAndPushThenMergeToMaster =
   (gitService: GitService) =>
   async (
@@ -63,12 +71,12 @@ const commitAndPushThenMergeToMaster =
     return { success: true, value: undefined };
   };
 
-const yoloWorkflow = (gitService: GitService): Workflow => ({
-  onTaskCompleted: commitAndPushThenMergeToMaster(gitService),
-});
-
-const reviewWorkflow = (gitService: GitService): Workflow => ({
-  async onTaskCompleted(task, repository) {
+const pushBranch =
+  (gitService: GitService) =>
+  async (
+    task: Task,
+    repository: GitRepository,
+  ): Promise<Result<void, Error>> => {
     // Commit the work
     const commitResult = await gitService.commitRepository(
       repository,
@@ -80,10 +88,7 @@ const reviewWorkflow = (gitService: GitService): Workflow => ({
     // Push it
     const pushResult = await gitService.pushRepository(repository);
     return pushResult;
-  },
-});
-
-export type WorkflowKind = "yolo" | "review";
+  };
 
 export interface Workflow {
   onTaskCompleted(
@@ -95,12 +100,16 @@ export interface Workflow {
 /**
  * For the workflow config, construct the set of callbacks to properly drive that workflow
  */
-export const realiseWorkflowConfig = (
-  workflowKind: WorkflowKind,
+export const realiseWorkflowConfiguration = (
+  workflowConfig: WorkflowConfiguration,
   services: { gitService: GitService },
 ): Workflow => {
-  return match(workflowKind)
-    .with("yolo", () => yoloWorkflow(services.gitService))
-    .with("review", () => reviewWorkflow(services.gitService))
+  const onTaskCompleted = match(workflowConfig.onTaskCompleted)
+    .with("push-branch", () => pushBranch(services.gitService))
+    .with("merge-immediately", () =>
+      commitAndPushThenMergeToMaster(services.gitService),
+    )
     .exhaustive();
+
+  return { onTaskCompleted };
 };

@@ -94,7 +94,7 @@ export function ProjectListItem({
         onClick={() => onSave(project)}
       >
         <PencilIcon className="size-4" />
-        <span className="sr-only">Rename project</span>
+        <span className="sr-only">Edit project</span>
       </Button>
     </div>
   );

@@ -11,6 +11,8 @@ const fromProjectEntity = (
     id: project.id as ProjectId,
     name: project.name,
     shortCode: project.shortCode as ProjectShortCode,
+    repositoryUrl: project.repositoryUrl,
+    workflowConfiguration: project.workflowConfiguration,
   };
 };
 
@@ -42,7 +44,12 @@ export class DatabaseProjectService implements ProjectsService {
     const tx = getTransaction();
     const [newProject] = await tx
       .insert(projectsTable)
-      .values({ name: project.name, shortCode: project.shortCode })
+      .values({
+        name: project.name,
+        shortCode: project.shortCode,
+        repositoryUrl: project.repositoryUrl,
+        workflowConfiguration: project.workflowConfiguration,
+      })
       .returning();
 
     return fromProjectEntity(newProject);
@@ -68,7 +75,12 @@ export class DatabaseProjectService implements ProjectsService {
     const tx = getTransaction();
     const [updatedProject] = await tx
       .update(projectsTable)
-      .set({ name: project.name, shortCode: project.shortCode })
+      .set({
+        name: project.name,
+        shortCode: project.shortCode,
+        repositoryUrl: project.repositoryUrl,
+        workflowConfiguration: project.workflowConfiguration,
+      })
       .where(eq(projectsTable.id, project.id))
       .returning();
 

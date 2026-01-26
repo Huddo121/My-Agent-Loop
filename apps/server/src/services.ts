@@ -47,7 +47,6 @@ const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
-  projectsService,
   gitService,
   sandboxService,
   fileSystemService,

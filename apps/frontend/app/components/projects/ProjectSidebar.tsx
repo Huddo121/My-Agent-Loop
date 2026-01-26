@@ -1,4 +1,8 @@
-import type { ProjectShortCode } from "@mono/api";
+import type {
+  CreateProjectRequest,
+  ProjectId,
+  UpdateProjectRequest,
+} from "@mono/api";
 import { LoaderIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -20,15 +24,11 @@ export type ProjectSidebarProps = {
   projects: Project[];
   selectedProject: Project | null;
   onSelectProject: (project: Project) => void;
-  onCreateProject: (params: {
-    name: string;
-    shortCode: ProjectShortCode;
-  }) => void;
-  onUpdateProject: (params: {
-    projectId: string;
-    name: string;
-    shortCode: string;
-  }) => void;
+  onCreateProject: (createProjectRequest: CreateProjectRequest) => void;
+  onUpdateProject: (
+    projectId: ProjectId,
+    updateProjectRequest: UpdateProjectRequest,
+  ) => void;
   isLoading?: boolean;
 };
 
@@ -50,17 +50,17 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleOpenRenameDialog = (project: Project) => {
-    setDialogMode("rename");
+  const handleOpenUpdateDialog = (project: Project) => {
+    setDialogMode("update");
     setProjectToEdit(project);
     setDialogOpen(true);
   };
 
-  const handleDialogSubmit = (name: string, shortCode: ProjectShortCode) => {
+  const handleDialogSubmit = (createProjectRequest: CreateProjectRequest) => {
     if (dialogMode === "create") {
-      onCreateProject({ name, shortCode });
+      onCreateProject(createProjectRequest);
     } else if (projectToEdit) {
-      onUpdateProject({ projectId: projectToEdit.id, name, shortCode });
+      onUpdateProject(projectToEdit.id, createProjectRequest);
     }
   };
 
@@ -91,7 +91,7 @@ export const ProjectSidebar = ({
                   project={project}
                   isSelected={selectedProject?.id === project.id}
                   onSelect={onSelectProject}
-                  onSave={handleOpenRenameDialog}
+                  onSave={handleOpenUpdateDialog}
                 />
               ))
             )}
@@ -103,6 +103,8 @@ export const ProjectSidebar = ({
           mode={dialogMode}
           initialName={projectToEdit?.name ?? ""}
           initialShortCode={projectToEdit?.shortCode ?? ""}
+          initialRepositoryUrl={projectToEdit?.repositoryUrl ?? ""}
+          initialWorkflowConfiguration={projectToEdit?.workflowConfiguration}
           onSubmit={handleDialogSubmit}
         />
       </SidebarContent>

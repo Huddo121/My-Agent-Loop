@@ -5,6 +5,7 @@ packages:
 onlyBuiltDependencies:
   - cpu-features
   - esbuild
+  - msgpackr-extract
   - msw
   - protobufjs
   - ssh2

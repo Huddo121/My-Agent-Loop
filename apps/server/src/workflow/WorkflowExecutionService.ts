@@ -3,14 +3,14 @@ import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { GitService } from "../git/GitService";
-import type { Project, ProjectsService } from "../projects/ProjectsService";
+import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { absolutePath } from "../utils/absolutePath";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
-import { type Workflow } from "./Workflow";
+import type { Workflow } from "./Workflow";
 
 const formatTaskFile = (task: Task): string => {
   return `# ${task.title}
@@ -27,7 +27,6 @@ ${task.description}
 export class WorkflowExecutionService {
   constructor(
     private readonly taskQueue: TaskQueue,
-    private readonly projectsService: ProjectsService,
     private readonly gitService: GitService,
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,

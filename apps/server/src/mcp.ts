@@ -7,6 +7,8 @@ import { withMcpServices } from "./utils/mcp-service-context";
 const mcpServer = new FastMCP({
   name: "My Agent Loop",
   version: "0.0.1",
+  // FastMCP just kept logging heaps of uses messages about not being able to infer client capabilities during runs,
+  //   so I've silenced these logs. I look forward to the day that this bites me.
   logger: {
     debug(..._args) {},
     error(..._args) {},

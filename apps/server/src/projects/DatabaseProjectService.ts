@@ -12,6 +12,7 @@ const fromProjectEntity = (
     name: project.name,
     shortCode: project.shortCode as ProjectShortCode,
     repositoryUrl: project.repositoryUrl,
+    workflowConfiguration: project.workflowConfiguration,
   };
 };
 
@@ -47,6 +48,7 @@ export class DatabaseProjectService implements ProjectsService {
         name: project.name,
         shortCode: project.shortCode,
         repositoryUrl: project.repositoryUrl,
+        workflowConfiguration: project.workflowConfiguration,
       })
       .returning();
 

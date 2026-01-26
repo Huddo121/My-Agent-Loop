@@ -2,13 +2,14 @@ import type { ProjectId, TaskId } from "@mono/api";
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
 import type { RunId } from "../runs/RunId";
+import type { WorkflowConfiguration } from "../workflow/Workflow";
 
 export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
   name: pg.text().notNull(),
   shortCode: pg.text().notNull().unique(),
   repositoryUrl: pg.text().notNull(),
-  workflowConfiguration: pg.jsonb(),
+  workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
 });
 
 export const tasksTable = pg.pgTable("tasks", {

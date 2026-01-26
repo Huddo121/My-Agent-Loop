@@ -8,8 +8,8 @@ import {
   useCreateProject,
   useCreateTask,
   useProjects,
-  useRenameProject,
   useTasks,
+  useUpdateProject,
 } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
 import type { NewTask, Project, Task } from "~/types";
@@ -44,7 +44,7 @@ export default function ProjectRoute() {
 
   // Mutations for projects
   const createProjectMutation = useCreateProject();
-  const renameProjectMutation = useRenameProject();
+  const renameProjectMutation = useUpdateProject();
 
   // Fetch tasks for the selected project
   const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
@@ -70,7 +70,15 @@ export default function ProjectRoute() {
   );
 
   const handleCreateProject = useCallback(
-    ({ name, shortCode, repositoryUrl }: { name: string; shortCode: ProjectShortCode; repositoryUrl: string }) => {
+    ({
+      name,
+      shortCode,
+      repositoryUrl,
+    }: {
+      name: string;
+      shortCode: ProjectShortCode;
+      repositoryUrl: string;
+    }) => {
       createProjectMutation.mutate(
         { name, shortCode, repositoryUrl },
         {

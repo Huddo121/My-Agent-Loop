@@ -1,4 +1,8 @@
-import type { ProjectId, ProjectShortCode } from "@mono/api";
+import type {
+  CreateProjectRequest,
+  ProjectId,
+  UpdateProjectRequest,
+} from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { Project } from "~/types";
@@ -28,17 +32,11 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      name,
-      shortCode,
-      repositoryUrl,
-    }: {
-      name: string;
-      shortCode: ProjectShortCode;
-      repositoryUrl: string;
-    }): Promise<Project> => {
+    mutationFn: async (
+      createProjectRequest: CreateProjectRequest,
+    ): Promise<Project> => {
       const response = await apiClient.projects.POST({
-        body: { name, shortCode, repositoryUrl },
+        body: createProjectRequest,
       });
       if (response.status === 200) {
         return response.responseBody;
@@ -58,24 +56,20 @@ export function useCreateProject() {
 /**
  * Hook to rename an existing project.
  */
-export function useRenameProject() {
+export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       projectId,
-      name,
-      shortCode,
-      repositoryUrl,
+      updateProjectRequest,
     }: {
       projectId: ProjectId;
-      name: string;
-      shortCode: ProjectShortCode;
-      repositoryUrl: string;
+      updateProjectRequest: UpdateProjectRequest;
     }): Promise<Project> => {
       const response = await apiClient.projects[":projectId"].PATCH({
         pathParams: { projectId },
-        body: { name, shortCode, repositoryUrl },
+        body: updateProjectRequest,
       });
       if (response.status === 200) {
         return response.responseBody as Project;

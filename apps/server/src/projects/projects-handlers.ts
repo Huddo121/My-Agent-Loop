@@ -13,6 +13,7 @@ import { tasksHandlers } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import type { BeginWorkflowError } from "../workflow/BackgroundWorkflowProcessor";
+import type { WorkflowConfiguration } from "../workflow/Workflow";
 
 export const projectsHandlers: HonoHandlersFor<
   ["projects"],
@@ -33,6 +34,7 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     PATCH: async (ctx) => {
+      // TODO: This isn't operating as a proper patch endpoint, update to take a Partial<Project>
       const { projectId } = ctx.hono.req.param();
       return withNewTransaction(ctx.services.db, async () => {
         const project = await ctx.services.projectsService.updateProject({
@@ -40,6 +42,7 @@ export const projectsHandlers: HonoHandlersFor<
           name: ctx.body.name,
           shortCode: ctx.body.shortCode,
           repositoryUrl: ctx.body.repositoryUrl,
+          workflowConfiguration: ctx.body.workflowConfiguration,
         });
         if (project === undefined) {
           return notFound();
@@ -114,11 +117,17 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     return withNewTransaction(ctx.services.db, async () => {
+      const defaultWorkflowConfiguration: WorkflowConfiguration = {
+        version: "1",
+        onTaskCompleted: "push-branch",
+      };
+
       const project = await ctx.services.projectsService.createProject({
-        id: crypto.randomUUID() as ProjectId,
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
         repositoryUrl: ctx.body.repositoryUrl,
+        workflowConfiguration:
+          ctx.body.workflowConfiguration ?? defaultWorkflowConfiguration,
       });
       return ok(project);
     });

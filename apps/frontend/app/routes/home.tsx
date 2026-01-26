@@ -1,4 +1,4 @@
-import type { ProjectShortCode } from "@mono/api";
+import type { CreateProjectRequest } from "@mono/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ProjectDialog } from "~/components/projects";
@@ -38,15 +38,12 @@ export default function Home() {
     }
   }, [projects, isLoadingProjects]);
 
-  const handleCreateProject = (name: string, shortCode: ProjectShortCode, repositoryUrl: string) => {
-    createProjectMutation.mutate(
-      { name, shortCode, repositoryUrl },
-      {
-        onSuccess: (newProject) => {
-          navigate(`/projects/${newProject.id}`, { replace: true });
-        },
+  const handleCreateProject = (createProjectRequest: CreateProjectRequest) => {
+    createProjectMutation.mutate(createProjectRequest, {
+      onSuccess: (newProject) => {
+        navigate(`/projects/${newProject.id}`, { replace: true });
       },
-    );
+    });
   };
 
   // Show loading or redirecting state

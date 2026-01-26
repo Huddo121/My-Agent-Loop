@@ -1,4 +1,8 @@
-import { type ProjectShortCode, shortCodeCodec } from "@mono/api";
+import {
+  type CreateProjectRequest,
+  shortCodeCodec,
+  type WorkflowConfigurationDto,
+} from "@mono/api";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -20,7 +24,8 @@ export type ProjectDialogProps = {
   initialName?: string;
   initialShortCode?: string;
   initialRepositoryUrl?: string;
-  onSubmit: (name: string, shortCode: ProjectShortCode, repositoryUrl: string) => void;
+  initialWorkflowConfiguration?: WorkflowConfigurationDto;
+  onSubmit: (createProjectRequest: CreateProjectRequest) => void;
 };
 
 export function ProjectDialog({
@@ -30,12 +35,18 @@ export function ProjectDialog({
   initialName = "",
   initialShortCode = "",
   initialRepositoryUrl = "",
+  initialWorkflowConfiguration = {
+    version: "1",
+    onTaskCompleted: "push-branch",
+  },
   onSubmit,
 }: ProjectDialogProps) {
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
   const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
+  const [workflowConfiguration, setWorkflowConfiguration] =
+    useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
 
   useEffect(() => {
     if (open) {
@@ -48,11 +59,12 @@ export function ProjectDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
-      onSubmit(
-        name.trim(),
-        shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+      onSubmit({
+        name: name.trim(),
+        shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
         repositoryUrl,
-      );
+        workflowConfiguration,
+      });
       onOpenChange(false);
     }
   };

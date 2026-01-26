@@ -9,6 +9,13 @@ if [ -f /code/.agent-loop/setup.sh ]; then
   echo "Running setup script..."
   source /code/.agent-loop/setup.sh
 
+  SETUP_EXIT_CODE=$?
+
+  if [ $SETUP_EXIT_CODE -ne 0 ]; then
+    echo "Setup script failed with exit code $SETUP_EXIT_CODE"
+    exit $SETUP_EXIT_CODE
+  fi
+
   # Restore shell options and flags, preventing the `setup.sh` from modifying the runtime behaviour of this script (somewhat)
   eval "$SAVED_SHELL_OPTIONS"
   set -$SAVED_FLAGS

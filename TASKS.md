@@ -17,6 +17,7 @@
 - [ ] Clean up pending runs that are too old
 - [ ] Surface run state to the frontend (and actually track it somewhere usable)
 - [ ] Streamed results for task updates
+- [ ] Add other agent runtimes (Claude Code, Cursor CLI)
 
 ## Big features
 

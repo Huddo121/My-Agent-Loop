@@ -70,9 +70,9 @@ export default function ProjectRoute() {
   );
 
   const handleCreateProject = useCallback(
-    ({ name, shortCode }: { name: string; shortCode: ProjectShortCode }) => {
+    ({ name, shortCode, repositoryUrl }: { name: string; shortCode: ProjectShortCode; repositoryUrl: string }) => {
       createProjectMutation.mutate(
-        { name, shortCode },
+        { name, shortCode, repositoryUrl },
         {
           onSuccess: (newProject) => {
             navigate(`/projects/${newProject.id}`);
@@ -89,13 +89,15 @@ export default function ProjectRoute() {
       projectId,
       name,
       shortCode,
+      repositoryUrl,
     }: {
-      projectId: string;
+      projectId: ProjectId;
       name: string;
-      shortCode: string;
+      shortCode: ProjectShortCode;
+      repositoryUrl: string;
     }) => {
       renameProjectMutation.mutate(
-        { projectId: projectId as ProjectId, name, shortCode },
+        { projectId: projectId, name, shortCode, repositoryUrl },
         {
           onSuccess: (updatedProject) => {
             // Navigate to same project ID (the ID doesn't change on rename)

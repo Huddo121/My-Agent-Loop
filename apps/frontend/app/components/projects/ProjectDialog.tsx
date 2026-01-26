@@ -19,7 +19,8 @@ export type ProjectDialogProps = {
   mode: ProjectDialogMode;
   initialName?: string;
   initialShortCode?: string;
-  onSubmit: (name: string, shortCode: ProjectShortCode) => void;
+  initialRepositoryUrl?: string;
+  onSubmit: (name: string, shortCode: ProjectShortCode, repositoryUrl: string) => void;
 };
 
 export function ProjectDialog({
@@ -28,24 +29,29 @@ export function ProjectDialog({
   mode,
   initialName = "",
   initialShortCode = "",
+  initialRepositoryUrl = "",
   onSubmit,
 }: ProjectDialogProps) {
+  // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
+  const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
 
   useEffect(() => {
     if (open) {
       setName(initialName);
       setShortCode(initialShortCode);
+      setRepositoryUrl(initialRepositoryUrl);
     }
-  }, [open, initialName, initialShortCode]);
+  }, [open, initialName, initialShortCode, initialRepositoryUrl]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && shortCode.trim()) {
+    if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
       onSubmit(
         name.trim(),
         shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+        repositoryUrl,
       );
       onOpenChange(false);
     }
@@ -80,6 +86,21 @@ export function ProjectDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="repository-url"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Repository URL
+              </label>
+              <Input
+                id="repository-url"
+                placeholder="git@github.com/something/amazing.git"
+                value={repositoryUrl}
+                onChange={(e) => setRepositoryUrl(e.target.value)}
                 className="mt-1"
               />
             </div>

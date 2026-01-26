@@ -7,6 +7,8 @@ export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
   name: pg.text().notNull(),
   shortCode: pg.text().notNull().unique(),
+  repositoryUrl: pg.text().notNull(),
+  workflowConfiguration: pg.jsonb(),
 });
 
 export const tasksTable = pg.pgTable("tasks", {

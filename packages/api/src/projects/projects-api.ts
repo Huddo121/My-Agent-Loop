@@ -9,18 +9,21 @@ export const projectDtoSchema = z.object({
   id: projectIdSchema,
   name: z.string(),
   shortCode: shortCodeCodec,
+  repositoryUrl: z.string(),
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
 
 export const createProjectRequestSchema = z.object({
   name: z.string(),
   shortCode: shortCodeCodec,
+  repositoryUrl: z.string(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
 export const updateProjectRequestSchema = z.object({
   name: z.string(),
   shortCode: shortCodeCodec,
+  repositoryUrl: z.string(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 

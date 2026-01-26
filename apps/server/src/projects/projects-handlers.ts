@@ -39,6 +39,7 @@ export const projectsHandlers: HonoHandlersFor<
           id: projectId as ProjectId,
           name: ctx.body.name,
           shortCode: ctx.body.shortCode,
+          repositoryUrl: ctx.body.repositoryUrl,
         });
         if (project === undefined) {
           return notFound();
@@ -117,6 +118,7 @@ export const projectsHandlers: HonoHandlersFor<
         id: crypto.randomUUID() as ProjectId,
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
+        repositoryUrl: ctx.body.repositoryUrl,
       });
       return ok(project);
     });

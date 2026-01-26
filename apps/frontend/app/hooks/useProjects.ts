@@ -31,12 +31,14 @@ export function useCreateProject() {
     mutationFn: async ({
       name,
       shortCode,
+      repositoryUrl,
     }: {
       name: string;
       shortCode: ProjectShortCode;
+      repositoryUrl: string;
     }): Promise<Project> => {
       const response = await apiClient.projects.POST({
-        body: { name, shortCode },
+        body: { name, shortCode, repositoryUrl },
       });
       if (response.status === 200) {
         return response.responseBody;
@@ -64,14 +66,16 @@ export function useRenameProject() {
       projectId,
       name,
       shortCode,
+      repositoryUrl,
     }: {
       projectId: ProjectId;
       name: string;
-      shortCode: string;
+      shortCode: ProjectShortCode;
+      repositoryUrl: string;
     }): Promise<Project> => {
       const response = await apiClient.projects[":projectId"].PATCH({
         pathParams: { projectId },
-        body: { name, shortCode: shortCode as ProjectShortCode },
+        body: { name, shortCode, repositoryUrl },
       });
       if (response.status === 200) {
         return response.responseBody as Project;

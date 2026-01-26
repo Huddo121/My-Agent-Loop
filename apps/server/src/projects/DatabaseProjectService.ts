@@ -11,6 +11,7 @@ const fromProjectEntity = (
     id: project.id as ProjectId,
     name: project.name,
     shortCode: project.shortCode as ProjectShortCode,
+    repositoryUrl: project.repositoryUrl,
   };
 };
 
@@ -42,7 +43,11 @@ export class DatabaseProjectService implements ProjectsService {
     const tx = getTransaction();
     const [newProject] = await tx
       .insert(projectsTable)
-      .values({ name: project.name, shortCode: project.shortCode })
+      .values({
+        name: project.name,
+        shortCode: project.shortCode,
+        repositoryUrl: project.repositoryUrl,
+      })
       .returning();
 
     return fromProjectEntity(newProject);

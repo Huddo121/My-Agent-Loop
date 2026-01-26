@@ -1,4 +1,4 @@
-import type { ProjectShortCode } from "@mono/api";
+import type { ProjectId, ProjectShortCode } from "@mono/api";
 import { LoaderIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -23,11 +23,13 @@ export type ProjectSidebarProps = {
   onCreateProject: (params: {
     name: string;
     shortCode: ProjectShortCode;
+    repositoryUrl: string;
   }) => void;
   onUpdateProject: (params: {
-    projectId: string;
+    projectId: ProjectId;
     name: string;
-    shortCode: string;
+    shortCode: ProjectShortCode;
+    repositoryUrl: string;
   }) => void;
   isLoading?: boolean;
 };
@@ -56,11 +58,11 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleDialogSubmit = (name: string, shortCode: ProjectShortCode) => {
+  const handleDialogSubmit = (name: string, shortCode: ProjectShortCode, repositoryUrl: string) => {
     if (dialogMode === "create") {
-      onCreateProject({ name, shortCode });
+      onCreateProject({ name, shortCode, repositoryUrl });
     } else if (projectToEdit) {
-      onUpdateProject({ projectId: projectToEdit.id, name, shortCode });
+      onUpdateProject({ projectId: projectToEdit.id, name, shortCode, repositoryUrl });
     }
   };
 
@@ -103,6 +105,7 @@ export const ProjectSidebar = ({
           mode={dialogMode}
           initialName={projectToEdit?.name ?? ""}
           initialShortCode={projectToEdit?.shortCode ?? ""}
+          initialRepositoryUrl={projectToEdit?.repositoryUrl ?? ""}
           onSubmit={handleDialogSubmit}
         />
       </SidebarContent>

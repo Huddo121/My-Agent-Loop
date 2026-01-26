@@ -38,9 +38,9 @@ export default function Home() {
     }
   }, [projects, isLoadingProjects]);
 
-  const handleCreateProject = (name: string, shortCode: ProjectShortCode) => {
+  const handleCreateProject = (name: string, shortCode: ProjectShortCode, repositoryUrl: string) => {
     createProjectMutation.mutate(
-      { name, shortCode },
+      { name, shortCode, repositoryUrl },
       {
         onSuccess: (newProject) => {
           navigate(`/projects/${newProject.id}`, { replace: true });

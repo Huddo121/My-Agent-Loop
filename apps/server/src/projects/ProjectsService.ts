@@ -4,6 +4,7 @@ export interface Project {
   id: ProjectId;
   name: string;
   shortCode: ProjectShortCode;
+  repositoryUrl: string;
 }
 
 export interface ProjectsService {

@@ -151,15 +151,17 @@ export function ProjectDialog({
                 className="mt-1 font-mono"
               />
             </div>
+            <hr />
+            <h2 className="text-lg font-medium mb-1">Workflow Configuration</h2>
             <div>
               <label
                 htmlFor="on-task-completed"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                On Task Completed
+                Task Completed
               </label>
               <p className="text-xs text-muted-foreground mt-1">
-                What action to take when a task is completed.
+                What action to take when an agent completes a task.
               </p>
               <Select
                 value={workflowConfiguration.onTaskCompleted}
@@ -174,15 +176,17 @@ export function ProjectDialog({
                   <SelectValue placeholder="Select action" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="push-branch">Push Branch</SelectItem>
+                  <SelectItem value="push-branch">
+                    <p>Push task branch for review</p>
+                  </SelectItem>
                   <SelectItem value="merge-immediately">
-                    Merge Immediately
+                    <p>Merge task branch immediately</p>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button
               type="button"
               variant="outline"

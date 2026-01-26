@@ -20,6 +20,7 @@
 - [ ] Add other agent runtimes (Claude Code, Cursor CLI)
 - [ ] Split the create/update dialogs for tasks and projects, or at least wrap them with create/update wrappers to improve typesafety (i.e. remove optional fields from the 'update' variant)
 - [ ] Add sonner for error signaling when request fail
+- [ ] Give TsGo a try, it might make the typecheck loop in watch mode more enjoyable
 
 ## Big features
 

@@ -1,4 +1,9 @@
-import type { ProjectId, ProjectShortCode, TaskId } from "@mono/api";
+import type {
+  CreateProjectRequest,
+  ProjectId,
+  TaskId,
+  UpdateProjectRequest,
+} from "@mono/api";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AppLayout } from "~/components/layout";
@@ -70,42 +75,21 @@ export default function ProjectRoute() {
   );
 
   const handleCreateProject = useCallback(
-    ({
-      name,
-      shortCode,
-      repositoryUrl,
-    }: {
-      name: string;
-      shortCode: ProjectShortCode;
-      repositoryUrl: string;
-    }) => {
-      createProjectMutation.mutate(
-        { name, shortCode, repositoryUrl },
-        {
-          onSuccess: (newProject) => {
-            navigate(`/projects/${newProject.id}`);
-            setLocalTaskOrder(null);
-          },
+    (createProjectRequest: CreateProjectRequest) => {
+      createProjectMutation.mutate(createProjectRequest, {
+        onSuccess: (newProject) => {
+          navigate(`/projects/${newProject.id}`);
+          setLocalTaskOrder(null);
         },
-      );
+      });
     },
     [createProjectMutation, navigate],
   );
 
-  const handleRenameProject = useCallback(
-    ({
-      projectId,
-      name,
-      shortCode,
-      repositoryUrl,
-    }: {
-      projectId: ProjectId;
-      name: string;
-      shortCode: ProjectShortCode;
-      repositoryUrl: string;
-    }) => {
+  const handleUpdateProject = useCallback(
+    (projectId: ProjectId, updateProjectRequest: UpdateProjectRequest) => {
       renameProjectMutation.mutate(
-        { projectId: projectId, name, shortCode, repositoryUrl },
+        { projectId, updateProjectRequest },
         {
           onSuccess: (updatedProject) => {
             // Navigate to same project ID (the ID doesn't change on rename)
@@ -159,7 +143,7 @@ export default function ProjectRoute() {
           selectedProject={selectedProject}
           onSelectProject={handleSelectProject}
           onCreateProject={handleCreateProject}
-          onUpdateProject={handleRenameProject}
+          onUpdateProject={handleUpdateProject}
           isLoading={isLoadingProjects}
         />
       }

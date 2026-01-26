@@ -10,7 +10,7 @@
 
 ## Smaller features
 
-- [ ] Actually use the Projects and Runs APIs/Models
+- [X] Actually use the Projects and Runs APIs/Models
 - [ ] Use AsyncLocalStorage to add some logging context, create new contexts for each task
 - [ ] Refactor SandboxService to lean more on reusable helpers than it currently does
 - [ ] Update all service methods to return Result types with typed failures other than Error

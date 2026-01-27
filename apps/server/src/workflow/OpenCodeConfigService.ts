@@ -39,37 +39,13 @@ const baseConfig: Config = {
  */
 export class OpenCodeConfigService {
   /**
-   * Generates a project-scoped OpenCode configuration.
-   *
-   * @param projectId The project ID to scope MCP tool access to
-   * @returns The OpenCode configuration object
-   */
-  generateConfig(projectId: ProjectId): Config {
-    const mcpServerConfig: McpRemoteConfig = {
-      enabled: true,
-      type: "remote",
-      url: "http://host.docker.internal:3050/mcp",
-      headers: {
-        [MAL_PROJECT_ID_HEADER]: projectId,
-      },
-    };
-
-    return {
-      ...baseConfig,
-      mcp: {
-        "my-agent-loop-tools": mcpServerConfig,
-      },
-    };
-  }
-
-  /**
-   * Generates a project and task-scoped OpenCode configuration.
+   * Generates OpenCode configuration.
    *
    * @param projectId The project ID to scope MCP tool access to
    * @param taskId The task ID to scope MCP tool access to
    * @returns The OpenCode configuration object
    */
-  generateConfigWithTask(projectId: ProjectId, taskId: TaskId): Config {
+  generateConfig(projectId: ProjectId, taskId: TaskId): Config {
     const mcpServerConfig: McpRemoteConfig = {
       enabled: true,
       type: "remote",

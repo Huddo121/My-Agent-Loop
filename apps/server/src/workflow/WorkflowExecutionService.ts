@@ -87,8 +87,10 @@ export class WorkflowExecutionService {
       taskTempDirectory,
       "opencode.json",
     );
+
     const openCodeConfig = this.openCodeConfigService.generateConfig(
       project.id,
+      task.id,
     );
     fs.writeFileSync(
       openCodeConfigPath,

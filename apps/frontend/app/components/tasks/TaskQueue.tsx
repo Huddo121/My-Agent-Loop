@@ -141,8 +141,8 @@ export function TaskQueue({
 
       moveRequest = {
         method: "relative",
-        after: afterTask.id as TaskId,
-        before: beforeTask.id as TaskId,
+        after: afterTask.id,
+        before: beforeTask.id,
       };
     }
 

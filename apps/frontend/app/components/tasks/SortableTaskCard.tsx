@@ -22,13 +22,11 @@ export function SortableTaskCard({
     transform,
     transition,
     isDragging,
-    isSorting,
   } = useSortable({ id: task.id });
 
   const style = {
-    // Only apply transform while actively sorting to prevent flash on drop
-    transform: isSorting ? CSS.Transform.toString(transform) : undefined,
-    transition: isSorting ? transition : undefined,
+    transform: CSS.Transform.toString(transform),
+    transition: transition,
   };
 
   return (

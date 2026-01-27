@@ -16,7 +16,7 @@ const POSITION_GAP = 128;
 
 const fromTaskEntity = (task: typeof tasksTable.$inferSelect): Task => {
   return {
-    id: task.id as TaskId,
+    id: task.id,
     title: task.title,
     description: task.description,
     completedOn: task.completedOn ?? undefined,

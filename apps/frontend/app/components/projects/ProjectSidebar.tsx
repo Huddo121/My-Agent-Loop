@@ -81,7 +81,7 @@ export const ProjectSidebar = ({
       <SidebarFooter className="items-end border-t">
         <Tooltip>
           <TooltipContent>
-            <Kbd>Ctrl+B</Kbd>
+            <Kbd>Ctrl + B</Kbd>
           </TooltipContent>
           <TooltipTrigger asChild>
             <SidebarTrigger />

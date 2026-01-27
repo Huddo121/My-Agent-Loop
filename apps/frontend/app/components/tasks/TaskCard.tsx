@@ -1,5 +1,5 @@
 import type { ProjectId } from "@mono/api";
-import { CheckCircle2Icon, Edit2Icon, GripVerticalIcon } from "lucide-react";
+import { CheckCircle2Icon } from "lucide-react";
 import { forwardRef } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -12,7 +12,7 @@ export type TaskCardProps = {
   projectId: ProjectId;
   isDragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
-  onEdit?: (task: Task) => void;
+  onEdit: (task: Task) => void;
 };
 
 export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
@@ -31,57 +31,41 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
 
     return (
       <Card
+        {...dragHandleProps}
         ref={ref}
         className={cn(
-          "transition-shadow",
+          "transition-shadow w-[240px] py-0 gap-0 cursor-pointer",
           isDragging && "shadow-lg ring-2 ring-primary/20",
           isCompleted && "opacity-60",
         )}
+        onClick={() => {
+          onEdit(task)
+        }}
       >
-        <CardContent className="flex items-start gap-3 py-3 px-4">
-          <div
-            {...dragHandleProps}
-            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors mt-0.5"
-          >
-            <GripVerticalIcon className="size-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              {isCompleted && (
-                <CheckCircle2Icon className="size-4 text-green-600 shrink-0" />
+        <CardContent className="flex gap-2 py-2 px-3">
+          <div className="flex-1 min-w-0 flex gap-2">
+            <h3
+              className={cn(
+                "font-medium text-sm",
+                isCompleted && "line-through text-muted-foreground",
               )}
-              <h3
-                className={cn(
-                  "font-medium text-sm truncate",
-                  isCompleted && "line-through text-muted-foreground",
-                )}
-              >
-                {task.title}
-              </h3>
-            </div>
-            {task.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                {task.description}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => onEdit?.(task)}
-              className="shrink-0 mt-0.5"
-              title="Edit task"
             >
-              <Edit2Icon className="size-4" />
-            </Button>
+              {task.title}
+            </h3>
+          </div>
+          <div className="w-[32px]">
             {!isCompleted && (
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={handleCompleteTask}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  handleCompleteTask()
+                }}
                 disabled={completeTask.isPending}
-                className="shrink-0 mt-0.5"
+                className="shrink-0 rounded-lg"
                 title="Mark as completed"
               >
                 <CheckCircle2Icon className="size-4" />

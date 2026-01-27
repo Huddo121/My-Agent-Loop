@@ -15,11 +15,10 @@ import {
 } from "@dnd-kit/sortable";
 import type { UpdateProjectRequest } from "@mono/api";
 import {
-  LoaderIcon,
-  PencilIcon,
-  PlayIcon,
+  LoaderIcon, PlayIcon,
   PlusIcon,
   RepeatIcon,
+  SettingsIcon
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -70,7 +69,11 @@ export function TaskQueue({
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8
+      }
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -114,7 +117,7 @@ export function TaskQueue({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b px-6 py-4">
+      <div className="flex items-center justify-between border-b px-6 py-4 gap-2">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-xl font-semibold">{project.name}</h1>
@@ -124,15 +127,15 @@ export function TaskQueue({
           </div>
           <div className="flex items-center gap-2">
             <Tooltip>
-              <TooltipContent>Edit project</TooltipContent>
+              <TooltipContent>Project settings</TooltipContent>
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
                   size="icon-sm"
                   onClick={() => setProjectDialogOpen(true)}
                 >
-                  <PencilIcon className="size-4" />
-                  <span className="sr-only">Edit project</span>
+                  <SettingsIcon className="size-4" />
+                  <span className="sr-only">Project settings</span>
                 </Button>
               </TooltipTrigger>
             </Tooltip>
@@ -168,12 +171,18 @@ export function TaskQueue({
             </ButtonGroup>
           </div>
         </div>
-        <Button onClick={() => setTaskDialogOpen(true)}>
-          <PlusIcon className="size-4" />
-          Add Task
-        </Button>
+        <Tooltip>
+          <TooltipContent>Add task</TooltipContent>
+          <TooltipTrigger asChild>
+            <Button onClick={() => setTaskDialogOpen(true)}>
+              <PlusIcon className="size-4" />
+              <span className="hidden md:inline">
+                Add Task
+              </span>
+            </Button></TooltipTrigger>
+        </Tooltip>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-full">
         <div className="p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">

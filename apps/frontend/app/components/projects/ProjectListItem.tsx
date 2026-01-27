@@ -51,14 +51,14 @@ export function ProjectListItem({
           <Button
             type="button"
             variant="ghost"
-            className="flex-1 truncate px-3 py-2 text-left justify-start text-sm font-medium"
+            className="flex-1 min-w-0 truncate px-3 py-2 text-left justify-start text-sm font-medium"
             onClick={() => onSelect(project)}
           >
-            <div className="flex gap-2 items-baseline">
-              <span className="text-xs text-muted-foreground font-mono">
+            <div className="flex gap-2 items-baseline min-w-0">
+              <span className="text-xs text-muted-foreground font-mono shrink-0">
                 {project.shortCode}
               </span>
-              <span className="truncate text-ellipsis">{project.name}</span>
+              <span className="truncate">{project.name}</span>
             </div>
           </Button>
         </TooltipTrigger>

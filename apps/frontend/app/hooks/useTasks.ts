@@ -137,6 +137,7 @@ export function useUpdateTask(projectId: ProjectId | null) {
 
 /**
  * Hook to move a task within the queue.
+ * Supports optimistic updates with rollback on failure.
  */
 export function useMoveTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
@@ -148,6 +149,7 @@ export function useMoveTask(projectId: ProjectId | null) {
     }: {
       taskId: TaskId;
       request: MoveTaskRequest;
+      optimisticTasks: Task[];
     }): Promise<Task> => {
       if (!projectId) {
         throw new Error("No project selected");
@@ -168,9 +170,35 @@ export function useMoveTask(projectId: ProjectId | null) {
       }
       throw new Error("Failed to move task");
     },
-    onSuccess: () => {
+    onMutate: async ({ optimisticTasks }) => {
       if (!projectId) return;
-      // Invalidate the tasks query to refetch the updated order
+
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey(projectId) });
+
+      // Snapshot the previous value for potential rollback
+      const previousTasks = queryClient.getQueryData<Task[]>(
+        tasksQueryKey(projectId),
+      );
+
+      // Update the cache with the optimistic value
+      queryClient.setQueryData<Task[]>(
+        tasksQueryKey(projectId),
+        optimisticTasks,
+      );
+
+      return { previousTasks };
+    },
+    onError: (_err, _variables, context) => {
+      if (!projectId) return;
+      // Roll back to the previous value on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData<Task[]>(
+          tasksQueryKey(projectId),
+          context.previousTasks,
+        );
+      }
+      // Refetch to ensure we're in sync with the server after an error
       queryClient.invalidateQueries({ queryKey: tasksQueryKey(projectId) });
     },
   });

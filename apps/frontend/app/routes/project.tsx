@@ -12,7 +12,7 @@ import {
   useTasks,
 } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
-import type { NewTask, Project } from "~/types";
+import type { NewTask, Project, Task } from "~/types";
 
 export function meta() {
   return [
@@ -78,8 +78,8 @@ export default function ProjectRoute() {
   );
 
   const handleMoveTask = useCallback(
-    (taskId: TaskId, request: MoveTaskRequest) => {
-      moveTaskMutation.mutate({ taskId, request });
+    (taskId: TaskId, request: MoveTaskRequest, optimisticTasks: Task[]) => {
+      moveTaskMutation.mutate({ taskId, request, optimisticTasks });
     },
     [moveTaskMutation],
   );

@@ -8,6 +8,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -20,7 +21,7 @@ import {
   RepeatIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
@@ -38,7 +39,11 @@ import { TaskDialog } from "./TaskDialog";
 export type TaskQueueProps = {
   project: Project;
   tasks: Task[];
-  onMoveTask: (taskId: TaskId, request: MoveTaskRequest) => void;
+  onMoveTask: (
+    taskId: TaskId,
+    request: MoveTaskRequest,
+    optimisticTasks: Task[],
+  ) => void;
   onAddTask: (task: NewTask) => void;
   onUpdateTask: (taskId: string, task: UpdateTask) => void;
   isLoading?: boolean;
@@ -46,12 +51,23 @@ export type TaskQueueProps = {
 
 export function TaskQueue({
   project,
-  tasks,
+  tasks: tasksProp,
   onMoveTask,
   onAddTask,
   onUpdateTask,
   isLoading = false,
 }: TaskQueueProps) {
+  // Local state for optimistic updates - this updates synchronously on drag end
+  const [localTasks, setLocalTasks] = useState(tasksProp);
+
+  // Sync local state when prop changes (e.g., from server refetch or other updates)
+  useEffect(() => {
+    setLocalTasks(tasksProp);
+  }, [tasksProp]);
+
+  // Use local tasks for rendering
+  const tasks = localTasks;
+
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
@@ -89,17 +105,18 @@ export function TaskQueue({
     const oldIndex = tasks.findIndex((t) => t.id === active.id);
     const overIndex = tasks.findIndex((t) => t.id === over.id);
 
-    // Calculate the new index after the move
-    // If moving down, the task goes after the target; if moving up, it goes before
-    const newIndex = oldIndex < overIndex ? overIndex : overIndex;
+    // Calculate the optimistically reordered tasks and update local state
+    // synchronously to prevent visual flash
+    const optimisticTasks = arrayMove(tasks, oldIndex, overIndex);
+    setLocalTasks(optimisticTasks);
 
     // Determine the move request based on the new position
     let moveRequest: MoveTaskRequest;
 
-    if (newIndex === 0) {
+    if (overIndex === 0) {
       // Moving to first position
       moveRequest = { method: "absolute", position: "first" };
-    } else if (newIndex === tasks.length - 1) {
+    } else if (overIndex === tasks.length - 1) {
       // Moving to last position
       moveRequest = { method: "absolute", position: "last" };
     } else {
@@ -129,7 +146,7 @@ export function TaskQueue({
       };
     }
 
-    onMoveTask(taskId, moveRequest);
+    onMoveTask(taskId, moveRequest, optimisticTasks);
   };
 
   const handleAddTask = (newTask: NewTask) => {

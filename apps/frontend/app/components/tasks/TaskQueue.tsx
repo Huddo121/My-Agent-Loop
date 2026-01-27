@@ -15,10 +15,11 @@ import {
 } from "@dnd-kit/sortable";
 import type { UpdateProjectRequest } from "@mono/api";
 import {
-  LoaderIcon, PlayIcon,
+  LoaderIcon,
+  PlayIcon,
   PlusIcon,
   RepeatIcon,
-  SettingsIcon
+  SettingsIcon,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -71,8 +72,8 @@ export function TaskQueue({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8
-      }
+        distance: 8,
+      },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -154,7 +155,8 @@ export function TaskQueue({
                 </TooltipTrigger>
                 <TooltipContent>Start next task</TooltipContent>
               </Tooltip>
-              {project.workflowConfiguration.onTaskCompleted === "merge-immediately" && (
+              {project.workflowConfiguration.onTaskCompleted ===
+                "merge-immediately" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -168,7 +170,8 @@ export function TaskQueue({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Start looping over tasks</TooltipContent>
-                </Tooltip>)}
+                </Tooltip>
+              )}
             </ButtonGroup>
           </div>
         </div>
@@ -177,10 +180,9 @@ export function TaskQueue({
           <TooltipTrigger asChild>
             <Button onClick={() => setTaskDialogOpen(true)}>
               <PlusIcon className="size-4" />
-              <span className="hidden md:inline">
-                Add Task
-              </span>
-            </Button></TooltipTrigger>
+              <span className="hidden md:inline">Add Task</span>
+            </Button>
+          </TooltipTrigger>
         </Tooltip>
       </div>
       <ScrollArea className="min-h-full">

@@ -23,7 +23,7 @@ export const tasksTable = pg.pgTable("tasks", {
   createdAt: pg.timestamp().notNull().defaultNow(),
   completedOn: pg.timestamp(),
   /** Where does this task appear in the queue? Only relevant for non-completed tasks. */
-  position: pg.bigint({ mode: "number" }),
+  position: pg.doublePrecision(),
 });
 
 export const runStateEnum = pg.pgEnum("run_state", [

@@ -39,7 +39,7 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
           isCompleted && "opacity-60",
         )}
         onClick={() => {
-          onEdit(task)
+          onEdit(task);
         }}
       >
         <CardContent className="flex gap-2 py-2 px-3">
@@ -62,7 +62,7 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
                   e.preventDefault();
                   e.stopPropagation();
 
-                  handleCompleteTask()
+                  handleCompleteTask();
                 }}
                 disabled={completeTask.isPending}
                 className="shrink-0 rounded-lg"

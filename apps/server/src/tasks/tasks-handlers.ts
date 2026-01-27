@@ -78,7 +78,7 @@ export const tasksHandlers: HonoHandlersFor<
       return [200, completedTask];
     },
     move: async (ctx) => {
-      const { projectId, taskId } = ctx.hono.req.param();
+      const { taskId } = ctx.hono.req.param();
 
       const movedTask = await withNewTransaction(ctx.services.db, () =>
         ctx.services.taskQueue.moveTask(taskId as TaskId, ctx.body),

@@ -2,7 +2,7 @@
 
 ## Smaller features
 
-- [ ] Actually use the Projects and Runs APIs/Models
+- [X] Actually use the Projects and Runs APIs/Models
 - [ ] Use AsyncLocalStorage to add some logging context, create new contexts for each task
 - [ ] Refactor SandboxService to lean more on reusable helpers than it currently does
 - [ ] Update all service methods to return Result types with typed failures other than Error
@@ -21,6 +21,7 @@
 - [ ] Split the create/update dialogs for tasks and projects, or at least wrap them with create/update wrappers to improve typesafety (i.e. remove optional fields from the 'update' variant)
 - [ ] Add sonner for error signaling when request fail
 - [ ] Give TsGo a try, it might make the typecheck loop in watch mode more enjoyable
+- [ ] Add a command palette
 
 ## Big features
 

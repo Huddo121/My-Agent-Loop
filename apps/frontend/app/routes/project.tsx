@@ -1,9 +1,4 @@
-import type {
-  CreateProjectRequest,
-  ProjectId,
-  TaskId,
-  UpdateProjectRequest,
-} from "@mono/api";
+import type { CreateProjectRequest, TaskId } from "@mono/api";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AppLayout } from "~/components/layout";
@@ -14,7 +9,6 @@ import {
   useCreateTask,
   useProjects,
   useTasks,
-  useUpdateProject,
 } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
 import type { NewTask, Project, Task } from "~/types";
@@ -49,7 +43,6 @@ export default function ProjectRoute() {
 
   // Mutations for projects
   const createProjectMutation = useCreateProject();
-  const updateProjectMutation = useUpdateProject();
 
   // Fetch tasks for the selected project
   const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
@@ -84,23 +77,6 @@ export default function ProjectRoute() {
       });
     },
     [createProjectMutation, navigate],
-  );
-
-  const handleUpdateProject = useCallback(
-    (projectId: ProjectId, updateProjectRequest: UpdateProjectRequest) => {
-      updateProjectMutation.mutate(
-        { projectId, updateProjectRequest },
-        {
-          onSuccess: (updatedProject) => {
-            // Navigate to same project ID (the ID doesn't change on update)
-            if (selectedProject?.id === updatedProject.id) {
-              navigate(`/projects/${updatedProject.id}`, { replace: true });
-            }
-          },
-        },
-      );
-    },
-    [updateProjectMutation, selectedProject, navigate],
   );
 
   const handleTasksReorder = useCallback((tasks: Task[]) => {
@@ -143,7 +119,6 @@ export default function ProjectRoute() {
           selectedProject={selectedProject}
           onSelectProject={handleSelectProject}
           onCreateProject={handleCreateProject}
-          onUpdateProject={handleUpdateProject}
           isLoading={isLoadingProjects}
         />
       }

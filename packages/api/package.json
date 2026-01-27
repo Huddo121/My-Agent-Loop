@@ -16,7 +16,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "cerato": "0.0.2",
+    "cerato": "0.0.4",
     "zod": "4.3.5"
   }
 }

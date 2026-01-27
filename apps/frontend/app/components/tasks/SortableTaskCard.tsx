@@ -7,7 +7,7 @@ import { TaskCard } from "./TaskCard";
 export type SortableTaskCardProps = {
   task: Task;
   projectId: ProjectId;
-  onEdit?: (task: Task) => void;
+  onEdit: (task: Task) => void;
 };
 
 export function SortableTaskCard({

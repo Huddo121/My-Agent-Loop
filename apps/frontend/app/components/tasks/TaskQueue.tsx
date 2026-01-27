@@ -149,25 +149,26 @@ export function TaskQueue({
                     disabled={startRunMutation.isPending}
                   >
                     <PlayIcon className="size-4" />
-                    <span className="sr-only">Start single run</span>
+                    <span className="sr-only">Start next task</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Start single run</TooltipContent>
+                <TooltipContent>Start next task</TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => handleStartRun("loop")}
-                    disabled={startRunMutation.isPending}
-                  >
-                    <RepeatIcon className="size-4" />
-                    <span className="sr-only">Start loop run</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Start loop run</TooltipContent>
-              </Tooltip>
+              {project.workflowConfiguration.onTaskCompleted === "merge-immediately" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => handleStartRun("loop")}
+                      disabled={startRunMutation.isPending}
+                    >
+                      <RepeatIcon className="size-4" />
+                      <span className="sr-only">Start looping over tasks</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Start looping over tasks</TooltipContent>
+                </Tooltip>)}
             </ButtonGroup>
           </div>
         </div>

@@ -3,9 +3,10 @@ import {
   notFound,
   ok,
   type ProjectId,
+  type RunFailureResponse,
   runIdSchema,
 } from "@mono/api";
-import type { HonoHandlersFor } from "cerato";
+import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
 import type { RunId } from "../runs/RunId";
 import type { Services } from "../services";
@@ -86,7 +87,12 @@ export const projectsHandlers: HonoHandlersFor<
       const result = await withNewTransaction(
         ctx.services.db,
         async (): Promise<
-          Result<RunId, BeginWorkflowError | { reason: "project-not-found" }>
+          Result<
+            RunId,
+            | BeginWorkflowError
+            | RunFailureResponse
+            | { reason: "project-not-found" }
+          >
         > => {
           const project = await ctx.services.projectsService.getProject(
             projectId as ProjectId,
@@ -94,6 +100,16 @@ export const projectsHandlers: HonoHandlersFor<
 
           if (project === undefined) {
             return { success: false, error: { reason: "project-not-found" } };
+          }
+
+          if (
+            project.workflowConfiguration.onTaskCompleted === "push-branch" &&
+            mode === "loop"
+          ) {
+            return {
+              success: false,
+              error: { reason: "cannot-loop-with-review-workflow" },
+            };
           }
 
           return ctx.services.backgroundWorkflowProcessor.queueNextTask(
@@ -108,12 +124,18 @@ export const projectsHandlers: HonoHandlersFor<
       }
 
       return match(result.error)
+        .returnType<
+          // TODO: Fix this verbose monstrosity in Cerato
+          ResponsesForEndpoint<
+            MyAgentLoopApi["projects"]["children"][":projectId"]["children"]["run"]
+          >
+        >()
         .with({ reason: "no-tasks-available" }, () => {
           console.warn(
             "Can not start workflow because no tasks are available",
             { projectId },
           );
-          return notFound("No tasks are available to process");
+          return [400, { reason: "no-tasks-available" }] as const;
         })
         .with({ reason: "project-not-found" }, () => {
           console.warn(
@@ -121,6 +143,13 @@ export const projectsHandlers: HonoHandlersFor<
             { projectId },
           );
           return notFound("The project could not be found");
+        })
+        .with({ reason: "cannot-loop-with-review-workflow" }, () => {
+          console.warn(
+            "Can not start workflow because the project is configured to use a review workflow",
+            { projectId },
+          );
+          return [400, { reason: "cannot-loop-with-review-workflow" }] as const;
         })
         .exhaustive();
     },

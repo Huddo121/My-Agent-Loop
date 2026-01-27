@@ -42,6 +42,11 @@ export const runStartedResponseSchema = z.object({
 });
 export type RunStartedResponse = z.infer<typeof runStartedResponseSchema>;
 
+export const runFailureResponseSchema = z.object({
+  reason: z.literal(["no-tasks-available", "cannot-loop-with-review-workflow"]),
+});
+export type RunFailureResponse = z.infer<typeof runFailureResponseSchema>;
+
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
   POST: Endpoint.post()
@@ -64,6 +69,7 @@ export const projectsApi = Endpoint.multi({
         run: Endpoint.post()
           .input(startRunRequestSchema)
           .output(200, runStartedResponseSchema)
+          .output(400, runFailureResponseSchema)
           .output(404, notFoundSchema),
       },
     }),

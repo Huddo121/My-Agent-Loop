@@ -30,7 +30,7 @@
     "@mono/api": "workspace:*",
     "@types/pg": "8.16.0",
     "bullmq": "5.67.1",
-    "cerato": "0.0.2",
+    "cerato": "0.0.4",
     "dockerode": "4.0.9",
     "dotenv": "17.2.3",
     "drizzle-kit": "0.31.8",

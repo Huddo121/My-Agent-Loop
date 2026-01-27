@@ -91,7 +91,7 @@ export const ProjectSidebar = ({
                   project={project}
                   isSelected={selectedProject?.id === project.id}
                   onSelect={onSelectProject}
-                  onSave={handleOpenUpdateDialog}
+                  onEditPressed={handleOpenUpdateDialog}
                 />
               ))
             )}

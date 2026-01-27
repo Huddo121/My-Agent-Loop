@@ -14,14 +14,14 @@ export type ProjectListItemProps = {
   project: Project;
   isSelected: boolean;
   onSelect: (project: Project) => void;
-  onSave: (project: Project) => void;
+  onEditPressed: (project: Project) => void;
 };
 
 export function ProjectListItem({
   project,
   isSelected,
   onSelect,
-  onSave,
+  onEditPressed,
 }: ProjectListItemProps) {
   const startRunMutation = useStartRun();
 
@@ -101,7 +101,7 @@ export function ProjectListItem({
               variant="ghost"
               size="icon-sm"
               className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
-              onClick={() => onSave(project)}
+              onClick={() => onEditPressed(project)}
             >
               <PencilIcon className="size-4" />
               <span className="sr-only">Edit project</span>

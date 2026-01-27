@@ -13,14 +13,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { UpdateProjectRequest } from "@mono/api";
+import type { MoveTaskRequest, TaskId, UpdateProjectRequest } from "@mono/api";
 import {
-  LoaderIcon, PlayIcon,
+  LoaderIcon,
+  PlayIcon,
   PlusIcon,
   RepeatIcon,
-  SettingsIcon
+  SettingsIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
@@ -38,7 +39,11 @@ import { TaskDialog } from "./TaskDialog";
 export type TaskQueueProps = {
   project: Project;
   tasks: Task[];
-  onTasksReorder: (tasks: Task[]) => void;
+  onMoveTask: (
+    taskId: TaskId,
+    request: MoveTaskRequest,
+    optimisticTasks: Task[],
+  ) => void;
   onAddTask: (task: NewTask) => void;
   onUpdateTask: (taskId: string, task: UpdateTask) => void;
   isLoading?: boolean;
@@ -46,12 +51,23 @@ export type TaskQueueProps = {
 
 export function TaskQueue({
   project,
-  tasks,
-  onTasksReorder,
+  tasks: tasksProp,
+  onMoveTask,
   onAddTask,
   onUpdateTask,
   isLoading = false,
 }: TaskQueueProps) {
+  // Local state for optimistic updates - this updates synchronously on drag end
+  const [localTasks, setLocalTasks] = useState(tasksProp);
+
+  // Sync local state when prop changes (e.g., from server refetch or other updates)
+  useEffect(() => {
+    setLocalTasks(tasksProp);
+  }, [tasksProp]);
+
+  // Use local tasks for rendering
+  const tasks = localTasks;
+
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
@@ -71,8 +87,8 @@ export function TaskQueue({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8
-      }
+        distance: 8,
+      },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -81,12 +97,56 @@ export function TaskQueue({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = tasks.findIndex((t) => t.id === active.id);
-      const newIndex = tasks.findIndex((t) => t.id === over.id);
-      const newTasks = arrayMove(tasks, oldIndex, newIndex);
-      onTasksReorder(newTasks);
+    if (!over || active.id === over.id) {
+      return;
     }
+
+    const taskId = active.id as TaskId;
+    const oldIndex = tasks.findIndex((t) => t.id === active.id);
+    const overIndex = tasks.findIndex((t) => t.id === over.id);
+
+    // Calculate the optimistically reordered tasks and update local state
+    // synchronously to prevent visual flash
+    const optimisticTasks = arrayMove(tasks, oldIndex, overIndex);
+    setLocalTasks(optimisticTasks);
+
+    // Determine the move request based on the new position
+    let moveRequest: MoveTaskRequest;
+
+    if (overIndex === 0) {
+      // Moving to first position
+      moveRequest = { method: "absolute", position: "first" };
+    } else if (overIndex === tasks.length - 1) {
+      // Moving to last position
+      moveRequest = { method: "absolute", position: "last" };
+    } else {
+      // Moving between two tasks
+      // The task at overIndex in the original array becomes our reference point
+      // If we're moving down (oldIndex < overIndex), we insert after the over item
+      // If we're moving up (oldIndex > overIndex), we insert before the over item
+      let afterTask: Task;
+      let beforeTask: Task;
+
+      if (oldIndex < overIndex) {
+        // Moving down: insert after the 'over' task
+        // after = task at overIndex, before = task at overIndex + 1
+        afterTask = tasks[overIndex];
+        beforeTask = tasks[overIndex + 1];
+      } else {
+        // Moving up: insert before the 'over' task
+        // after = task at overIndex - 1, before = task at overIndex
+        afterTask = tasks[overIndex - 1];
+        beforeTask = tasks[overIndex];
+      }
+
+      moveRequest = {
+        method: "relative",
+        after: afterTask.id,
+        before: beforeTask.id,
+      };
+    }
+
+    onMoveTask(taskId, moveRequest, optimisticTasks);
   };
 
   const handleAddTask = (newTask: NewTask) => {
@@ -154,7 +214,8 @@ export function TaskQueue({
                 </TooltipTrigger>
                 <TooltipContent>Start next task</TooltipContent>
               </Tooltip>
-              {project.workflowConfiguration.onTaskCompleted === "merge-immediately" && (
+              {project.workflowConfiguration.onTaskCompleted ===
+                "merge-immediately" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -168,7 +229,8 @@ export function TaskQueue({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Start looping over tasks</TooltipContent>
-                </Tooltip>)}
+                </Tooltip>
+              )}
             </ButtonGroup>
           </div>
         </div>
@@ -177,10 +239,9 @@ export function TaskQueue({
           <TooltipTrigger asChild>
             <Button onClick={() => setTaskDialogOpen(true)}>
               <PlusIcon className="size-4" />
-              <span className="hidden md:inline">
-                Add Task
-              </span>
-            </Button></TooltipTrigger>
+              <span className="hidden md:inline">Add Task</span>
+            </Button>
+          </TooltipTrigger>
         </Tooltip>
       </div>
       <ScrollArea className="min-h-full">

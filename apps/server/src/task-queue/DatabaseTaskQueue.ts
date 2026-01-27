@@ -1,18 +1,22 @@
 import type { ProjectId, TaskId } from "@mono/api";
-import { and, asc, count, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull, isNull, max, min } from "drizzle-orm";
 import { tasksTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
 import type {
   GetAllTasksOptions,
+  MoveTaskRequest,
   NewTask,
   Task,
   TaskQueue,
   UpdateTask,
 } from "./TaskQueue";
 
+/** Gap between positions when adding new tasks */
+const POSITION_GAP = 128;
+
 const fromTaskEntity = (task: typeof tasksTable.$inferSelect): Task => {
   return {
-    id: task.id as TaskId,
+    id: task.id,
     title: task.title,
     description: task.description,
     completedOn: task.completedOn ?? undefined,
@@ -32,7 +36,7 @@ export class DatabaseTaskQueue implements TaskQueue {
       .select()
       .from(tasksTable)
       .where(and(eq(tasksTable.projectId, projectId), where))
-      .orderBy(asc(tasksTable.createdAt), asc(tasksTable.id));
+      .orderBy(asc(tasksTable.position), asc(tasksTable.id));
     return tasks.map(fromTaskEntity);
   }
 
@@ -49,9 +53,23 @@ export class DatabaseTaskQueue implements TaskQueue {
 
   async addTask(projectId: ProjectId, task: NewTask): Promise<Task> {
     const tx = getTransaction();
+
+    // Find the maximum position for incomplete tasks in this project
+    const [{ maxPosition }] = await tx
+      .select({ maxPosition: max(tasksTable.position) })
+      .from(tasksTable)
+      .where(
+        and(
+          eq(tasksTable.projectId, projectId),
+          isNull(tasksTable.completedOn),
+        ),
+      );
+
+    const newPosition = (maxPosition ?? 0) + POSITION_GAP;
+
     const [newTask] = await tx
       .insert(tasksTable)
-      .values({ ...task, projectId })
+      .values({ ...task, projectId, position: newPosition })
       .returning();
     console.info("Added to task to database backed queue", {
       taskId: newTask.id,
@@ -86,7 +104,7 @@ export class DatabaseTaskQueue implements TaskQueue {
           eq(tasksTable.projectId, projectId),
         ),
       )
-      .orderBy(asc(tasksTable.createdAt), asc(tasksTable.id))
+      .orderBy(asc(tasksTable.position), asc(tasksTable.id))
       .limit(1);
 
     const mappedTasks = foundTasks.map(fromTaskEntity);
@@ -114,7 +132,7 @@ export class DatabaseTaskQueue implements TaskQueue {
     const tx = getTransaction();
     const [updatedTask] = await tx
       .update(tasksTable)
-      .set({ completedOn: new Date() })
+      .set({ completedOn: new Date(), position: null })
       .where(and(eq(tasksTable.id, id), isNull(tasksTable.completedOn)))
       .returning();
 
@@ -146,5 +164,99 @@ export class DatabaseTaskQueue implements TaskQueue {
       .then((result) => result[0]?.count ?? 0);
 
     return { total: totalCount, completed: completedCount };
+  }
+
+  async moveTask(
+    id: TaskId,
+    request: MoveTaskRequest,
+  ): Promise<Task | undefined> {
+    const tx = getTransaction();
+
+    // First, get the task we're moving and verify it exists and is not completed
+    const taskToMove = await tx.query.tasksTable.findFirst({
+      where: and(eq(tasksTable.id, id), isNull(tasksTable.completedOn)),
+    });
+
+    if (!taskToMove || taskToMove.position === null) {
+      return undefined;
+    }
+
+    let newPosition: number;
+
+    if (request.method === "absolute") {
+      if (request.position === "first") {
+        // Find the minimum position among incomplete tasks in this project
+        const [{ minPosition }] = await tx
+          .select({ minPosition: min(tasksTable.position) })
+          .from(tasksTable)
+          .where(
+            and(
+              eq(tasksTable.projectId, taskToMove.projectId),
+              isNull(tasksTable.completedOn),
+            ),
+          );
+
+        // Place before the first item
+        newPosition = (minPosition ?? POSITION_GAP) - POSITION_GAP;
+      } else {
+        // position === "last"
+        // Find the maximum position among incomplete tasks in this project
+        const [{ maxPosition }] = await tx
+          .select({ maxPosition: max(tasksTable.position) })
+          .from(tasksTable)
+          .where(
+            and(
+              eq(tasksTable.projectId, taskToMove.projectId),
+              isNull(tasksTable.completedOn),
+            ),
+          );
+
+        newPosition = (maxPosition ?? 0) + POSITION_GAP;
+      }
+    } else {
+      // request.method === "relative"
+      // Get both reference tasks and validate them
+      const [beforeTask, afterTask] = await Promise.all([
+        tx.query.tasksTable.findFirst({
+          where: and(
+            eq(tasksTable.id, request.before),
+            isNull(tasksTable.completedOn),
+          ),
+        }),
+        tx.query.tasksTable.findFirst({
+          where: and(
+            eq(tasksTable.id, request.after),
+            isNull(tasksTable.completedOn),
+          ),
+        }),
+      ]);
+
+      // Validate both tasks exist, have positions, and are not completed
+      if (
+        !beforeTask ||
+        !afterTask ||
+        beforeTask.position === null ||
+        afterTask.position === null
+      ) {
+        return undefined;
+      }
+
+      // Calculate midpoint between the two tasks
+      newPosition = (afterTask.position + beforeTask.position) / 2;
+    }
+
+    // NB: This could result in two tasks with the same position. The task's ID will tie-break if necessary
+    // Update the task's position
+    const [updatedTask] = await tx
+      .update(tasksTable)
+      .set({ position: newPosition })
+      .where(eq(tasksTable.id, id))
+      .returning();
+
+    if (!updatedTask) {
+      return undefined;
+    }
+
+    return fromTaskEntity(updatedTask);
   }
 }

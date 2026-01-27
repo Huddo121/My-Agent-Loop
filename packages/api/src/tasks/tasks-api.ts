@@ -9,6 +9,7 @@ export const taskDtoSchema = z.object({
   title: z.string(),
   description: z.string(),
   completedOn: isoDatetimeToDate.nullish(),
+  position: z.number().nullish(),
 });
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 
@@ -23,6 +24,19 @@ export const updateTaskRequestSchema = taskDtoSchema.pick({
   description: true,
 });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
+
+export const moveTaskRequestSchema = z.union([
+  z.object({
+    method: z.literal("absolute"),
+    position: z.enum(["first", "last"]),
+  }),
+  z.object({
+    method: z.literal("relative"),
+    before: taskIdSchema,
+    after: taskIdSchema,
+  }),
+]);
+export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 
 export const tasksApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(taskDtoSchema)),
@@ -40,6 +54,10 @@ export const tasksApi = Endpoint.multi({
         .output(404, notFoundSchema),
       children: {
         complete: Endpoint.post()
+          .output(200, taskDtoSchema)
+          .output(404, notFoundSchema),
+        move: Endpoint.post()
+          .input(moveTaskRequestSchema)
           .output(200, taskDtoSchema)
           .output(404, notFoundSchema),
       },

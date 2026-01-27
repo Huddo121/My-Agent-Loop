@@ -14,6 +14,17 @@ export type GetAllTasksOptions = {
   includeCompleted?: boolean;
 };
 
+export type MoveTaskRequest =
+  | {
+      method: "absolute";
+      position: "first" | "last";
+    }
+  | {
+      method: "relative";
+      before: TaskId;
+      after: TaskId;
+    };
+
 export interface TaskQueue {
   getAllTasks(
     projectId: ProjectId,
@@ -25,6 +36,11 @@ export interface TaskQueue {
   getNextTask(projectId: ProjectId): Promise<Task | undefined>;
   isEmpty(projectId: ProjectId): Promise<boolean>;
   completeTask(id: TaskId): Promise<Task | undefined>;
+  /**
+   * Move a task within the queue.
+   * Can either move the task to the first or last position, or to between two other tasks.
+   */
+  moveTask(id: TaskId, request: MoveTaskRequest): Promise<Task | undefined>;
   taskCount(
     projectId: ProjectId,
   ): Promise<{ total: number; completed: number }>;

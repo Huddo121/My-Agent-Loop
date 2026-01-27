@@ -1,5 +1,5 @@
-import type { CreateProjectRequest, TaskId } from "@mono/api";
-import { useCallback, useEffect, useState } from "react";
+import type { CreateProjectRequest, MoveTaskRequest, TaskId } from "@mono/api";
+import { useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AppLayout } from "~/components/layout";
 import { ProjectSidebar } from "~/components/projects";
@@ -7,6 +7,7 @@ import { EmptyState, TaskQueue } from "~/components/tasks";
 import {
   useCreateProject,
   useCreateTask,
+  useMoveTask,
   useProjects,
   useTasks,
 } from "~/hooks";
@@ -26,7 +27,6 @@ export function meta() {
 export default function ProjectRoute() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [localTaskOrder, setLocalTaskOrder] = useState<Task[] | null>(null);
 
   // Fetch projects from the backend
   const { data: projects = [], isLoading: isLoadingProjects } = useProjects();
@@ -49,20 +49,19 @@ export default function ProjectRoute() {
     selectedProject?.id ?? null,
   );
 
+  // TODO: The fact that these have null in their type signatures is a failure
   // Mutation for creating tasks
   const createTaskMutation = useCreateTask(selectedProject?.id ?? null);
 
   // Mutation for updating tasks
   const updateTaskMutation = useUpdateTask(selectedProject?.id ?? null);
 
-  // Use local task order if available (for drag-and-drop), otherwise use fetched tasks
-  const currentTasks = localTaskOrder ?? fetchedTasks;
+  // Mutation for moving tasks
+  const moveTaskMutation = useMoveTask(selectedProject?.id ?? null);
 
-  // Reset local task order when selected project changes or tasks are refetched
   const handleSelectProject = useCallback(
     (project: Project) => {
       navigate(`/projects/${project.id}`);
-      setLocalTaskOrder(null);
     },
     [navigate],
   );
@@ -72,41 +71,29 @@ export default function ProjectRoute() {
       createProjectMutation.mutate(createProjectRequest, {
         onSuccess: (newProject) => {
           navigate(`/projects/${newProject.id}`);
-          setLocalTaskOrder(null);
         },
       });
     },
     [createProjectMutation, navigate],
   );
 
-  const handleTasksReorder = useCallback((tasks: Task[]) => {
-    // Store reordered tasks locally (no backend support yet)
-    setLocalTaskOrder(tasks);
-  }, []);
+  const handleMoveTask = useCallback(
+    (taskId: TaskId, request: MoveTaskRequest, optimisticTasks: Task[]) => {
+      moveTaskMutation.mutate({ taskId, request, optimisticTasks });
+    },
+    [moveTaskMutation],
+  );
 
   const handleAddTask = useCallback(
     (newTask: NewTask) => {
-      createTaskMutation.mutate(newTask, {
-        onSuccess: () => {
-          // Clear local order so we get the updated list from the server
-          setLocalTaskOrder(null);
-        },
-      });
+      createTaskMutation.mutate(newTask);
     },
     [createTaskMutation],
   );
 
   const handleUpdateTask = useCallback(
     (taskId: string, task: NewTask) => {
-      updateTaskMutation.mutate(
-        { taskId: taskId as TaskId, task },
-        {
-          onSuccess: () => {
-            // Clear local order so we get the updated list from the server
-            setLocalTaskOrder(null);
-          },
-        },
-      );
+      updateTaskMutation.mutate({ taskId: taskId as TaskId, task });
     },
     [updateTaskMutation],
   );
@@ -126,8 +113,8 @@ export default function ProjectRoute() {
       {selectedProject ? (
         <TaskQueue
           project={selectedProject}
-          tasks={currentTasks}
-          onTasksReorder={handleTasksReorder}
+          tasks={fetchedTasks}
+          onMoveTask={handleMoveTask}
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           isLoading={isLoadingTasks}

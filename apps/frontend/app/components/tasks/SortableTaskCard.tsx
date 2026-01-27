@@ -26,7 +26,7 @@ export function SortableTaskCard({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition,
   };
 
   return (

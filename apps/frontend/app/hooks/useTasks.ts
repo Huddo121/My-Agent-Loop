@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from "@mono/api";
+import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { NewTask, Task, UpdateTask } from "~/types";
@@ -131,6 +131,75 @@ export function useUpdateTask(projectId: ProjectId | null) {
           task.id === updatedTask.id ? updatedTask : task,
         );
       });
+    },
+  });
+}
+
+/**
+ * Hook to move a task within the queue.
+ * Supports optimistic updates with rollback on failure.
+ */
+export function useMoveTask(projectId: ProjectId | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      request,
+    }: {
+      taskId: TaskId;
+      request: MoveTaskRequest;
+      optimisticTasks: Task[];
+    }): Promise<Task> => {
+      if (!projectId) {
+        throw new Error("No project selected");
+      }
+      const response = await apiClient.projects[":projectId"].tasks[
+        ":taskId"
+      ].move.POST({
+        pathParams: { projectId, taskId },
+        body: request,
+      });
+      if (response.status === 200) {
+        return {
+          ...response.responseBody,
+          completedOn: response.responseBody.completedOn
+            ? new Date(response.responseBody.completedOn)
+            : null,
+        };
+      }
+      throw new Error("Failed to move task");
+    },
+    onMutate: async ({ optimisticTasks }) => {
+      if (!projectId) return;
+
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey(projectId) });
+
+      // Snapshot the previous value for potential rollback
+      const previousTasks = queryClient.getQueryData<Task[]>(
+        tasksQueryKey(projectId),
+      );
+
+      // Update the cache with the optimistic value
+      queryClient.setQueryData<Task[]>(
+        tasksQueryKey(projectId),
+        optimisticTasks,
+      );
+
+      return { previousTasks };
+    },
+    onError: (_err, _variables, context) => {
+      if (!projectId) return;
+      // Roll back to the previous value on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData<Task[]>(
+          tasksQueryKey(projectId),
+          context.previousTasks,
+        );
+      }
+      // Refetch to ensure we're in sync with the server after an error
+      queryClient.invalidateQueries({ queryKey: tasksQueryKey(projectId) });
     },
   });
 }

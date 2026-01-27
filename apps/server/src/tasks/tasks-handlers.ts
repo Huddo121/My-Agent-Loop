@@ -77,5 +77,22 @@ export const tasksHandlers: HonoHandlersFor<
 
       return [200, completedTask];
     },
+    move: async (ctx) => {
+      const { projectId, taskId } = ctx.hono.req.param();
+
+      const movedTask = await withNewTransaction(ctx.services.db, () =>
+        ctx.services.taskQueue.moveTask(taskId as TaskId, ctx.body),
+      );
+
+      if (!movedTask) {
+        console.warn("Can not move task, task not found or already completed", {
+          projectId,
+          taskId,
+        });
+        return notFound();
+      }
+
+      return ok(movedTask);
+    },
   },
 };

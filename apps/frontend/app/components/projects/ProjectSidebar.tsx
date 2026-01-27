@@ -48,7 +48,11 @@ export const ProjectSidebar = ({
         <Tooltip>
           <TooltipContent>Create project</TooltipContent>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={handleOpenCreateDialog}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleOpenCreateDialog}
+            >
               <PlusIcon className="size-4" />
               <span className="sr-only">Create project</span>
             </Button>

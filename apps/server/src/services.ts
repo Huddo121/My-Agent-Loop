@@ -14,6 +14,7 @@ import {
 } from "./sandbox/SandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
+import { OpenCodeConfigService } from "./workflow/OpenCodeConfigService";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
 import { WorkflowQueues } from "./workflow/workflow-queues";
 
@@ -45,11 +46,14 @@ const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
+const openCodeConfigService = new OpenCodeConfigService();
+
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
   sandboxService,
   fileSystemService,
+  openCodeConfigService,
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(

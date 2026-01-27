@@ -12,6 +12,9 @@ export type WorkflowConfiguration = {
   onTaskCompleted: OnTaskCompletedAction;
 };
 
+const commitMessage = (task: Task) =>
+  `${task.title}\n\n${task.description}\n\nTask ID: ${task.id}`;
+
 const commitAndPushThenMergeToMaster =
   (gitService: GitService) =>
   async (
@@ -21,7 +24,7 @@ const commitAndPushThenMergeToMaster =
     const workBranch = repository.branch;
     const commitResult = await gitService.commitRepository(
       repository,
-      `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
+      commitMessage(task),
     );
     if (commitResult.success === false) {
       console.error(
@@ -80,7 +83,7 @@ const pushBranch =
     // Commit the work
     const commitResult = await gitService.commitRepository(
       repository,
-      `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
+      commitMessage(task),
     );
     if (commitResult.success === false) {
       return { success: false, error: commitResult.error };

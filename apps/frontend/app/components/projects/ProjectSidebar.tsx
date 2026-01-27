@@ -45,10 +45,15 @@ export const ProjectSidebar = ({
     <Sidebar className="border-r-0">
       <SidebarHeader className="flex-row items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Projects</h2>
-        <Button variant="ghost" size="icon-sm" onClick={handleOpenCreateDialog}>
-          <PlusIcon className="size-4" />
-          <span className="sr-only">Create project</span>
-        </Button>
+        <Tooltip>
+          <TooltipContent>Create project</TooltipContent>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" onClick={handleOpenCreateDialog}>
+              <PlusIcon className="size-4" />
+              <span className="sr-only">Create project</span>
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
       </SidebarHeader>
       <SidebarContent>
         <div className="flex flex-col gap-1 p-2">

@@ -5,8 +5,8 @@
 - [X] The Sidebar is hideous, does not fit the project names any more
 - [X] Make the sidebar resizable
 - [ ] Make the sidebar collapse to icons
-- [ ] Task cards don't shrink down, make them more like regular Kanban cards
-- [ ] Add tooltips to icon-only buttons
+- [X] Task cards don't shrink down, make them more like regular Kanban cards
+- [X] Add tooltips to icon-only buttons
 
 ## Smaller features
 

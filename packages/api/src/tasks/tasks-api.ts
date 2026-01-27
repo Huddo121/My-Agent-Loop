@@ -24,6 +24,18 @@ export const updateTaskRequestSchema = taskDtoSchema.pick({
 });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 
+export const moveTaskRequestSchema = z.union([
+  z.object({
+    method: z.literal("absolute"),
+    position: z.literal(["first", "last"]),
+  }),
+  z.object({
+    method: z.literal("relative"),
+    before: taskIdSchema,
+    after: taskIdSchema,
+  }),
+]);
+
 export const tasksApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(taskDtoSchema)),
   POST: Endpoint.post()
@@ -40,6 +52,10 @@ export const tasksApi = Endpoint.multi({
         .output(404, notFoundSchema),
       children: {
         complete: Endpoint.post()
+          .output(200, taskDtoSchema)
+          .output(404, notFoundSchema),
+        move: Endpoint.post()
+          .input(moveTaskRequestSchema)
           .output(200, taskDtoSchema)
           .output(404, notFoundSchema),
       },

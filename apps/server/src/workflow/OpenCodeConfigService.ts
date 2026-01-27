@@ -1,7 +1,5 @@
-import fs from "node:fs";
 import type { ProjectId } from "@mono/api";
 import type { Config, McpRemoteConfig } from "@opencode-ai/sdk";
-import type { AbsoluteFilePath } from "../file-system/FilePath";
 
 export const MAL_PROJECT_ID_HEADER = "X-MAL-Project-ID";
 
@@ -36,17 +34,16 @@ const baseConfig: Config = {
 };
 
 /**
- * Generates OpenCode configuration files for agent containers, scoping MCP tool access to a specific project.
+ * Generates OpenCode configuration objects for agent containers, scoping MCP tool access to a specific project.
  */
 export class OpenCodeConfigService {
   /**
-   * Generates a project-scoped OpenCode configuration and writes it to a file.
+   * Generates a project-scoped OpenCode configuration.
    *
    * @param projectId The project ID to scope MCP tool access to
-   * @param targetPath The path where the configuration file should be written
-   * @returns The path to the generated configuration file
+   * @returns The OpenCode configuration object
    */
-  generateConfig(projectId: ProjectId, targetPath: AbsoluteFilePath): void {
+  generateConfig(projectId: ProjectId): Config {
     const mcpServerConfig: McpRemoteConfig = {
       enabled: true,
       type: "remote",
@@ -56,13 +53,11 @@ export class OpenCodeConfigService {
       },
     };
 
-    const config: Config = {
+    return {
       ...baseConfig,
       mcp: {
         "my-agent-loop-tools": mcpServerConfig,
       },
     };
-
-    fs.writeFileSync(targetPath, JSON.stringify(config, null, 2));
   }
 }

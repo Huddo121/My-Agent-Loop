@@ -9,7 +9,7 @@ import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
-import { OpenCodeConfigService } from "./OpenCodeConfigService";
+import type { OpenCodeConfigService } from "./OpenCodeConfigService";
 import type { Workflow } from "./Workflow";
 
 const formatTaskFile = (task: Task): string => {
@@ -25,16 +25,13 @@ ${task.description}
  *   for the agent to execute are available (i.e. the code, the task, opencode config).
  */
 export class WorkflowExecutionService {
-  private readonly openCodeConfigService: OpenCodeConfigService;
-
   constructor(
     private readonly taskQueue: TaskQueue,
     private readonly gitService: GitService,
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
-  ) {
-    this.openCodeConfigService = new OpenCodeConfigService();
-  }
+    private readonly openCodeConfigService: OpenCodeConfigService,
+  ) {}
 
   async executeWorkflow(
     runId: RunId,
@@ -90,7 +87,13 @@ export class WorkflowExecutionService {
       taskTempDirectory,
       "opencode.json",
     );
-    this.openCodeConfigService.generateConfig(project.id, openCodeConfigPath);
+    const openCodeConfig = this.openCodeConfigService.generateConfig(
+      project.id,
+    );
+    fs.writeFileSync(
+      openCodeConfigPath,
+      JSON.stringify(openCodeConfig, null, 2),
+    );
 
     const repository = checkoutResult.value;
 

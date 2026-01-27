@@ -8,6 +8,7 @@ import {
 import { useStartRun } from "~/hooks";
 import { cn } from "~/lib/utils";
 import type { Project } from "~/types";
+import { ButtonGroup } from "../ui/button-group";
 
 export type ProjectListItemProps = {
   project: Project;
@@ -38,7 +39,7 @@ export function ProjectListItem({
   return (
     <div
       className={cn(
-        "group/project-item flex w-full items-center rounded-md transition-colors gap-1 p-1",
+        "group/project-item flex justify-between w-full items-center rounded-md transition-colors gap-1 p-1",
         isSelected
           ? "bg-sidebar-accent/50 text-sidebar-accent-foreground"
           : undefined,
@@ -57,50 +58,57 @@ export function ProjectListItem({
               <span className="text-xs text-muted-foreground font-mono">
                 {project.shortCode}
               </span>
-              <span>{project.name}</span>
+              <span className="truncate text-ellipsis">{project.name}</span>
             </div>
           </Button>
         </TooltipTrigger>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
-            onClick={() => handleStartRun("single")}
-            disabled={startRunMutation.isPending}
-          >
-            <PlayIcon className="size-4" />
-            <span className="sr-only">Start single run</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Start single run</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
-            onClick={() => handleStartRun("loop")}
-            disabled={startRunMutation.isPending}
-          >
-            <RepeatIcon className="size-4" />
-            <span className="sr-only">Start loop run</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Start loop run</TooltipContent>
-      </Tooltip>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
-        onClick={() => onSave(project)}
-      >
-        <PencilIcon className="size-4" />
-        <span className="sr-only">Edit project</span>
-      </Button>
+      <ButtonGroup>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+              onClick={() => handleStartRun("single")}
+              disabled={startRunMutation.isPending}
+            >
+              <PlayIcon className="size-4" />
+              <span className="sr-only">Start single run</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Start single run</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipContent>Start loop run</TooltipContent>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+              onClick={() => handleStartRun("loop")}
+              disabled={startRunMutation.isPending}
+            >
+              <RepeatIcon className="size-4" />
+              <span className="sr-only">Start loop run</span>
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
+        <Tooltip>
+          <TooltipContent>Edit project</TooltipContent>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="opacity-0 group-hover/project-item:opacity-100 transition-opacity shrink-0"
+              onClick={() => onSave(project)}
+            >
+              <PencilIcon className="size-4" />
+              <span className="sr-only">Edit project</span>
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
+      </ButtonGroup>
     </div>
   );
 }

@@ -9,6 +9,7 @@ export const taskDtoSchema = z.object({
   title: z.string(),
   description: z.string(),
   completedOn: isoDatetimeToDate.nullish(),
+  position: z.number().nullish(),
 });
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 

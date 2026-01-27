@@ -49,6 +49,7 @@ export default function ProjectRoute() {
     selectedProject?.id ?? null,
   );
 
+  // TODO: The fact that these have null in their type signatures is a failure
   // Mutation for creating tasks
   const createTaskMutation = useCreateTask(selectedProject?.id ?? null);
 

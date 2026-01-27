@@ -159,7 +159,12 @@ export function useMoveTask(projectId: ProjectId | null) {
         body: request,
       });
       if (response.status === 200) {
-        return response.responseBody as Task;
+        return {
+          ...response.responseBody,
+          completedOn: response.responseBody.completedOn
+            ? new Date(response.responseBody.completedOn)
+            : null,
+        };
       }
       throw new Error("Failed to move task");
     },

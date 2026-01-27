@@ -27,7 +27,7 @@ export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 export const moveTaskRequestSchema = z.union([
   z.object({
     method: z.literal("absolute"),
-    position: z.literal(["first", "last"]),
+    position: z.enum(["first", "last"]),
   }),
   z.object({
     method: z.literal("relative"),
@@ -35,6 +35,7 @@ export const moveTaskRequestSchema = z.union([
     after: taskIdSchema,
   }),
 ]);
+export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 
 export const tasksApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(taskDtoSchema)),

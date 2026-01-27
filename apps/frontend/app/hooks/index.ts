@@ -4,4 +4,4 @@ export {
   useStartRun,
   useUpdateProject,
 } from "./useProjects";
-export { useCreateTask, useTasks } from "./useTasks";
+export { useCreateTask, useMoveTask, useTasks } from "./useTasks";

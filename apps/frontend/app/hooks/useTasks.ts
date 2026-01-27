@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from "@mono/api";
+import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { NewTask, Task, UpdateTask } from "~/types";
@@ -131,6 +131,42 @@ export function useUpdateTask(projectId: ProjectId | null) {
           task.id === updatedTask.id ? updatedTask : task,
         );
       });
+    },
+  });
+}
+
+/**
+ * Hook to move a task within the queue.
+ */
+export function useMoveTask(projectId: ProjectId | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      request,
+    }: {
+      taskId: TaskId;
+      request: MoveTaskRequest;
+    }): Promise<Task> => {
+      if (!projectId) {
+        throw new Error("No project selected");
+      }
+      const response = await apiClient.projects[":projectId"].tasks[
+        ":taskId"
+      ].move.POST({
+        pathParams: { projectId, taskId },
+        body: request,
+      });
+      if (response.status === 200) {
+        return response.responseBody as Task;
+      }
+      throw new Error("Failed to move task");
+    },
+    onSuccess: () => {
+      if (!projectId) return;
+      // Invalidate the tasks query to refetch the updated order
+      queryClient.invalidateQueries({ queryKey: tasksQueryKey(projectId) });
     },
   });
 }

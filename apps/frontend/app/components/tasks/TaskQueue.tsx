@@ -8,12 +8,11 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { UpdateProjectRequest } from "@mono/api";
+import type { MoveTaskRequest, TaskId, UpdateProjectRequest } from "@mono/api";
 import {
   LoaderIcon,
   PlayIcon,
@@ -39,7 +38,7 @@ import { TaskDialog } from "./TaskDialog";
 export type TaskQueueProps = {
   project: Project;
   tasks: Task[];
-  onTasksReorder: (tasks: Task[]) => void;
+  onMoveTask: (taskId: TaskId, request: MoveTaskRequest) => void;
   onAddTask: (task: NewTask) => void;
   onUpdateTask: (taskId: string, task: UpdateTask) => void;
   isLoading?: boolean;
@@ -48,7 +47,7 @@ export type TaskQueueProps = {
 export function TaskQueue({
   project,
   tasks,
-  onTasksReorder,
+  onMoveTask,
   onAddTask,
   onUpdateTask,
   isLoading = false,
@@ -82,12 +81,55 @@ export function TaskQueue({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = tasks.findIndex((t) => t.id === active.id);
-      const newIndex = tasks.findIndex((t) => t.id === over.id);
-      const newTasks = arrayMove(tasks, oldIndex, newIndex);
-      onTasksReorder(newTasks);
+    if (!over || active.id === over.id) {
+      return;
     }
+
+    const taskId = active.id as TaskId;
+    const oldIndex = tasks.findIndex((t) => t.id === active.id);
+    const overIndex = tasks.findIndex((t) => t.id === over.id);
+
+    // Calculate the new index after the move
+    // If moving down, the task goes after the target; if moving up, it goes before
+    const newIndex = oldIndex < overIndex ? overIndex : overIndex;
+
+    // Determine the move request based on the new position
+    let moveRequest: MoveTaskRequest;
+
+    if (newIndex === 0) {
+      // Moving to first position
+      moveRequest = { method: "absolute", position: "first" };
+    } else if (newIndex === tasks.length - 1) {
+      // Moving to last position
+      moveRequest = { method: "absolute", position: "last" };
+    } else {
+      // Moving between two tasks
+      // The task at overIndex in the original array becomes our reference point
+      // If we're moving down (oldIndex < overIndex), we insert after the over item
+      // If we're moving up (oldIndex > overIndex), we insert before the over item
+      let afterTask: Task;
+      let beforeTask: Task;
+
+      if (oldIndex < overIndex) {
+        // Moving down: insert after the 'over' task
+        // after = task at overIndex, before = task at overIndex + 1
+        afterTask = tasks[overIndex];
+        beforeTask = tasks[overIndex + 1];
+      } else {
+        // Moving up: insert before the 'over' task
+        // after = task at overIndex - 1, before = task at overIndex
+        afterTask = tasks[overIndex - 1];
+        beforeTask = tasks[overIndex];
+      }
+
+      moveRequest = {
+        method: "relative",
+        after: afterTask.id as TaskId,
+        before: beforeTask.id as TaskId,
+      };
+    }
+
+    onMoveTask(taskId, moveRequest);
   };
 
   const handleAddTask = (newTask: NewTask) => {

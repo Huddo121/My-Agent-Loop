@@ -138,10 +138,13 @@ export const addTaskMcpHandler = {
   execute: async (params) => {
     const services = getMcpServices();
     // TODO: Technically this could fail because the Project doesn't exist
-    const task = await services.taskQueue.addTask(
-      params.projectId,
-      params.task,
+    const task = await withNewTransaction(
+      services.db,
+      async () =>
+        await services.taskQueue.addTask(params.projectId, params.task),
     );
+
+    console.info("Handled Add Task MCP", { projectId: params.projectId, task });
 
     return JSON.stringify(task);
   },

@@ -11,6 +11,10 @@ export const getCurrentProjectMcpHandler = {
     const projectId = session?.projectId;
 
     if (projectId === undefined) {
+      console.error(
+        "Project ID not provided. X-MAL-Project-ID header is required.",
+        { session },
+      );
       return JSON.stringify({
         error: "Project ID not provided. X-MAL-Project-ID header is required.",
       });
@@ -24,11 +28,16 @@ export const getCurrentProjectMcpHandler = {
     );
 
     if (project === undefined) {
+      console.error("Can not get current project, project not found", {
+        projectId,
+        session,
+      });
       return JSON.stringify({
         error: "Project not found",
       });
     }
 
+    console.info("Returning current project", { project });
     return JSON.stringify(project);
   },
 } satisfies McpTool;

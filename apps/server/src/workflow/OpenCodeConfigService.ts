@@ -1,7 +1,8 @@
-import type { ProjectId } from "@mono/api";
+import type { ProjectId, TaskId } from "@mono/api";
 import type { Config, McpRemoteConfig } from "@opencode-ai/sdk";
 
 export const MAL_PROJECT_ID_HEADER = "X-MAL-Project-ID";
+export const MAL_TASK_ID_HEADER = "X-MAL-Task-ID";
 
 /**
  * Base configuration for OpenCode that is shared across all agent containers.
@@ -34,7 +35,7 @@ const baseConfig: Config = {
 };
 
 /**
- * Generates OpenCode configuration objects for agent containers, scoping MCP tool access to a specific project.
+ * Generates OpenCode configuration objects for agent containers, scoping MCP tool access to a specific project and task.
  */
 export class OpenCodeConfigService {
   /**
@@ -50,6 +51,32 @@ export class OpenCodeConfigService {
       url: "http://host.docker.internal:3050/mcp",
       headers: {
         [MAL_PROJECT_ID_HEADER]: projectId,
+      },
+    };
+
+    return {
+      ...baseConfig,
+      mcp: {
+        "my-agent-loop-tools": mcpServerConfig,
+      },
+    };
+  }
+
+  /**
+   * Generates a project and task-scoped OpenCode configuration.
+   *
+   * @param projectId The project ID to scope MCP tool access to
+   * @param taskId The task ID to scope MCP tool access to
+   * @returns The OpenCode configuration object
+   */
+  generateConfigWithTask(projectId: ProjectId, taskId: TaskId): Config {
+    const mcpServerConfig: McpRemoteConfig = {
+      enabled: true,
+      type: "remote",
+      url: "http://host.docker.internal:3050/mcp",
+      headers: {
+        [MAL_PROJECT_ID_HEADER]: projectId,
+        [MAL_TASK_ID_HEADER]: taskId,
       },
     };
 

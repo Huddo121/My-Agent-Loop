@@ -65,7 +65,7 @@ export const ProjectSidebar = ({
   };
 
   return (
-    <Sidebar>
+    <Sidebar className="border-r-0">
       <SidebarHeader className="flex-row items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Projects</h2>
         <Button variant="ghost" size="icon-sm" onClick={handleOpenCreateDialog}>

@@ -44,19 +44,24 @@ export function ProjectListItem({
           : undefined,
       )}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        className="flex-1 truncate px-3 py-2 text-left justify-start text-sm font-medium"
-        onClick={() => onSelect(project)}
-      >
-        <div className="flex gap-2 items-baseline">
-          <span>{project.name}</span>
-          <span className="text-xs text-muted-foreground font-mono">
-            {project.shortCode}
-          </span>
-        </div>
-      </Button>
+      <Tooltip>
+        <TooltipContent>{project.name}</TooltipContent>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex-1 truncate px-3 py-2 text-left justify-start text-sm font-medium"
+            onClick={() => onSelect(project)}
+          >
+            <div className="flex gap-2 items-baseline">
+              <span className="text-xs text-muted-foreground font-mono">
+                {project.shortCode}
+              </span>
+              <span>{project.name}</span>
+            </div>
+          </Button>
+        </TooltipTrigger>
+      </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

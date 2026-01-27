@@ -84,7 +84,7 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
       >
         {sidebar}
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle />
       <ResizablePanel id="main" defaultSize={80}>
         <main className="h-full w-full overflow-hidden">{children}</main>
       </ResizablePanel>

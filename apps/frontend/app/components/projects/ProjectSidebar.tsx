@@ -42,7 +42,7 @@ export const ProjectSidebar = ({
   };
 
   return (
-    <Sidebar className="border-r-0">
+    <Sidebar className="border-r-0" collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Projects</h2>
         <Tooltip>

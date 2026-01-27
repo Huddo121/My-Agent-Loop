@@ -1,13 +1,17 @@
-import type { ProjectId } from "@mono/api";
+import type { ProjectId, TaskId } from "@mono/api";
 import { FastMCP } from "fastmcp";
 import { projectsMcpTools } from "./projects/projects-mcp-handlers";
 import type { Services } from "./services";
 import { tasksMcpTools } from "./tasks/tasks-mcp-handlers";
 import { withMcpServices } from "./utils/mcp-service-context";
-import { MAL_PROJECT_ID_HEADER } from "./workflow/OpenCodeConfigService";
+import {
+  MAL_PROJECT_ID_HEADER,
+  MAL_TASK_ID_HEADER,
+} from "./workflow/OpenCodeConfigService";
 
 export interface McpSessionData {
   projectId: ProjectId | undefined;
+  taskId: TaskId | undefined;
   [key: string]: unknown;
 }
 
@@ -30,8 +34,12 @@ const mcpServer = new FastMCP<McpSessionData>({
       ? projectIdHeader[0]
       : projectIdHeader;
 
+    const taskIdHeader = request.headers[MAL_TASK_ID_HEADER.toLowerCase()];
+    const taskId = Array.isArray(taskIdHeader) ? taskIdHeader[0] : taskIdHeader;
+
     return {
       projectId: projectId as ProjectId | undefined,
+      taskId: taskId as TaskId | undefined,
     };
   },
 });

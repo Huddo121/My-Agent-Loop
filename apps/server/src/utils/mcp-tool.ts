@@ -1,9 +1,8 @@
 import type { Tool, ToolParameters } from "fastmcp";
+import type { McpSessionData } from "../mcp";
 
-/** Duplicated from FastMCP, they don't export it */
-type FastMCPSessionAuth = Record<string, unknown> | undefined;
 export type McpTool<T extends ToolParameters = ToolParameters> = Tool<
-  FastMCPSessionAuth,
+  McpSessionData,
   T
 >;
 

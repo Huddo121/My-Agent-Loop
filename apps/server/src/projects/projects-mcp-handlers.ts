@@ -1,4 +1,3 @@
-import type { ProjectId } from "@mono/api";
 import z from "zod";
 import { getMcpServices } from "../utils/mcp-service-context";
 import type { McpTool, McpTools } from "../utils/mcp-tool";
@@ -8,10 +7,16 @@ export const getCurrentProjectMcpHandler = {
   name: "Get current project",
   description: "Get the current project",
   parameters: z.object({}),
-  execute: async () => {
+  execute: async (_params, { session }) => {
+    const projectId = session?.projectId;
+
+    if (projectId === undefined) {
+      return JSON.stringify({
+        error: "Project ID not provided. X-MAL-Project-ID header is required.",
+      });
+    }
+
     const services = getMcpServices();
-    // TODO: Currently stubbing this out, need to get the project ID in to the MCP connections somehow
-    const projectId = "019bf786-95b5-7bbb-bb57-25f0d87684bd" as ProjectId;
 
     const project = await withNewTransaction(
       services.db,

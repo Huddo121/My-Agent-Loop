@@ -7,9 +7,9 @@ import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
-import { absolutePath } from "../utils/absolutePath";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
+import { OpenCodeConfigService } from "./OpenCodeConfigService";
 import type { Workflow } from "./Workflow";
 
 const formatTaskFile = (task: Task): string => {
@@ -25,12 +25,16 @@ ${task.description}
  *   for the agent to execute are available (i.e. the code, the task, opencode config).
  */
 export class WorkflowExecutionService {
+  private readonly openCodeConfigService: OpenCodeConfigService;
+
   constructor(
     private readonly taskQueue: TaskQueue,
     private readonly gitService: GitService,
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
-  ) {}
+  ) {
+    this.openCodeConfigService = new OpenCodeConfigService();
+  }
 
   async executeWorkflow(
     runId: RunId,
@@ -81,6 +85,13 @@ export class WorkflowExecutionService {
     // Write out task to file to mount to the container
     fs.writeFileSync(taskFilePath, formatTaskFile(task));
 
+    // Generate a project-scoped OpenCode config for this container
+    const openCodeConfigPath = AbsoluteFilePath.joinPath(
+      taskTempDirectory,
+      "opencode.json",
+    );
+    this.openCodeConfigService.generateConfig(project.id, openCodeConfigPath);
+
     const repository = checkoutResult.value;
 
     const sandbox = await this.sandboxService.createNewSandbox({
@@ -88,7 +99,7 @@ export class WorkflowExecutionService {
         { hostPath: repository.path, containerPath: "/code" },
         { hostPath: taskFilePath, containerPath: "/task.txt" },
         {
-          hostPath: absolutePath(import.meta.url, "opencode.json"),
+          hostPath: openCodeConfigPath,
           // Mounting the default config to the container's config directory allows end users to override the config.
           // See https://opencode.ai/docs/config/#precedence-order
           containerPath: "/root/.config/opencode/opencode.json",

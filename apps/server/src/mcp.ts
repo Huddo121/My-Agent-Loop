@@ -1,10 +1,17 @@
+import type { ProjectId } from "@mono/api";
 import { FastMCP } from "fastmcp";
 import { projectsMcpTools } from "./projects/projects-mcp-handlers";
 import type { Services } from "./services";
 import { tasksMcpTools } from "./tasks/tasks-mcp-handlers";
 import { withMcpServices } from "./utils/mcp-service-context";
+import { MAL_PROJECT_ID_HEADER } from "./workflow/OpenCodeConfigService";
 
-const mcpServer = new FastMCP({
+export interface McpSessionData {
+  projectId: ProjectId | undefined;
+  [key: string]: unknown;
+}
+
+const mcpServer = new FastMCP<McpSessionData>({
   name: "My Agent Loop",
   version: "0.0.1",
   // FastMCP just kept logging heaps of uses messages about not being able to infer client capabilities during runs,
@@ -15,6 +22,17 @@ const mcpServer = new FastMCP({
     info(..._args) {},
     log(..._args) {},
     warn(..._args) {},
+  },
+  authenticate: async (request) => {
+    const projectIdHeader =
+      request.headers[MAL_PROJECT_ID_HEADER.toLowerCase()];
+    const projectId = Array.isArray(projectIdHeader)
+      ? projectIdHeader[0]
+      : projectIdHeader;
+
+    return {
+      projectId: projectId as ProjectId | undefined,
+    };
   },
 });
 

@@ -303,25 +303,23 @@ export class SimpleGitService implements GitService {
       }
 
       const repoGit = this.getGitForPath(repoPath);
-      const fr = await repoGit.fetch();
-
-      if (fr.branches.find((b) => b.name === branch.toString()) === undefined) {
-        return {
-          success: false,
-          error: new Error(
-            `Branch '${branch}' not found in repository at '${repository.path}'. Cannot merge.`,
-          ),
-        };
-      }
-
-      const branchSummary = await repoGit.branchLocal();
-      const taskBranch = branchSummary.current as GitBranch | undefined;
+      const branches = await repoGit.branchLocal();
+      const taskBranch = branches.current as GitBranch | undefined;
 
       if (!taskBranch) {
         return {
           success: false,
           error: new Error(
             `No branch checked out for repository at '${repository.path}'. Cannot merge.`,
+          ),
+        };
+      }
+
+      if (!branches.all.includes(branch)) {
+        return {
+          success: false,
+          error: new Error(
+            `Branch '${branch}' not found in repository at '${repository.path}'. Cannot merge.`,
           ),
         };
       }

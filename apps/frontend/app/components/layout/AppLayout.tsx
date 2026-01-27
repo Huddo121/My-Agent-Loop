@@ -76,7 +76,7 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
         id="sidebar"
         panelRef={sidebarPanelRef}
         defaultSize={20}
-        minSize={"3rem"}
+        minSize="200px"
         maxSize={400}
         collapsible
         collapsedSize={0}

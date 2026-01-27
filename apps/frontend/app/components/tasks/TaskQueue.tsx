@@ -13,8 +13,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { LoaderIcon, PlayIcon, PlusIcon, RepeatIcon } from "lucide-react";
-import { useState } from "react";
+import type { UpdateProjectRequest } from "@mono/api";
+import {
+  LoaderIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  RepeatIcon,
+} from "lucide-react";
+import { useCallback, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
@@ -22,8 +29,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { useStartRun } from "~/hooks";
+import { useStartRun, useUpdateProject } from "~/hooks";
 import type { NewTask, Project, Task, UpdateTask } from "~/types";
+import { ProjectDialog } from "../projects";
+import { ButtonGroup } from "../ui/button-group";
 import { SortableTaskCard } from "./SortableTaskCard";
 import { TaskDialog } from "./TaskDialog";
 
@@ -44,7 +53,8 @@ export function TaskQueue({
   onUpdateTask,
   isLoading = false,
 }: TaskQueueProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const startRunMutation = useStartRun();
 
@@ -87,8 +97,20 @@ export function TaskQueue({
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
-    setDialogOpen(true);
+    setTaskDialogOpen(true);
   };
+
+  const updateProjectMutation = useUpdateProject();
+
+  const handleUpdateProject = useCallback(
+    (updateProjectRequest: UpdateProjectRequest) => {
+      updateProjectMutation.mutate({
+        projectId: project.id,
+        updateProjectRequest,
+      });
+    },
+    [updateProjectMutation, project.id],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -102,36 +124,51 @@ export function TaskQueue({
           </div>
           <div className="flex items-center gap-2">
             <Tooltip>
+              <TooltipContent>Edit project</TooltipContent>
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={() => handleStartRun("single")}
-                  disabled={startRunMutation.isPending}
+                  size="icon-sm"
+                  onClick={() => setProjectDialogOpen(true)}
                 >
-                  <PlayIcon className="size-4" />
-                  <span className="sr-only">Start single run</span>
+                  <PencilIcon className="size-4" />
+                  <span className="sr-only">Edit project</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Start single run</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleStartRun("loop")}
-                  disabled={startRunMutation.isPending}
-                >
-                  <RepeatIcon className="size-4" />
-                  <span className="sr-only">Start loop run</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Start loop run</TooltipContent>
-            </Tooltip>
+            <ButtonGroup>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => handleStartRun("single")}
+                    disabled={startRunMutation.isPending}
+                  >
+                    <PlayIcon className="size-4" />
+                    <span className="sr-only">Start single run</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Start single run</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => handleStartRun("loop")}
+                    disabled={startRunMutation.isPending}
+                  >
+                    <RepeatIcon className="size-4" />
+                    <span className="sr-only">Start loop run</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Start loop run</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
           </div>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setTaskDialogOpen(true)}>
           <PlusIcon className="size-4" />
           Add Task
         </Button>
@@ -150,7 +187,7 @@ export function TaskQueue({
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => setDialogOpen(true)}
+                onClick={() => setTaskDialogOpen(true)}
               >
                 <PlusIcon className="size-4" />
                 Add your first task
@@ -182,15 +219,25 @@ export function TaskQueue({
         </div>
       </ScrollArea>
       <TaskDialog
-        open={dialogOpen}
+        open={taskDialogOpen}
         onOpenChange={(open) => {
-          setDialogOpen(open);
+          setTaskDialogOpen(open);
           if (!open) {
             setEditingTask(undefined);
           }
         }}
         onSubmit={handleAddTask}
         task={editingTask}
+      />
+      <ProjectDialog
+        open={projectDialogOpen}
+        onOpenChange={setProjectDialogOpen}
+        mode={"update"}
+        initialName={project.name}
+        initialShortCode={project.shortCode}
+        initialRepositoryUrl={project.repositoryUrl}
+        initialWorkflowConfiguration={project.workflowConfiguration}
+        onSubmit={handleUpdateProject}
       />
     </div>
   );

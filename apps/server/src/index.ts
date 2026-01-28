@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { myAgentLoopApi } from "@mono/api";
 import { createHonoServer } from "cerato";
+import { adminHandlers } from "./admin/admin-handlers";
 import { startMcp } from "./mcp";
 import { projectsHandlers } from "./projects/projects-handlers";
 import { services } from "./services";
@@ -28,6 +29,7 @@ process.on("SIGHUP", () => shutdown("SIGHUP"));
 const app = createHonoServer(
   myAgentLoopApi,
   {
+    admin: adminHandlers,
     projects: projectsHandlers,
   },
   services,

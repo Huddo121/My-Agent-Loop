@@ -18,8 +18,8 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["./app/*"],
-      "@mono/api": ["../../packages/api/src/index.ts"],
-      "@mono/api/*": ["../../packages/api/src/*"]
+      "@mono/api": ["../../packages/api/dist/index.d.ts"],
+      "@mono/api/*": ["../../packages/api/dist/*"]
     }
   },
   "references": [

@@ -163,18 +163,6 @@ export class WorkflowExecutionService {
     );
 
     if (result.value.reason === "completed") {
-      const commitResult = await this.gitService.commitRepository(
-        repository,
-        `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
-      );
-      if (commitResult.success === false) {
-        console.error(
-          `Failed to commit task ${task.id}:`,
-          commitResult.error.message,
-        );
-        return { success: false, error: commitResult.error };
-      }
-
       const workflowOnTaskCompletedResult = await workflow.onTaskCompleted(
         task,
         repository,

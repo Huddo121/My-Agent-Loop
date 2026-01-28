@@ -97,7 +97,7 @@ export class OpenCodeConfigService {
       this.modelProviderService.getAvailableProviders();
 
     if (availableProviders.includes("openrouter")) {
-      return "openrouter/qwen/qwen3-coder:free";
+      return "openrouter/z-ai/glm-4.5-air:free";
     }
 
     return "opencode/big-pickle";

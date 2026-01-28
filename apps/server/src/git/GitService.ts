@@ -21,6 +21,7 @@ export interface GitService {
   getRepositoryMetadata(
     targetDirectory: AbsoluteFilePath,
   ): Promise<Result<GitRepository>>;
+  /** Adds all changes and then commits using the provided message */
   commitRepository(
     repository: GitRepository,
     message: string,

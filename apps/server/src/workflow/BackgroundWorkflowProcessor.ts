@@ -93,12 +93,20 @@ export class BackgroundWorkflowProcessor {
             | { reason: "task-not-found" }
             | { reason: "project-not-found" }
             | { reason: "execution-failed" }
+            | { reason: "task-already-completed" }
           >
         > => {
           // Get the all the data we need for the run
           const task = await this.taskQueue.getTask(job.data.taskId);
           if (task === undefined) {
             return { success: false, error: { reason: "task-not-found" } };
+          }
+
+          if (task.completedOn !== undefined) {
+            return {
+              success: false,
+              error: { reason: "task-already-completed" },
+            };
           }
 
           const project = await this.projectsService.getProject(

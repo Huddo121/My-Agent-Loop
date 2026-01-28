@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file=.env.local --watch --inspect src/index.ts",
+    "dev": "tsx --env-file=.env.local --env-file-if-exists=.env --watch --inspect src/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",

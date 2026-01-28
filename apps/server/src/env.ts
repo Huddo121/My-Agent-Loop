@@ -19,6 +19,8 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
+
+  OPENROUTER_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -6,6 +6,7 @@ import { LocalFileSystemService } from "./file-system/FileSystemService";
 import { type GitService, SimpleGitService } from "./git/GitService";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
+import { ModelProviderService } from "./providers/ModelProviderServices";
 import { DatabaseRunsService } from "./runs/RunsService";
 import { DockerLoggingService } from "./sandbox/DockerLoggingService";
 import {
@@ -46,7 +47,10 @@ const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
-const openCodeConfigService = new OpenCodeConfigService();
+const modelProviderService = new ModelProviderService({
+  openrouter: env.OPENROUTER_API_KEY,
+});
+const openCodeConfigService = new OpenCodeConfigService(modelProviderService);
 
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,

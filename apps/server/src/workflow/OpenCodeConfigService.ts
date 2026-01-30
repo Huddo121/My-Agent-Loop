@@ -1,8 +1,16 @@
 import type { ProjectId, TaskId } from "@mono/api";
-import type { Config, McpRemoteConfig } from "@opencode-ai/sdk";
+import type { Auth, Config, McpRemoteConfig } from "@opencode-ai/sdk";
+import type { ModelProviderService } from "../providers/ModelProviderServices";
 
 export const MAL_PROJECT_ID_HEADER = "X-MAL-Project-ID";
 export const MAL_TASK_ID_HEADER = "X-MAL-Task-ID";
+
+/**
+ * The configuration for the OpenCode authentication.
+ * If you connect to a provider (e.g. OpenRouter), your auth config is stored in a file
+ *   at `~/.local/share/opencode/auth.json`.
+ */
+type AuthConfig = Record<string, Auth>;
 
 /**
  * Base configuration for OpenCode that is shared across all agent containers.
@@ -24,6 +32,11 @@ const baseConfig: Config = {
           tool_call: true,
           reasoning: true,
         },
+        "glm-4.7-flash": {
+          name: "GLM 4.7 Flash",
+          tool_call: true,
+          reasoning: true,
+        },
       },
     },
   },
@@ -38,6 +51,8 @@ const baseConfig: Config = {
  * Generates OpenCode configuration objects for agent containers, scoping MCP tool access to a specific project and task.
  */
 export class OpenCodeConfigService {
+  constructor(private readonly modelProviderService: ModelProviderService) {}
+
   /**
    * Generates OpenCode configuration.
    *
@@ -61,6 +76,39 @@ export class OpenCodeConfigService {
       mcp: {
         "my-agent-loop-tools": mcpServerConfig,
       },
+      model: this.selectModel(),
     };
+  }
+
+  /**
+   * Generates the OpenCode authentication configuration for the available providers.
+   * @returns The OpenCode authentication configuration
+   */
+  generateAuthConfig(): AuthConfig {
+    const configuredProviders = this.modelProviderService.authConfig;
+    return Object.entries(configuredProviders).reduce(
+      (acc, [provider, value]) => {
+        const auth: Auth = { type: "api", key: value.getSecretValue() };
+        return Object.assign(acc, {
+          [provider]: auth,
+        });
+      },
+      {},
+    );
+  }
+
+  private selectModel(): string {
+    // TODO: Use the project and task's preferences for model selection.
+    const _availableProviders =
+      this.modelProviderService.getAvailableProviders();
+
+    // Disabling this code because opencode has some good free models available again
+    // return "ollama/glm-4.7-flash";
+
+    // if (availableProviders.includes("openrouter")) {
+    //   return "openrouter/qwen/qwen3-coder:free";
+    // }
+
+    return "opencode/kimi-k2.5-free";
   }
 }

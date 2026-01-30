@@ -97,6 +97,16 @@ export class WorkflowExecutionService {
       JSON.stringify(openCodeConfig, null, 2),
     );
 
+    const openCodeAuthConfigPath = AbsoluteFilePath.joinPath(
+      taskTempDirectory,
+      "auth.json",
+    );
+    const openCodeAuthConfig = this.openCodeConfigService.generateAuthConfig();
+    fs.writeFileSync(
+      openCodeAuthConfigPath,
+      JSON.stringify(openCodeAuthConfig, null, 2),
+    );
+
     const repository = checkoutResult.value;
 
     const sandbox = await this.sandboxService.createNewSandbox({
@@ -108,6 +118,10 @@ export class WorkflowExecutionService {
           // Mounting the default config to the container's config directory allows end users to override the config.
           // See https://opencode.ai/docs/config/#precedence-order
           containerPath: "/root/.config/opencode/opencode.json",
+        },
+        {
+          hostPath: openCodeAuthConfigPath,
+          containerPath: "/root/.local/share/opencode/auth.json",
         },
       ],
     });
@@ -149,18 +163,6 @@ export class WorkflowExecutionService {
     );
 
     if (result.value.reason === "completed") {
-      const commitResult = await this.gitService.commitRepository(
-        repository,
-        `Completed task ${task.id} - ${task.title}\n\n${task.description}`,
-      );
-      if (commitResult.success === false) {
-        console.error(
-          `Failed to commit task ${task.id}:`,
-          commitResult.error.message,
-        );
-        return { success: false, error: commitResult.error };
-      }
-
       const workflowOnTaskCompletedResult = await workflow.onTaskCompleted(
         task,
         repository,
@@ -174,7 +176,20 @@ export class WorkflowExecutionService {
         return { success: false, error: workflowOnTaskCompletedResult.error };
       }
 
-      await this.taskQueue.completeTask(task.id);
+      const completedTask = await this.taskQueue.completeTask(task.id);
+      if (completedTask === undefined) {
+        return {
+          success: false,
+          error: new Error(
+            `Failed to complete task ${task.id}: task not found`,
+          ),
+        };
+      } else {
+        console.info("Marked task as completed", {
+          taskId: task.id,
+          task: completedTask,
+        });
+      }
     }
 
     await this.sandboxService.stopSandbox(sandbox.id);

@@ -32,6 +32,11 @@ const baseConfig: Config = {
           tool_call: true,
           reasoning: true,
         },
+        "glm-4.7-flash": {
+          name: "GLM 4.7 Flash",
+          tool_call: true,
+          reasoning: true,
+        },
       },
     },
   },
@@ -93,13 +98,17 @@ export class OpenCodeConfigService {
   }
 
   private selectModel(): string {
-    const availableProviders =
+    // TODO: Use the project and task's preferences for model selection.
+    const _availableProviders =
       this.modelProviderService.getAvailableProviders();
 
-    if (availableProviders.includes("openrouter")) {
-      return "openrouter/z-ai/glm-4.5-air:free";
-    }
+    // Disabling this code because opencode has some good free models available again
+    // return "ollama/glm-4.7-flash";
 
-    return "opencode/big-pickle";
+    // if (availableProviders.includes("openrouter")) {
+    //   return "openrouter/qwen/qwen3-coder:free";
+    // }
+
+    return "opencode/kimi-k2.5-free";
   }
 }

@@ -39,6 +39,7 @@ export class BackgroundWorkflowProcessor {
   ) {
     const runWorker = new Worker(RUN_QUEUE, (job) => this.processRun(job), {
       connection: workflowQueues.redisConnectionOptions,
+      concurrency: 5,
     });
 
     runWorker.on("error", (reason) => {

@@ -1,6 +1,7 @@
 import type { CreateProjectRequest } from "@mono/api";
-import { LoaderIcon, PlusIcon } from "lucide-react";
+import { LoaderIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import type { Project } from "~/types";
 import { Kbd } from "../ui/kbd";
@@ -31,6 +32,7 @@ export const ProjectSidebar = ({
   isLoading = false,
 }: ProjectSidebarProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleOpenCreateDialog = () => {
     setDialogOpen(true);
@@ -87,7 +89,20 @@ export const ProjectSidebar = ({
           onSubmit={handleDialogSubmit}
         />
       </SidebarContent>
-      <SidebarFooter className="items-end border-t">
+      <SidebarFooter className="flex flex-row items-center justify-between border-t px-2 py-2">
+        <Tooltip>
+          <TooltipContent>Admin</TooltipContent>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => navigate("/admin")}
+            >
+              <SettingsIcon className="size-4" />
+              <span className="sr-only">Admin</span>
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
         <Tooltip>
           <TooltipContent>
             <Kbd>Ctrl + B</Kbd>

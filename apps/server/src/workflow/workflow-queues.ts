@@ -12,7 +12,7 @@ export type RunQueueJobPayload = {
 };
 
 export class WorkflowQueues {
-  public readonly runQueue: Queue;
+  public readonly runQueue: Queue<RunQueueJobPayload>;
   public readonly redisConnectionOptions: ConnectionOptions;
 
   constructor(redisHost: string) {

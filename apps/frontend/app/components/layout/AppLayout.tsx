@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { useDefaultLayout } from "react-resizable-panels";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -15,6 +16,7 @@ export type AppLayoutProps = {
 export function AppLayout({ sidebar, children }: AppLayoutProps) {
   const { open, setOpen, isMobile } = useSidebar();
   const sidebarPanelRef = usePanelRef();
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'app-layout', storage: sessionStorage })
 
   // Track if we're currently handling a panel event to avoid circular updates
   const isHandlingPanelEvent = useRef(false);
@@ -71,6 +73,8 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
       orientation="horizontal"
       className="h-full w-full"
       id="app-layout"
+      defaultLayout={defaultLayout}
+      onLayoutChanged={onLayoutChanged}
     >
       <ResizablePanel
         id="sidebar"

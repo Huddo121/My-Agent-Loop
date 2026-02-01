@@ -7,6 +7,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { Project } from "~/types";
 
+//
+// These hooks are expected to be private to the projects directory
+//
+
 const PROJECTS_QUERY_KEY = ["projects"] as const;
 
 /**

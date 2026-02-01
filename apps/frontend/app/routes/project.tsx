@@ -9,7 +9,7 @@ import { useUpdateTask } from "~/hooks/useTasks";
 import {
   ProjectsProvider,
   useProjectsContext,
-} from "~/lib/projects/ProjectsContext";
+} from "~/lib/projects";
 import type { NewTask, Task } from "~/types";
 
 export function meta() {

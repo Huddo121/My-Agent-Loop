@@ -1,5 +1,5 @@
 import type { ProjectId } from "@mono/api";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import { create } from "zustand";
 import {
   useCreateProject,
@@ -67,13 +67,19 @@ export function ProjectsProvider({
   const currentProjectId = useProjectsStore((s) => s.currentProjectId);
   const selectProject = useProjectsStore((s) => s.selectProject);
 
+  useEffect(() => {
+    if (projectId !== undefined && projectId !== currentProjectId) {
+      selectProject(projectId);
+    }
+  }, [projectId, currentProjectId, selectProject])
+
   const { data: projects = [], isLoading: isLoadingProjects } =
     useProjectsQuery();
 
   const selectedProject = useMemo(
     () =>
-      projectId ? (projects.find((p) => p.id === projectId) ?? null) : null,
-    [projectId, projects],
+      currentProjectId ? (projects.find((p) => p.id === currentProjectId) ?? null) : null,
+    [currentProjectId, projects],
   );
 
   const createProject = useCreateProject();

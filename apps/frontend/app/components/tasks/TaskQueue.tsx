@@ -29,7 +29,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { useStartRun, useUpdateProject } from "~/hooks";
+import { useProjectsContext } from "~/lib/projects";
 import type { NewTask, Project, Task, UpdateTask } from "~/types";
 import { ProjectDialog } from "../projects";
 import { ButtonGroup } from "../ui/button-group";
@@ -71,10 +71,10 @@ export function TaskQueue({
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
-  const startRunMutation = useStartRun();
+  const { startRun, updateProject } = useProjectsContext();
 
   const handleStartRun = (mode: "single" | "loop") => {
-    startRunMutation.mutate(
+    startRun.mutate(
       { projectId: project.id, mode },
       {
         onError: (error) => {
@@ -163,16 +163,14 @@ export function TaskQueue({
     setTaskDialogOpen(true);
   };
 
-  const updateProjectMutation = useUpdateProject();
-
   const handleUpdateProject = useCallback(
     (updateProjectRequest: UpdateProjectRequest) => {
-      updateProjectMutation.mutate({
+      updateProject.mutate({
         projectId: project.id,
         updateProjectRequest,
       });
     },
-    [updateProjectMutation, project.id],
+    [updateProject, project.id],
   );
 
   return (
@@ -206,7 +204,7 @@ export function TaskQueue({
                     variant="outline"
                     size="icon-sm"
                     onClick={() => handleStartRun("single")}
-                    disabled={startRunMutation.isPending}
+                    disabled={startRun.isPending}
                   >
                     <PlayIcon className="size-4" />
                     <span className="sr-only">Start next task</span>
@@ -216,21 +214,21 @@ export function TaskQueue({
               </Tooltip>
               {project.workflowConfiguration.onTaskCompleted ===
                 "merge-immediately" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => handleStartRun("loop")}
-                      disabled={startRunMutation.isPending}
-                    >
-                      <RepeatIcon className="size-4" />
-                      <span className="sr-only">Start looping over tasks</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Start looping over tasks</TooltipContent>
-                </Tooltip>
-              )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={() => handleStartRun("loop")}
+                        disabled={startRun.isPending}
+                      >
+                        <RepeatIcon className="size-4" />
+                        <span className="sr-only">Start looping over tasks</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Start looping over tasks</TooltipContent>
+                  </Tooltip>
+                )}
             </ButtonGroup>
           </div>
         </div>

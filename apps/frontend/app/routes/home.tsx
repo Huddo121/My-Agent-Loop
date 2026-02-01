@@ -2,7 +2,7 @@ import type { CreateProjectRequest } from "@mono/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ProjectDialog } from "~/components/projects";
-import { useCreateProject, useProjectsQuery } from "~/hooks";
+import { ProjectsProvider, useProjectsContext } from "~/lib/projects";
 
 export function meta() {
   return [
@@ -14,15 +14,12 @@ export function meta() {
   ];
 }
 
-export default function Home() {
+const HomePage = () => {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Fetch projects from the backend
-  const { data: projects = [], isLoading: isLoadingProjects } = useProjectsQuery();
-
-  // Mutation for creating projects
-  const createProjectMutation = useCreateProject();
+  const { projects, isLoadingProjects, createProject } = useProjectsContext();
 
   // Redirect to first project when projects are loaded
   useEffect(() => {
@@ -39,7 +36,7 @@ export default function Home() {
   }, [projects, isLoadingProjects]);
 
   const handleCreateProject = (createProjectRequest: CreateProjectRequest) => {
-    createProjectMutation.mutate(createProjectRequest, {
+    createProject.mutate(createProjectRequest, {
       onSuccess: (newProject) => {
         navigate(`/projects/${newProject.id}`, { replace: true });
       },
@@ -64,4 +61,10 @@ export default function Home() {
       />
     </>
   );
+}
+
+export default function Home() {
+  return <ProjectsProvider>
+    <HomePage />
+  </ProjectsProvider>
 }

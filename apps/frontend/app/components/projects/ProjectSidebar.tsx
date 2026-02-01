@@ -5,7 +5,7 @@ import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useCreateProject } from "~/lib/projects/useProjects";
 import type { Project } from "~/types";
-import { useProjectsContext } from "../../lib/projects/ProjectsContext";
+import { useProjectsContext } from "../../lib/projects";
 import { Kbd } from "../ui/kbd";
 import {
   Sidebar,

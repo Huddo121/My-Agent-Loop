@@ -7,12 +7,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import type { Project } from "~/types";
 
+//
+// These hooks are expected to be private to the projects directory
+//
+
 const PROJECTS_QUERY_KEY = ["projects"] as const;
 
 /**
  * Hook to fetch all projects.
  */
-export function useProjects() {
+export function useProjectsQuery() {
   return useQuery({
     queryKey: PROJECTS_QUERY_KEY,
     queryFn: async (): Promise<Project[]> => {

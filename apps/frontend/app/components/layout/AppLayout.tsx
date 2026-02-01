@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { useDefaultLayout } from "react-resizable-panels";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -15,6 +16,10 @@ export type AppLayoutProps = {
 export function AppLayout({ sidebar, children }: AppLayoutProps) {
   const { open, setOpen, isMobile } = useSidebar();
   const sidebarPanelRef = usePanelRef();
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "app-layout",
+    storage: sessionStorage,
+  });
 
   // Track if we're currently handling a panel event to avoid circular updates
   const isHandlingPanelEvent = useRef(false);
@@ -41,7 +46,7 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
       isHandlingPanelEvent.current = true;
 
       // Panel is collapsed when size is 0
-      const isCollapsed = panelSize.asPercentage === 0;
+      const isCollapsed = sidebarPanelRef.current?.isCollapsed() ?? false;
       if (isCollapsed && open) {
         setOpen(false);
       } else if (!isCollapsed && !open) {
@@ -53,8 +58,73 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
         isHandlingPanelEvent.current = false;
       });
     },
-    [open, setOpen],
+    [open, setOpen, sidebarPanelRef],
   );
+
+  // Store current values in refs so the resize handler always has fresh values
+  // without needing to re-register the listener
+  const openRef = useRef(open);
+  const isMobileRef = useRef(isMobile);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    isMobileRef.current = isMobile;
+  }, [isMobile]);
+
+  // Window resize listener to sync sidebar open state when crossing mobile threshold
+  // When resizing to mobile, set open=false so FloatingSidebarTrigger renders
+  useEffect(() => {
+    const handleWindowResize = () => {
+      // Skip if we're already handling a panel event to avoid circular updates
+      if (isHandlingPanelEvent.current) {
+        return;
+      }
+
+      const currentOpen = openRef.current;
+
+      // When entering mobile mode, close the sidebar so FloatingSidebarTrigger appears
+      if (isMobileRef.current) {
+        if (currentOpen) {
+          isHandlingPanelEvent.current = true;
+          setOpen(false);
+          requestAnimationFrame(() => {
+            isHandlingPanelEvent.current = false;
+          });
+        }
+        return;
+      }
+
+      // On desktop, sync with panel collapsed state
+      const panel = sidebarPanelRef.current;
+      if (!panel) {
+        return;
+      }
+
+      const isCollapsed = panel.isCollapsed();
+
+      // Sync the sidebar context with the panel's collapsed state
+      if (isCollapsed && currentOpen) {
+        isHandlingPanelEvent.current = true;
+        setOpen(false);
+        requestAnimationFrame(() => {
+          isHandlingPanelEvent.current = false;
+        });
+      } else if (!isCollapsed && !currentOpen) {
+        isHandlingPanelEvent.current = true;
+        setOpen(true);
+        requestAnimationFrame(() => {
+          isHandlingPanelEvent.current = false;
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleWindowResize);
+
+    return () => {
+      window.removeEventListener("resize", handleWindowResize);
+    };
+  }, [sidebarPanelRef, setOpen]);
 
   // On mobile, don't use resizable panels - the sidebar uses a Sheet
   if (isMobile) {
@@ -71,11 +141,13 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
       orientation="horizontal"
       className="h-full w-full"
       id="app-layout"
+      defaultLayout={defaultLayout}
+      onLayoutChanged={onLayoutChanged}
     >
       <ResizablePanel
         id="sidebar"
         panelRef={sidebarPanelRef}
-        defaultSize={20}
+        defaultSize={15}
         minSize="200px"
         maxSize={400}
         collapsible

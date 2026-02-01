@@ -30,6 +30,12 @@ These should be avoided. This applies to both imports from different folders, or
 
 We want to limit the number of different libraries and tools that are used. If we use a library in one package or app, we shouldn't use an alternative in another just because. When selecting a library or tool, do a quick check to see if there are any alternatives that are already in use within the project.
 
+### Internal implementations and 'privacy'
+
+Typescript has limited facilities for marking code as "private". Classes can have private instance variables and methods, and a package can choose not to export a value, and that's about it. This is obviously very annoying if you want to break up your code, or export functions so that they can be tested, but in doing so you lose any real ability to prevent their use somewhere unexpected.
+
+In this codebase, if a folder has a barrel file (an index.ts{x}), then you should assume that anything *not* exported from that file is expected to be private. In these cases only other bits of code inside that folder should import the values.
+
 ## Techniques
 
 **NB:** Not all these techniques are set up in the repo yet

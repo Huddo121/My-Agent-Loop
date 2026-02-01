@@ -16,7 +16,10 @@ export type AppLayoutProps = {
 export function AppLayout({ sidebar, children }: AppLayoutProps) {
   const { open, setOpen, isMobile } = useSidebar();
   const sidebarPanelRef = usePanelRef();
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'app-layout', storage: sessionStorage })
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "app-layout",
+    storage: sessionStorage,
+  });
 
   // Track if we're currently handling a panel event to avoid circular updates
   const isHandlingPanelEvent = useRef(false);

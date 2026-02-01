@@ -1,7 +1,7 @@
 export {
   useCreateProject,
-  useProjects,
+  useProjectsQuery,
   useStartRun,
   useUpdateProject,
-} from "./useProjects";
+} from "../lib/projects/useProjects";
 export { useCreateTask, useMoveTask, useTasks } from "./useTasks";

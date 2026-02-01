@@ -2,7 +2,7 @@ import type { CreateProjectRequest } from "@mono/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ProjectDialog } from "~/components/projects";
-import { useCreateProject, useProjects } from "~/hooks";
+import { useCreateProject, useProjectsQuery } from "~/hooks";
 
 export function meta() {
   return [
@@ -19,7 +19,7 @@ export default function Home() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Fetch projects from the backend
-  const { data: projects = [], isLoading: isLoadingProjects } = useProjects();
+  const { data: projects = [], isLoading: isLoadingProjects } = useProjectsQuery();
 
   // Mutation for creating projects
   const createProjectMutation = useCreateProject();

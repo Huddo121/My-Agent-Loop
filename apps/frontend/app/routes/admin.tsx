@@ -12,7 +12,7 @@ import { useClearQueue, useQueueStats } from "~/hooks/useAdmin";
 
 export function meta() {
   return [
-    { title: "My Agent Loop - Admin" },
+    { title: "Admin - My Agent Loop" },
     {
       name: "description",
       content: "Admin dashboard for managing the system",

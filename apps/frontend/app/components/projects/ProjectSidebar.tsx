@@ -1,9 +1,11 @@
 import type { CreateProjectRequest } from "@mono/api";
 import { LoaderIcon, PlusIcon, SettingsIcon } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
+import { useCreateProject } from "~/lib/projects/useProjects";
 import type { Project } from "~/types";
+import { useProjectsContext } from "../../lib/projects/ProjectsContext";
 import { Kbd } from "../ui/kbd";
 import {
   Sidebar,
@@ -18,7 +20,7 @@ import { ProjectListItem } from "./ProjectListItem";
 
 export type ProjectSidebarProps = {
   projects: Project[];
-  selectedProject: Project | null;
+  currentProject: Project | null;
   onSelectProject: (project: Project) => void;
   onCreateProject: (createProjectRequest: CreateProjectRequest) => void;
   isLoading?: boolean;
@@ -26,7 +28,7 @@ export type ProjectSidebarProps = {
 
 export const ProjectSidebar = ({
   projects,
-  selectedProject,
+  currentProject: selectedProject,
   onSelectProject,
   onCreateProject,
   isLoading = false,
@@ -113,5 +115,42 @@ export const ProjectSidebar = ({
         </Tooltip>
       </SidebarFooter>
     </Sidebar>
+  );
+};
+
+export const ConnectedProjectSidebar = () => {
+  const navigate = useNavigate();
+  // Fetch projects from the backend
+  const { projects, currentProject, isLoadingProjects } = useProjectsContext();
+
+  // Mutations for projects
+  const createProjectMutation = useCreateProject();
+
+  const handleSelectProject = useCallback(
+    (project: Project) => {
+      navigate(`/projects/${project.id}`);
+    },
+    [navigate],
+  );
+
+  const handleCreateProject = useCallback(
+    (createProjectRequest: CreateProjectRequest) => {
+      createProjectMutation.mutate(createProjectRequest, {
+        onSuccess: (newProject) => {
+          navigate(`/projects/${newProject.id}`);
+        },
+      });
+    },
+    [createProjectMutation, navigate],
+  );
+
+  return (
+    <ProjectSidebar
+      projects={projects}
+      currentProject={currentProject}
+      onSelectProject={handleSelectProject}
+      onCreateProject={handleCreateProject}
+      isLoading={isLoadingProjects}
+    />
   );
 };

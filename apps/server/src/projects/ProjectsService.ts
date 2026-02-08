@@ -34,5 +34,9 @@ export interface ProjectsService {
     projectId: ProjectId,
     project: UpdateProject,
   ): Promise<Project | undefined>;
+  updateProjectQueueState(
+    projectId: ProjectId,
+    queueState: QueueState,
+  ): Promise<Project | undefined>;
   deleteProject(projectId: ProjectId): Promise<Project | undefined>;
 }

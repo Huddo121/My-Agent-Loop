@@ -5,6 +5,7 @@ import { runIdSchema } from "../runs/runs-model";
 import { tasksApi } from "../tasks/tasks-api";
 import { projectIdSchema, shortCodeCodec } from "./projects-model";
 
+// TODO: The Version of the workflow configuration should not be exposed over the API, only stored in the DB.
 export const workflowConfigurationDtoSchema = z.object({
   version: z.literal("1"),
   onTaskCompleted: z.enum(["push-branch", "merge-immediately"]),
@@ -60,7 +61,11 @@ export const runStartedResponseSchema = z.object({
 export type RunStartedResponse = z.infer<typeof runStartedResponseSchema>;
 
 export const runFailureResponseSchema = z.object({
-  reason: z.literal(["no-tasks-available", "cannot-loop-with-review-workflow"]),
+  reason: z.literal([
+    "no-tasks-available",
+    "cannot-loop-with-review-workflow",
+    "project-already-processing-tasks",
+  ]),
 });
 export type RunFailureResponse = z.infer<typeof runFailureResponseSchema>;
 

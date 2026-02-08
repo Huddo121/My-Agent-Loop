@@ -35,19 +35,32 @@ export const tasksTable = pg.pgTable("tasks", {
 });
 
 export const runStateEnum = pg.pgEnum("run_state", [
+  /** The run record is created, but not yet picked up for processing by a worker */
   "pending",
+  /** The run is now being processed by a worker */
   "in_progress",
+  /** The run has been completed successfully */
   "completed",
+  /** The run has failed */
   "failed",
 ]);
 
-export const runsTable = pg.pgTable("runs", {
-  id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<RunId>(),
-  taskId: pg
-    .uuid()
-    .references(() => tasksTable.id)
-    .notNull(),
-  startedAt: pg.timestamp().notNull().defaultNow(),
-  state: runStateEnum().notNull().default("pending"),
-  completedAt: pg.timestamp(),
-});
+export const runsTable = pg.pgTable(
+  "runs",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<RunId>(),
+    taskId: pg
+      .uuid()
+      .references(() => tasksTable.id)
+      .notNull(),
+    startedAt: pg.timestamp().notNull().defaultNow(),
+    state: runStateEnum().notNull().default("pending"),
+    completedAt: pg.timestamp(),
+  },
+  (table) => ({
+    oneActiveRunPerTask: pg
+      .uniqueIndex()
+      .on(table.taskId, table.state)
+      .where(sql`state IN ('pending', 'in_progress')`),
+  }),
+);

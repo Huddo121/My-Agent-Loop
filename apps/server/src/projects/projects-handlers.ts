@@ -113,10 +113,10 @@ export const projectsHandlers: HonoHandlersFor<
             };
           }
 
-          return ctx.services.backgroundWorkflowProcessor.queueNextTask(
-            project.id,
-            mode,
-          );
+          const workflowResult =
+            await ctx.services.workflowManager.startWorkflow(project.id, mode);
+
+          return workflowResult;
         },
       );
 
@@ -151,6 +151,13 @@ export const projectsHandlers: HonoHandlersFor<
             { projectId },
           );
           return [400, { reason: "cannot-loop-with-review-workflow" }] as const;
+        })
+        .with({ reason: "project-already-processing-tasks" }, () => {
+          console.warn(
+            "Can not start workflow because the project is already processing tasks",
+            { projectId },
+          );
+          return [400, { reason: "project-already-processing-tasks" }] as const;
         })
         .exhaustive();
     },

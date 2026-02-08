@@ -6,6 +6,7 @@ import type {
   CreateProject,
   Project,
   ProjectsService,
+  QueueState,
   UpdateProject,
 } from "./ProjectsService";
 
@@ -86,6 +87,24 @@ export class DatabaseProjectService implements ProjectsService {
     const [updatedProject] = await tx
       .update(projectsTable)
       .set({ ...project })
+      .where(eq(projectsTable.id, projectId))
+      .returning();
+
+    if (!updatedProject) {
+      return undefined;
+    }
+
+    return fromProjectEntity(updatedProject);
+  }
+
+  async updateProjectQueueState(
+    projectId: ProjectId,
+    queueState: QueueState,
+  ): Promise<Project | undefined> {
+    const tx = getTransaction();
+    const [updatedProject] = await tx
+      .update(projectsTable)
+      .set({ queueState })
       .where(eq(projectsTable.id, projectId))
       .returning();
 

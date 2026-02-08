@@ -2,7 +2,12 @@ import type { ProjectId, ProjectShortCode } from "@mono/api";
 import { asc, eq } from "drizzle-orm";
 import { projectsTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
-import type { Project, ProjectsService } from "./ProjectsService";
+import type {
+  CreateProject,
+  Project,
+  ProjectsService,
+  UpdateProject,
+} from "./ProjectsService";
 
 const fromProjectEntity = (
   project: typeof projectsTable.$inferSelect,
@@ -13,6 +18,7 @@ const fromProjectEntity = (
     shortCode: project.shortCode as ProjectShortCode,
     repositoryUrl: project.repositoryUrl,
     workflowConfiguration: project.workflowConfiguration,
+    queueState: project.queueState,
   };
 };
 
@@ -40,7 +46,7 @@ export class DatabaseProjectService implements ProjectsService {
     return fromProjectEntity(project);
   }
 
-  async createProject(project: Project): Promise<Project> {
+  async createProject(project: CreateProject): Promise<Project> {
     const tx = getTransaction();
     const [newProject] = await tx
       .insert(projectsTable)
@@ -71,17 +77,16 @@ export class DatabaseProjectService implements ProjectsService {
     return fromProjectEntity(project);
   }
 
-  async updateProject(project: Project): Promise<Project | undefined> {
+  async updateProject(
+    projectId: ProjectId,
+    project: UpdateProject,
+  ): Promise<Project | undefined> {
     const tx = getTransaction();
+
     const [updatedProject] = await tx
       .update(projectsTable)
-      .set({
-        name: project.name,
-        shortCode: project.shortCode,
-        repositoryUrl: project.repositoryUrl,
-        workflowConfiguration: project.workflowConfiguration,
-      })
-      .where(eq(projectsTable.id, project.id))
+      .set({ ...project })
+      .where(eq(projectsTable.id, projectId))
       .returning();
 
     if (!updatedProject) {

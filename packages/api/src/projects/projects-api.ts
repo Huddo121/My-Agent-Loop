@@ -13,20 +13,37 @@ export type WorkflowConfigurationDto = z.infer<
   typeof workflowConfigurationDtoSchema
 >;
 
+export const queueStateDtoSchema = z.enum([
+  "idle",
+  "processing-single",
+  "processing-loop",
+  "failed",
+]);
+export type QueueStateDto = z.infer<typeof queueStateDtoSchema>;
+
 export const projectDtoSchema = z.object({
   id: projectIdSchema,
   name: z.string(),
   shortCode: shortCodeCodec,
   repositoryUrl: z.string(),
   workflowConfiguration: workflowConfigurationDtoSchema,
+  queueState: queueStateDtoSchema,
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
 
-export const createProjectRequestSchema = projectDtoSchema.omit({ id: true });
+export const createProjectRequestSchema = projectDtoSchema.omit({
+  id: true,
+  queueState: true,
+});
 
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
-export const updateProjectRequestSchema = createProjectRequestSchema;
+export const updateProjectRequestSchema = projectDtoSchema
+  .omit({
+    id: true,
+    queueState: true,
+  })
+  .partial();
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 
 const runModeSchema = z.enum(["single", "loop"]);

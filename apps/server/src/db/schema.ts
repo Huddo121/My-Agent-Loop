@@ -4,12 +4,20 @@ import * as pg from "drizzle-orm/pg-core";
 import type { RunId } from "../runs/RunId";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
+export const queueStateEnum = pg.pgEnum("queue_state", [
+  "idle",
+  "processing-single",
+  "processing-loop",
+  "failed",
+]);
+
 export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
   name: pg.text().notNull(),
   shortCode: pg.text().notNull().unique(),
   repositoryUrl: pg.text().notNull(),
   workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
+  queueState: queueStateEnum().notNull().default("idle"),
 });
 
 export const tasksTable = pg.pgTable("tasks", {

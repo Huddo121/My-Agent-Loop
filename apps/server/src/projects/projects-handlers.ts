@@ -51,16 +51,17 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     PATCH: async (ctx) => {
-      // TODO: This isn't operating as a proper patch endpoint, update to take a Partial<Project>
       const { projectId } = ctx.hono.req.param();
       return withNewTransaction(ctx.services.db, async () => {
-        const project = await ctx.services.projectsService.updateProject({
-          id: projectId as ProjectId,
-          name: ctx.body.name,
-          shortCode: ctx.body.shortCode,
-          repositoryUrl: ctx.body.repositoryUrl,
-          workflowConfiguration: ctx.body.workflowConfiguration,
-        });
+        const project = await ctx.services.projectsService.updateProject(
+          projectId as ProjectId,
+          {
+            name: ctx.body.name,
+            shortCode: ctx.body.shortCode,
+            repositoryUrl: ctx.body.repositoryUrl,
+            workflowConfiguration: ctx.body.workflowConfiguration,
+          },
+        );
         if (project === undefined) {
           return notFound();
         }

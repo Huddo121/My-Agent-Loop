@@ -7,7 +7,7 @@ import { type GitService, SimpleGitService } from "./git/GitService";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
 import { ModelProviderService } from "./providers/ModelProviderServices";
-import { DatabaseRunsService } from "./runs/RunsService";
+import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
 import { DockerLoggingService } from "./sandbox/DockerLoggingService";
 import {
   DockerSandboxService,
@@ -17,6 +17,11 @@ import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
 import { OpenCodeConfigService } from "./workflow/OpenCodeConfigService";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
+import {
+  DatabaseWorkflowManager,
+  type WorkflowManager,
+} from "./workflow/WorkflowManager";
+import { WorkflowMessengerService } from "./workflow/WorkflowMessengerService";
 import { WorkflowQueues } from "./workflow/workflow-queues";
 
 export interface Services {
@@ -25,9 +30,11 @@ export interface Services {
   sandboxService: SandboxService;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
+  workflowManager: WorkflowManager;
   workflowExecutionService: WorkflowExecutionService;
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
+  runsService: RunsService;
 }
 
 const gitService = new SimpleGitService();
@@ -52,6 +59,17 @@ const modelProviderService = new ModelProviderService({
 });
 const openCodeConfigService = new OpenCodeConfigService(modelProviderService);
 
+const workflowMessengerService = new WorkflowMessengerService();
+
+const workflowManager = new DatabaseWorkflowManager(
+  workflowMessengerService,
+  taskQueue,
+  runsService,
+  projectsService,
+  workflowQueues,
+  db,
+);
+
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
@@ -62,6 +80,7 @@ const workflowExecutionService = new WorkflowExecutionService(
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   workflowQueues,
+  workflowMessengerService,
   taskQueue,
   runsService,
   projectsService,
@@ -75,8 +94,10 @@ export const services: Services = {
   taskQueue,
   sandboxService,
   gitService,
+  workflowManager,
   workflowExecutionService,
   projectsService,
   workflowQueues,
   backgroundWorkflowProcessor,
+  runsService,
 };

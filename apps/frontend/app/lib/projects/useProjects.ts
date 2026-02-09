@@ -96,6 +96,8 @@ export function useUpdateProject() {
  * Hook to start a run for a project.
  */
 export function useStartRun() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       projectId,
@@ -103,7 +105,7 @@ export function useStartRun() {
     }: {
       projectId: ProjectId;
       mode: "single" | "loop";
-    }): Promise<{ runId: string }> => {
+    }): Promise<{ runId: string; project: Project }> => {
       const response = await apiClient.projects[":projectId"].run.POST({
         pathParams: { projectId },
         body: { mode },
@@ -115,6 +117,66 @@ export function useStartRun() {
         throw new Error("Project not found or no tasks available");
       }
       throw new Error("Failed to start run");
+    },
+    onSuccess: (result) => {
+      // Update the cache with the project returned from the server
+      const updatedProject = result.project;
+      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
+        if (!old) return [updatedProject];
+        return old.map((p) =>
+          p.id === updatedProject.id ? updatedProject : p,
+        );
+      });
+    },
+    onError: () => {
+      // On error, invalidate to refetch and get the real state
+      queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to stop the queue for a project.
+ */
+export function useStopQueue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      stopImmediately,
+    }: {
+      projectId: ProjectId;
+      stopImmediately: boolean;
+    }): Promise<{ project: Project }> => {
+      const response = await apiClient.projects[":projectId"].stop.POST({
+        pathParams: { projectId },
+        body: { stopImmediately },
+      });
+      if (response.status === 200) {
+        return response.responseBody;
+      }
+      if (response.status === 404) {
+        throw new Error("Project not found");
+      }
+      if (response.status === 400) {
+        throw new Error("Queue is not in a running state");
+      }
+      throw new Error("Failed to stop queue");
+    },
+    onSuccess: (result) => {
+      // Update the cache with the project returned from the server
+      const updatedProject = result.project;
+      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
+        if (!old) return [updatedProject];
+        return old.map((p) =>
+          p.id === updatedProject.id ? updatedProject : p,
+        );
+      });
+    },
+    onError: () => {
+      // On error, invalidate to refetch and get the real state
+      queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
     },
   });
 }

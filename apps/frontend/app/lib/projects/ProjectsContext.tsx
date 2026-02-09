@@ -5,6 +5,7 @@ import {
   useCreateProject,
   useProjectsQuery,
   useStartRun,
+  useStopQueue,
   useUpdateProject,
 } from "~/lib/projects/useProjects";
 import type { Project } from "~/types";
@@ -47,6 +48,8 @@ export interface ProjectsContextValue {
   updateProject: ReturnType<typeof useUpdateProject>;
 
   startRun: ReturnType<typeof useStartRun>;
+
+  stopQueue: ReturnType<typeof useStopQueue>;
 }
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
@@ -85,6 +88,7 @@ export function ProjectsProvider({
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const startRun = useStartRun();
+  const stopQueue = useStopQueue();
 
   const value: ProjectsContextValue = useMemo(
     () => ({
@@ -96,6 +100,7 @@ export function ProjectsProvider({
       createProject,
       updateProject,
       startRun,
+      stopQueue,
     }),
     [
       projectId,
@@ -107,6 +112,7 @@ export function ProjectsProvider({
       createProject,
       updateProject,
       startRun,
+      stopQueue,
     ],
   );
 

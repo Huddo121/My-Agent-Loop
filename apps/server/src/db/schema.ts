@@ -4,12 +4,21 @@ import * as pg from "drizzle-orm/pg-core";
 import type { RunId } from "../runs/RunId";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
+export const queueStateEnum = pg.pgEnum("queue_state", [
+  "idle",
+  "processing-single",
+  "processing-loop",
+  "stopping",
+  "failed",
+]);
+
 export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
   name: pg.text().notNull(),
   shortCode: pg.text().notNull().unique(),
   repositoryUrl: pg.text().notNull(),
   workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
+  queueState: queueStateEnum().notNull().default("idle"),
 });
 
 export const tasksTable = pg.pgTable("tasks", {
@@ -27,19 +36,32 @@ export const tasksTable = pg.pgTable("tasks", {
 });
 
 export const runStateEnum = pg.pgEnum("run_state", [
+  /** The run record is created, but not yet picked up for processing by a worker */
   "pending",
+  /** The run is now being processed by a worker */
   "in_progress",
+  /** The run has been completed successfully */
   "completed",
+  /** The run has failed */
   "failed",
 ]);
 
-export const runsTable = pg.pgTable("runs", {
-  id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<RunId>(),
-  taskId: pg
-    .uuid()
-    .references(() => tasksTable.id)
-    .notNull(),
-  startedAt: pg.timestamp().notNull().defaultNow(),
-  state: runStateEnum().notNull().default("pending"),
-  completedAt: pg.timestamp(),
-});
+export const runsTable = pg.pgTable(
+  "runs",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<RunId>(),
+    taskId: pg
+      .uuid()
+      .references(() => tasksTable.id)
+      .notNull(),
+    startedAt: pg.timestamp().notNull().defaultNow(),
+    state: runStateEnum().notNull().default("pending"),
+    completedAt: pg.timestamp(),
+  },
+  (table) => ({
+    oneActiveRunPerTask: pg
+      .uniqueIndex()
+      .on(table.taskId, table.state)
+      .where(sql`state IN ('pending', 'in_progress')`),
+  }),
+);

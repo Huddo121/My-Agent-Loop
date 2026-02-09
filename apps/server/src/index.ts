@@ -16,7 +16,13 @@ async function shutdown(signal: string): Promise<void> {
   isShuttingDown = true;
 
   console.log(`\nReceived ${signal}, shutting down...`);
+
+  // Stop accepting new jobs and mark any in-progress runs as failed
+  await services.backgroundWorkflowProcessor.shutdown();
+
+  // Tear down all running sandbox containers
   await services.sandboxService.stopAllSandboxes();
+
   console.log("Shutdown complete.");
   process.exit(0);
 }

@@ -7,7 +7,7 @@ import { type GitService, SimpleGitService } from "./git/GitService";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
 import { ModelProviderService } from "./providers/ModelProviderServices";
-import { DatabaseRunsService } from "./runs/RunsService";
+import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
 import { DockerLoggingService } from "./sandbox/DockerLoggingService";
 import {
   DockerSandboxService,
@@ -34,6 +34,7 @@ export interface Services {
   workflowExecutionService: WorkflowExecutionService;
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
+  runsService: RunsService;
 }
 
 const gitService = new SimpleGitService();
@@ -98,4 +99,5 @@ export const services: Services = {
   projectsService,
   workflowQueues,
   backgroundWorkflowProcessor,
+  runsService,
 };

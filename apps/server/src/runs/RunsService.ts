@@ -1,6 +1,6 @@
-import type { TaskId } from "@mono/api";
-import { eq } from "drizzle-orm";
-import { runsTable } from "../db";
+import type { ProjectId, TaskId } from "@mono/api";
+import { and, eq, inArray } from "drizzle-orm";
+import { runsTable, tasksTable } from "../db";
 import type { Result } from "../utils/Result";
 import { getTransaction } from "../utils/transaction-context";
 import type { RunId } from "./RunId";
@@ -33,6 +33,10 @@ export interface RunsService {
     state: Exclude<RunState, "pending">,
   ): Promise<Result<Run, UpdateRunStateError>>;
   getRunLogs(runId: RunId): AsyncGenerator<RunLogLine>;
+  /**
+   * Get all active runs (pending or in_progress) for a given project.
+   */
+  getRunsForProject(projectId: ProjectId): Promise<Run[]>;
 }
 
 const fromRunEntity = (entity: typeof runsTable.$inferSelect): Run => ({
@@ -101,5 +105,27 @@ export class DatabaseRunsService implements RunsService {
   //         to stream the logs back to the caller if the stream is still running.
   getRunLogs(_runId: RunId): AsyncGenerator<RunLogLine> {
     throw new Error("Method not implemented.");
+  }
+
+  async getRunsForProject(projectId: ProjectId): Promise<Run[]> {
+    const tx = getTransaction();
+    const runs = await tx
+      .select({
+        id: runsTable.id,
+        taskId: runsTable.taskId,
+        startedAt: runsTable.startedAt,
+        completedAt: runsTable.completedAt,
+        state: runsTable.state,
+      })
+      .from(runsTable)
+      .innerJoin(tasksTable, eq(runsTable.taskId, tasksTable.id))
+      .where(
+        and(
+          eq(tasksTable.projectId, projectId),
+          inArray(runsTable.state, ["pending", "in_progress"]),
+        ),
+      );
+
+    return runs.map(fromRunEntity);
   }
 }

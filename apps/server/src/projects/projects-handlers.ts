@@ -177,10 +177,18 @@ export const projectsHandlers: HonoHandlersFor<
           return [400, { reason: "queue-not-in-running-state" }] as const;
         }
 
+        // Check if there are any executing runs (pending or in_progress) for this project
+        const activeRuns = await ctx.services.runsService.getRunsForProject(
+          projectId as ProjectId,
+        );
+
+        const hasExecutingRuns = activeRuns.length > 0;
+        const newQueueState = hasExecutingRuns ? "stopping" : "idle";
+
         const updatedProject =
           await ctx.services.projectsService.updateProjectQueueState(
             projectId as ProjectId,
-            "stopping",
+            newQueueState,
           );
 
         if (updatedProject === undefined) {
@@ -191,6 +199,8 @@ export const projectsHandlers: HonoHandlersFor<
           projectId,
           stopImmediately,
           previousQueueState: queueState,
+          newQueueState,
+          hasExecutingRuns,
         });
 
         return ok({ project: updatedProject });

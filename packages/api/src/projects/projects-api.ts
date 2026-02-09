@@ -58,6 +58,7 @@ export type StartRunRequest = z.infer<typeof startRunRequestSchema>;
 
 export const runStartedResponseSchema = z.object({
   runId: runIdSchema,
+  project: projectDtoSchema,
 });
 export type RunStartedResponse = z.infer<typeof runStartedResponseSchema>;
 
@@ -70,11 +71,9 @@ export const runFailureResponseSchema = z.object({
 });
 export type RunFailureResponse = z.infer<typeof runFailureResponseSchema>;
 
-export const stopQueueRequestSchema = z
-  .object({
-    immediate: z.boolean(),
-  })
-  .optional();
+export const stopQueueRequestSchema = z.object({
+  stopImmediately: z.boolean(),
+});
 export type StopQueueRequest = z.infer<typeof stopQueueRequestSchema>;
 
 export const stopQueueFailureResponseSchema = z.object({
@@ -83,6 +82,11 @@ export const stopQueueFailureResponseSchema = z.object({
 export type StopQueueFailureResponse = z.infer<
   typeof stopQueueFailureResponseSchema
 >;
+
+export const stopQueueResponseSchema = z.object({
+  project: projectDtoSchema,
+});
+export type StopQueueResponse = z.infer<typeof stopQueueResponseSchema>;
 
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
@@ -110,7 +114,7 @@ export const projectsApi = Endpoint.multi({
           .output(404, notFoundSchema),
         stop: Endpoint.post()
           .input(stopQueueRequestSchema)
-          .output(202)
+          .output(200, stopQueueResponseSchema)
           .output(400, stopQueueFailureResponseSchema)
           .output(404, notFoundSchema),
       },

@@ -12,7 +12,22 @@ export function ok<A>(body?: A): [200, A | undefined] {
   return [200, body as A | undefined];
 }
 
-export const accepted = (): [204, undefined] => [204, undefined];
+// /**
+//  * Returns a response tuple for HTTP 202 Accepted status code.
+//  * @param body - Optional response body (defaults to undefined)
+//  * @returns A tuple [202, body] suitable for use in endpoint handlers
+//  */
+export const accepted = <T = undefined>(body?: T): [202, T] => {
+  return [202, body as T];
+};
+
+/**
+ * Returns a response tuple for HTTP 204 No Content status code.
+ * @returns A tuple [204, undefined] suitable for use in endpoint handlers
+ */
+export const noContent = (): [204, undefined] => {
+  return [204, undefined];
+};
 
 export const badUserInput = (message: string): [400, BadUserInput] => [
   400,

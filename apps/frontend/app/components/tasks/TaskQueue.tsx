@@ -20,6 +20,7 @@ import {
   PlusIcon,
   RepeatIcon,
   SettingsIcon,
+  SquareIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -71,7 +72,13 @@ export function TaskQueue({
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
-  const { startRun, updateProject } = useProjectsContext();
+  const { startRun, stopQueue, updateProject } = useProjectsContext();
+
+  const queueState = project.queueState;
+  const isProcessingSingle = queueState === "processing-single";
+  const isProcessingLoop = queueState === "processing-loop";
+  const isStopping = queueState === "stopping";
+  const isProcessing = isProcessingSingle || isProcessingLoop;
 
   const handleStartRun = (mode: "single" | "loop") => {
     startRun.mutate(
@@ -79,6 +86,17 @@ export function TaskQueue({
       {
         onError: (error) => {
           console.error("Failed to start run:", error);
+        },
+      },
+    );
+  };
+
+  const handleStopQueue = () => {
+    stopQueue.mutate(
+      { projectId: project.id, stopImmediately: false },
+      {
+        onError: (error) => {
+          console.error("Failed to stop queue:", error);
         },
       },
     );
@@ -204,7 +222,7 @@ export function TaskQueue({
                     variant="outline"
                     size="icon-sm"
                     onClick={() => handleStartRun("single")}
-                    disabled={startRun.isPending}
+                    disabled={startRun.isPending || isProcessingSingle}
                   >
                     <PlayIcon className="size-4" />
                     <span className="sr-only">Start next task</span>
@@ -220,7 +238,7 @@ export function TaskQueue({
                         variant="outline"
                         size="icon-sm"
                         onClick={() => handleStartRun("loop")}
-                        disabled={startRun.isPending}
+                        disabled={startRun.isPending || isProcessingLoop}
                       >
                         <RepeatIcon className="size-4" />
                         <span className="sr-only">Start looping over tasks</span>
@@ -229,6 +247,24 @@ export function TaskQueue({
                     <TooltipContent>Start looping over tasks</TooltipContent>
                   </Tooltip>
                 )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={handleStopQueue}
+                    disabled={!isProcessing || stopQueue.isPending}
+                  >
+                    {isStopping ? (
+                      <LoaderIcon className="size-4 animate-spin" />
+                    ) : (
+                      <SquareIcon className="size-4" />
+                    )}
+                    <span className="sr-only">Stop queue</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Stop queue</TooltipContent>
+              </Tooltip>
             </ButtonGroup>
           </div>
         </div>

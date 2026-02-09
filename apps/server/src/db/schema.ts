@@ -8,6 +8,7 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
   "idle",
   "processing-single",
   "processing-loop",
+  "stopping",
   "failed",
 ]);
 

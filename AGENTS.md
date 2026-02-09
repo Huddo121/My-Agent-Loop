@@ -4,6 +4,7 @@ Review the `docs` directory to understand some of the specifics of this project.
 
 ## Specific guidance for AI Agents
 
+- At a bare minimum, you should read the coding-practices doc
 - Don't generate or modify configuration if a tool can do it for you
   - E.g. don't modify package.json to add a dependency, use a `pnpm` command to do it
 - If you modify the documentation, be sure to update the `00-index.md` if necessary
@@ -12,3 +13,4 @@ Review the `docs` directory to understand some of the specifics of this project.
 - If you wish to introduce a new pattern or technology to the codebase, be sure to document it in the `docs/decisions` folder in a markdown file
 - Leverage the `webfetch` tool to get the latest information on things, or to review the documentation of libraries and tools you're using.
   - Repeat the important parts of what you find when you do so
+- When the user is planning work with you, or gives you a set of instructions for work to complete, you are strongly encouraged to ask clarifying questions. Focus especially on missed states and edge cases. If the user suggests a technology to use, and you think there's a better one, surface it as a suggestion before continuing.

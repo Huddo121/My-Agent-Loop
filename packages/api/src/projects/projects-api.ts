@@ -18,6 +18,7 @@ export const queueStateDtoSchema = z.enum([
   "idle",
   "processing-single",
   "processing-loop",
+  "stopping",
   "failed",
 ]);
 export type QueueStateDto = z.infer<typeof queueStateDtoSchema>;
@@ -69,6 +70,20 @@ export const runFailureResponseSchema = z.object({
 });
 export type RunFailureResponse = z.infer<typeof runFailureResponseSchema>;
 
+export const stopQueueRequestSchema = z
+  .object({
+    immediate: z.boolean(),
+  })
+  .optional();
+export type StopQueueRequest = z.infer<typeof stopQueueRequestSchema>;
+
+export const stopQueueFailureResponseSchema = z.object({
+  reason: z.literal("queue-not-in-running-state"),
+});
+export type StopQueueFailureResponse = z.infer<
+  typeof stopQueueFailureResponseSchema
+>;
+
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
   POST: Endpoint.post()
@@ -92,6 +107,11 @@ export const projectsApi = Endpoint.multi({
           .input(startRunRequestSchema)
           .output(200, runStartedResponseSchema)
           .output(400, runFailureResponseSchema)
+          .output(404, notFoundSchema),
+        stop: Endpoint.post()
+          .input(stopQueueRequestSchema)
+          .output(202)
+          .output(400, stopQueueFailureResponseSchema)
           .output(404, notFoundSchema),
       },
     }),

@@ -53,7 +53,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     const queueState = project.queueState;
 
     const canStart = match(queueState)
-      .with("idle", "failed", () => true)
+      .with("idle", "failed", "stopping", () => true)
       .with("processing-loop", "processing-single", () => false)
       .exhaustive();
 
@@ -181,6 +181,24 @@ export class DatabaseWorkflowManager implements WorkflowManager {
           );
           return;
         })
+        .with("stopping", async () => {
+          const project = await this.projectsService.updateProjectQueueState(
+            projectId,
+            "idle",
+          );
+          if (project === undefined) {
+            console.error(
+              "Failed to update project queue state, could not find project",
+              { projectId, runId },
+            );
+            return;
+          }
+          console.info(
+            "Run completed while queue was stopping, updated project queue state to idle",
+            { projectId, runId },
+          );
+          return;
+        })
         .with("idle", "failed", async () => {
           console.error(
             "Found project in an invalid state while handling run completion",
@@ -209,7 +227,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
 
       // TODO: When we get to having multiple runs per project we'll need to think about what to do to other runs
       await match(queueState)
-        .with("processing-loop", "processing-single", async () => {
+        .with("processing-loop", "processing-single", "stopping", async () => {
           await this.projectsService.updateProjectQueueState(
             projectId,
             "failed",

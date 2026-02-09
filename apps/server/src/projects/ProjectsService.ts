@@ -5,6 +5,7 @@ export type QueueState =
   | "idle"
   | "processing-single"
   | "processing-loop"
+  | "stopping"
   | "failed";
 
 export interface Project {

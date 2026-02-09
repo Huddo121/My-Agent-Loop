@@ -4,6 +4,7 @@ import {
   ok,
   type ProjectId,
   type RunFailureResponse,
+  type StopQueueFailureResponse,
   runIdSchema,
 } from "@mono/api";
 import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
@@ -160,6 +161,48 @@ export const projectsHandlers: HonoHandlersFor<
           return [400, { reason: "project-already-processing-tasks" }] as const;
         })
         .exhaustive();
+    },
+    stop: async (ctx) => {
+      const { projectId } = ctx.hono.req.param();
+      const immediate = ctx.body?.immediate;
+
+      return await withNewTransaction(ctx.services.db, async () => {
+        const project = await ctx.services.projectsService.getProject(
+          projectId as ProjectId,
+        );
+
+        if (project === undefined) {
+          return notFound();
+        }
+
+        const queueState = project.queueState;
+        const isRunningState =
+          queueState === "processing-single" || queueState === "processing-loop";
+
+        if (!isRunningState) {
+          console.warn(
+            "Can not stop queue because it is not in a running state",
+            { projectId, queueState },
+          );
+          return [
+            400,
+            { reason: "queue-not-in-running-state" } as StopQueueFailureResponse,
+          ] as const;
+        }
+
+        console.info("Stopping queue", {
+          projectId,
+          immediate,
+          previousQueueState: queueState,
+        });
+
+        await ctx.services.projectsService.updateProjectQueueState(
+          projectId as ProjectId,
+          "stopping",
+        );
+
+        return [202, undefined] as const;
+      });
     },
   },
 };

@@ -182,19 +182,20 @@ export function useStopQueue() {
 }
 
 /**
- * Hook to test forge connection for a project.
+ * Hook to test forge connection using credentials provided in the request
+ * (e.g. from the project dialog form). Use this to validate credentials
+ * before saving; does not rely on server-stored project state.
  */
-export function useTestForgeConnection() {
+export function useTestForgeConnectionWithCredentials() {
   return useMutation({
-    mutationFn: async ({
-      projectId,
-    }: {
-      projectId: ProjectId;
+    mutationFn: async (params: {
+      forgeType: "gitlab" | "github";
+      forgeBaseUrl: string;
+      forgeToken: string;
+      repositoryUrl: string;
     }): Promise<{ success: true } | { success: false; error: string }> => {
-      const response = await apiClient.projects[":projectId"][
-        "test-forge-connection"
-      ].POST({
-        pathParams: { projectId },
+      const response = await apiClient.projects["test-forge-connection"].POST({
+        body: params,
       });
       if (response.status === 200) {
         return response.responseBody;

@@ -13,6 +13,7 @@ import {
 } from "../forge";
 import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
+import { ProtectedString } from "../utils/ProtectedString";
 import { withNewTransaction } from "../utils/transaction-context";
 
 export const projectsHandlers: HonoHandlersFor<
@@ -53,6 +54,25 @@ export const projectsHandlers: HonoHandlersFor<
         hasForgeToken,
       });
     });
+  },
+  "test-forge-connection": async (ctx) => {
+    const { forgeType, forgeBaseUrl, forgeToken, repositoryUrl } = ctx.body;
+    const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const credential = {
+      forgeType,
+      forgeBaseUrl,
+      token: new ProtectedString(forgeToken),
+      projectPath,
+    };
+    const gitForgeService = createGitForgeService(credential);
+    const result = await gitForgeService.testConnection();
+    if (result.success) {
+      return ok({ success: true as const });
+    }
+    return [
+      400,
+      { success: false as const, error: result.error.message },
+    ] as const;
   },
   ":projectId": {
     GET: async (ctx) => {
@@ -162,7 +182,6 @@ export const projectsHandlers: HonoHandlersFor<
         }
         const projectPath = getProjectPathFromRepositoryUrl(
           project.repositoryUrl,
-          project.forgeType,
         );
         const gitForgeService = createGitForgeService({
           forgeType: project.forgeType,

@@ -90,10 +90,7 @@ async function getGitForgeServiceOrError(
     };
   }
 
-  const projectPath = getProjectPathFromRepositoryUrl(
-    project.repositoryUrl,
-    project.forgeType,
-  );
+  const projectPath = getProjectPathFromRepositoryUrl(project.repositoryUrl);
   const service = createGitForgeService({
     forgeType: project.forgeType,
     forgeBaseUrl: project.forgeBaseUrl,

@@ -119,12 +119,27 @@ export type TestForgeConnectionFailure = z.infer<
   typeof testForgeConnectionFailureSchema
 >;
 
+/** Request body to test forge connection with provided credentials (e.g. from project dialog). */
+export const testForgeConnectionRequestSchema = z.object({
+  forgeType: forgeTypeSchema,
+  forgeBaseUrl: z.string().url(),
+  forgeToken: z.string(),
+  repositoryUrl: z.string(),
+});
+export type TestForgeConnectionRequest = z.infer<
+  typeof testForgeConnectionRequestSchema
+>;
+
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
   POST: Endpoint.post()
     .input(createProjectRequestSchema)
     .output(200, projectDtoSchema),
   children: {
+    "test-forge-connection": Endpoint.post()
+      .input(testForgeConnectionRequestSchema)
+      .output(200, testForgeConnectionSuccessSchema)
+      .output(400, testForgeConnectionFailureSchema),
     ":projectId": Endpoint.multi({
       GET: Endpoint.get()
         .output(200, projectDtoSchema)

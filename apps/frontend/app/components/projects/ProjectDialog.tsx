@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { useTestForgeConnection } from "~/lib/projects/useProjects";
+import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
 import type { ForgeTypeDto } from "~/types";
 
 export type ProjectDialogMode = "create" | "update";
@@ -62,7 +62,7 @@ export function ProjectDialog({
   initialForgeType = null,
   initialForgeBaseUrl = null,
   initialHasForgeToken = false,
-  initialProjectId,
+  initialProjectId: _initialProjectId,
   onSubmit,
 }: ProjectDialogProps) {
   // TODO: Switch to using react-hook-form
@@ -82,7 +82,7 @@ export function ProjectDialog({
     { success: true } | { success: false; error: string } | null
   >(null);
 
-  const testForgeConnection = useTestForgeConnection();
+  const testForgeConnection = useTestForgeConnectionWithCredentials();
 
   useEffect(() => {
     if (open) {
@@ -109,10 +109,14 @@ export function ProjectDialog({
   ]);
 
   const handleTestConnection = () => {
-    if (initialProjectId === undefined) return;
     setTestResult(null);
     testForgeConnection.mutate(
-      { projectId: initialProjectId },
+      {
+        forgeType,
+        forgeBaseUrl: forgeBaseUrl.trim(),
+        forgeToken: forgeToken.trim(),
+        repositoryUrl: repositoryUrl.trim(),
+      },
       {
         onSuccess: (result) => setTestResult(result),
         onError: () =>
@@ -120,6 +124,9 @@ export function ProjectDialog({
       },
     );
   };
+
+  const canTestConnection =
+    forgeToken.trim().length > 0 && repositoryUrl.trim().length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,31 +271,29 @@ export function ProjectDialog({
                 onChange={(e) => setForgeToken(e.target.value)}
                 className="mt-1"
               />
-              {mode === "update" &&
-                (initialHasForgeToken || forgeToken) &&
-                initialProjectId && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleTestConnection}
-                      disabled={testForgeConnection.isPending}
-                    >
-                      {testForgeConnection.isPending
-                        ? "Testing…"
-                        : "Test Connection"}
-                    </Button>
-                    {testResult !== null &&
-                      (testResult.success ? (
-                        <span className="text-sm text-green-600">Success</span>
-                      ) : (
-                        <span className="text-sm text-destructive">
-                          {testResult.error}
-                        </span>
-                      ))}
-                  </div>
-                )}
+              {canTestConnection && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testForgeConnection.isPending}
+                  >
+                    {testForgeConnection.isPending
+                      ? "Testing…"
+                      : "Test Connection"}
+                  </Button>
+                  {testResult !== null &&
+                    (testResult.success ? (
+                      <span className="text-sm text-green-600">Success</span>
+                    ) : (
+                      <span className="text-sm text-destructive">
+                        {testResult.error}
+                      </span>
+                    ))}
+                </div>
+              )}
             </div>
             <hr />
             <div>

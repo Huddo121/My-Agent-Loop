@@ -178,7 +178,6 @@ export class BackgroundWorkflowProcessor {
               if (secret !== undefined) {
                 const projectPath = getProjectPathFromRepositoryUrl(
                   project.repositoryUrl,
-                  project.forgeType,
                 );
                 gitForgeService = createGitForgeService({
                   forgeType: project.forgeType,

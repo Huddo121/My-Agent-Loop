@@ -11,7 +11,6 @@ import type {
 import type {
   CreateMergeRequestOptions,
   ForgeCredential,
-  ForgeType,
   JobId,
   ListMergeRequestOptions,
   MergeRequest,
@@ -252,13 +251,43 @@ export class DefaultGitForgeService implements GitForgeService {
 
 /**
  * Extracts the project path from a repository URL (e.g. "group/repo" for GitLab/GitHub).
+ * Handles HTTPS, SSH (ssh://), and SCP-style (git@host:path) URLs.
  */
-export function getProjectPathFromRepositoryUrl(
-  repositoryUrl: string,
-  _forgeType: ForgeType,
-): string {
-  const url = new URL(repositoryUrl);
-  return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+export function getProjectPathFromRepositoryUrl(repositoryUrl: string): string {
+  const trimmed = repositoryUrl.trim();
+
+  // SCP-style: git@host:path/to/repo.git — path is after the first colon
+  if (trimmed.startsWith("git@")) {
+    const colonIndex = trimmed.indexOf(":");
+    if (colonIndex !== -1) {
+      const path = trimmed.slice(colonIndex + 1);
+      return path.replace(/^\/+/, "").replace(/\.git$/i, "");
+    }
+  }
+
+  // ssh://[user@]host[:port]/path — path is after the authority
+  if (trimmed.startsWith("ssh://")) {
+    try {
+      const url = new URL(trimmed);
+      return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+    } catch {
+      // Fallback: strip ssh:// and take everything after first slash after host
+      const withoutScheme = trimmed.slice(6); // "ssh://"
+      const firstSlash = withoutScheme.indexOf("/");
+      if (firstSlash !== -1) {
+        const path = withoutScheme.slice(firstSlash);
+        return path.replace(/^\/+/, "").replace(/\.git$/i, "");
+      }
+    }
+  }
+
+  // HTTPS/HTTP or other URL-like
+  try {
+    const url = new URL(trimmed);
+    return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+  } catch {
+    return trimmed.replace(/^\/+/, "").replace(/\.git$/i, "");
+  }
 }
 
 /**

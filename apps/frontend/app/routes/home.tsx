@@ -1,7 +1,7 @@
 import type { CreateProjectRequest } from "@mono/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { ProjectDialog } from "~/components/projects";
+import { CreateProjectDialog } from "~/components/projects";
 import { ProjectsProvider, useProjectsContext } from "~/lib/projects";
 
 export function meta() {
@@ -35,10 +35,8 @@ const HomePage = () => {
     }
   }, [projects, isLoadingProjects]);
 
-  const handleCreateProject = (
-    request: CreateProjectRequest | import("@mono/api").UpdateProjectRequest,
-  ) => {
-    createProject.mutate(request as CreateProjectRequest, {
+  const handleCreateProject = (request: CreateProjectRequest) => {
+    createProject.mutate(request, {
       onSuccess: (newProject) => {
         navigate(`/projects/${newProject.id}`, { replace: true });
       },
@@ -55,10 +53,9 @@ const HomePage = () => {
           <div className="text-muted-foreground">Redirecting to project...</div>
         ) : null}
       </div>
-      <ProjectDialog
+      <CreateProjectDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        mode="create"
         onSubmit={handleCreateProject}
       />
     </>

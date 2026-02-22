@@ -15,7 +15,7 @@ import {
   SidebarTrigger,
 } from "../ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { ProjectDialog } from "./ProjectDialog";
+import { CreateProjectDialog } from "./ProjectDialog";
 import { ProjectListItem } from "./ProjectListItem";
 
 export type ProjectSidebarProps = {
@@ -40,11 +40,9 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleDialogSubmit = (
-    request: CreateProjectRequest | import("@mono/api").UpdateProjectRequest,
-  ) => {
+  const handleDialogSubmit = (request: CreateProjectRequest) => {
     // TODO: Wait for that to complete before returning
-    onCreateProject(request as CreateProjectRequest);
+    onCreateProject(request);
   };
 
   return (
@@ -86,10 +84,9 @@ export const ProjectSidebar = ({
             ))
           )}
         </div>
-        <ProjectDialog
+        <CreateProjectDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          mode="create"
           onSubmit={handleDialogSubmit}
         />
       </SidebarContent>

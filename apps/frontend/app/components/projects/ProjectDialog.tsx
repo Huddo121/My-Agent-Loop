@@ -24,14 +24,13 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
-import type { ForgeTypeDto } from "~/types";
+import type { ForgeTypeDto, Project } from "~/types";
 
 export type ProjectDialogMode = "create" | "update";
 
-export type ProjectDialogProps = {
+type BaseProjectDialogPropsShared = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: ProjectDialogMode;
   initialName?: string;
   initialShortCode?: string;
   initialRepositoryUrl?: string;
@@ -39,8 +38,35 @@ export type ProjectDialogProps = {
   initialForgeType?: ForgeTypeDto | null;
   initialForgeBaseUrl?: string | null;
   initialHasForgeToken?: boolean;
+};
+
+type BaseProjectDialogPropsCreate = BaseProjectDialogPropsShared & {
+  mode: "create";
+  initialProjectId?: never;
+  onSubmit: (request: CreateProjectRequest) => void;
+};
+
+type BaseProjectDialogPropsUpdate = BaseProjectDialogPropsShared & {
+  mode: "update";
   initialProjectId?: ProjectId;
-  onSubmit: (request: CreateProjectRequest | UpdateProjectRequest) => void;
+  onSubmit: (request: UpdateProjectRequest) => void;
+};
+
+type BaseProjectDialogProps =
+  | BaseProjectDialogPropsCreate
+  | BaseProjectDialogPropsUpdate;
+
+export type CreateProjectDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (request: CreateProjectRequest) => void;
+};
+
+export type EditProjectDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  project: Project;
+  onSubmit: (request: UpdateProjectRequest) => void;
 };
 
 const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
@@ -51,20 +77,20 @@ const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
 const defaultForgeBaseUrl = (forgeType: ForgeTypeDto) =>
   forgeType === "gitlab" ? "https://gitlab.com" : "https://github.com";
 
-export function ProjectDialog({
-  open,
-  onOpenChange,
-  mode,
-  initialName = "",
-  initialShortCode = "",
-  initialRepositoryUrl = "",
-  initialWorkflowConfiguration = defaultWorkflowConfiguration,
-  initialForgeType = null,
-  initialForgeBaseUrl = null,
-  initialHasForgeToken = false,
-  initialProjectId: _initialProjectId,
-  onSubmit,
-}: ProjectDialogProps) {
+function BaseProjectDialog(props: BaseProjectDialogProps) {
+  const {
+    open,
+    onOpenChange,
+    mode,
+    initialName = "",
+    initialShortCode = "",
+    initialRepositoryUrl = "",
+    initialWorkflowConfiguration = defaultWorkflowConfiguration,
+    initialForgeType = null,
+    initialForgeBaseUrl = null,
+    initialHasForgeToken = false,
+    initialProjectId: _initialProjectId,
+  } = props;
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
@@ -131,8 +157,8 @@ export function ProjectDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
-      if (mode === "create") {
-        onSubmit({
+      if (props.mode === "create") {
+        props.onSubmit({
           name: name.trim(),
           shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
           repositoryUrl,
@@ -153,7 +179,7 @@ export function ProjectDialog({
         if (forgeToken.trim()) {
           update.forgeToken = forgeToken.trim();
         }
-        onSubmit(update);
+        props.onSubmit(update);
       }
       onOpenChange(false);
     }
@@ -373,5 +399,44 @@ export function ProjectDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function CreateProjectDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: CreateProjectDialogProps) {
+  return (
+    <BaseProjectDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      mode="create"
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+export function EditProjectDialog({
+  open,
+  onOpenChange,
+  project,
+  onSubmit,
+}: EditProjectDialogProps) {
+  return (
+    <BaseProjectDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      mode="update"
+      initialName={project.name}
+      initialShortCode={shortCodeCodec.encode(project.shortCode)}
+      initialRepositoryUrl={project.repositoryUrl}
+      initialWorkflowConfiguration={project.workflowConfiguration}
+      initialForgeType={project.forgeType}
+      initialForgeBaseUrl={project.forgeBaseUrl}
+      initialHasForgeToken={project.hasForgeToken}
+      initialProjectId={project.id}
+      onSubmit={onSubmit}
+    />
   );
 }

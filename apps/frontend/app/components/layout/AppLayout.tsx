@@ -42,7 +42,7 @@ export function AppLayout({ sidebar, children }: AppLayoutProps) {
 
   // Handle panel resize to detect collapse/expand
   const handleResize = useCallback(
-    (panelSize: { asPercentage: number; inPixels: number }) => {
+    (_panelSize: { asPercentage: number; inPixels: number }) => {
       isHandlingPanelEvent.current = true;
 
       // Panel is collapsed when size is 0

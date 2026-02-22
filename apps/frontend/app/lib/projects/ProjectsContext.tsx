@@ -74,14 +74,16 @@ export function ProjectsProvider({
     if (projectId !== undefined && projectId !== currentProjectId) {
       selectProject(projectId);
     }
-  }, [projectId, currentProjectId, selectProject])
+  }, [projectId, currentProjectId, selectProject]);
 
   const { data: projects = [], isLoading: isLoadingProjects } =
     useProjectsQuery();
 
   const selectedProject = useMemo(
     () =>
-      currentProjectId ? (projects.find((p) => p.id === currentProjectId) ?? null) : null,
+      currentProjectId
+        ? (projects.find((p) => p.id === currentProjectId) ?? null)
+        : null,
     [currentProjectId, projects],
   );
 

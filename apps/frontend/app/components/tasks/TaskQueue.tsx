@@ -232,21 +232,21 @@ export function TaskQueue({
               </Tooltip>
               {project.workflowConfiguration.onTaskCompleted ===
                 "merge-immediately" && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => handleStartRun("loop")}
-                        disabled={startRun.isPending || isProcessingLoop}
-                      >
-                        <RepeatIcon className="size-4" />
-                        <span className="sr-only">Start looping over tasks</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Start looping over tasks</TooltipContent>
-                  </Tooltip>
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => handleStartRun("loop")}
+                      disabled={startRun.isPending || isProcessingLoop}
+                    >
+                      <RepeatIcon className="size-4" />
+                      <span className="sr-only">Start looping over tasks</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Start looping over tasks</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -337,11 +337,15 @@ export function TaskQueue({
       <ProjectDialog
         open={projectDialogOpen}
         onOpenChange={setProjectDialogOpen}
-        mode={"update"}
+        mode="update"
         initialName={project.name}
         initialShortCode={project.shortCode}
         initialRepositoryUrl={project.repositoryUrl}
         initialWorkflowConfiguration={project.workflowConfiguration}
+        initialForgeType={project.forgeType}
+        initialForgeBaseUrl={project.forgeBaseUrl}
+        initialHasForgeToken={project.hasForgeToken}
+        initialProjectId={project.id}
         onSubmit={handleUpdateProject}
       />
     </div>

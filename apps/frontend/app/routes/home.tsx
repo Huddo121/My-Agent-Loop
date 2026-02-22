@@ -35,8 +35,10 @@ const HomePage = () => {
     }
   }, [projects, isLoadingProjects]);
 
-  const handleCreateProject = (createProjectRequest: CreateProjectRequest) => {
-    createProject.mutate(createProjectRequest, {
+  const handleCreateProject = (
+    request: CreateProjectRequest | import("@mono/api").UpdateProjectRequest,
+  ) => {
+    createProject.mutate(request as CreateProjectRequest, {
       onSuccess: (newProject) => {
         navigate(`/projects/${newProject.id}`, { replace: true });
       },
@@ -61,10 +63,12 @@ const HomePage = () => {
       />
     </>
   );
-}
+};
 
 export default function Home() {
-  return <ProjectsProvider>
-    <HomePage />
-  </ProjectsProvider>
+  return (
+    <ProjectsProvider>
+      <HomePage />
+    </ProjectsProvider>
+  );
 }

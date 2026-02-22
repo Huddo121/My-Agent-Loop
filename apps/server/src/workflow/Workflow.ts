@@ -1,10 +1,14 @@
 import { match } from "ts-pattern";
+import type { GitForgeService } from "../forge";
 import type { GitRepository } from "../git/GitRepository";
-import type { GitService } from "../git/GitService";
+import type { ForgeGitCredentials, GitService } from "../git/GitService";
 import type { Task } from "../task-queue";
 import type { Result } from "../utils/Result";
 
-export type OnTaskCompletedAction = "push-branch" | "merge-immediately";
+export type OnTaskCompletedAction =
+  | "push-branch"
+  | "merge-immediately"
+  | "push-branch-and-create-mr";
 
 /** This should always be the latest version of the workflow config */
 export type WorkflowConfiguration = {
@@ -16,7 +20,13 @@ const commitMessage = (task: Task) =>
   `${task.title}\n\n${task.description}\n\nTask ID: ${task.id}`;
 
 const commitAndPushThenMergeToMaster =
-  (gitService: GitService) =>
+  (
+    gitService: GitService,
+    pushOptions?: {
+      credentials: ForgeGitCredentials;
+      repositoryUrl: string;
+    },
+  ) =>
   async (
     task: Task,
     repository: GitRepository,
@@ -34,7 +44,10 @@ const commitAndPushThenMergeToMaster =
       return { success: false, error: commitResult.error };
     }
 
-    await gitService.pushRepository(repository);
+    const pushResult = await gitService.pushRepository(repository, pushOptions);
+    if (pushResult.success === false) {
+      return { success: false, error: pushResult.error };
+    }
     const mainBranch = await gitService.detectMainBranch(repository);
     if (mainBranch.success === false) {
       return { success: false, error: mainBranch.error };
@@ -56,17 +69,20 @@ const commitAndPushThenMergeToMaster =
       return { success: false, error: mergeResult.error };
     }
 
-    const pushResult = await gitService.pushRepository(repository);
+    const mergePushResult = await gitService.pushRepository(
+      repository,
+      pushOptions,
+    );
 
-    if (pushResult.success === false) {
+    if (mergePushResult.success === false) {
       console.error(
         `Failed to merge and push task ${task.id}:`,
-        pushResult.error.message,
+        mergePushResult.error.message,
       );
       return {
         success: false,
         error: new Error(
-          `Could not merge code change: ${pushResult.error.message}`,
+          `Could not merge code change: ${mergePushResult.error.message}`,
         ),
       };
     }
@@ -75,7 +91,13 @@ const commitAndPushThenMergeToMaster =
   };
 
 const pushBranch =
-  (gitService: GitService) =>
+  (
+    gitService: GitService,
+    pushOptions?: {
+      credentials: ForgeGitCredentials;
+      repositoryUrl: string;
+    },
+  ) =>
   async (
     task: Task,
     repository: GitRepository,
@@ -89,8 +111,49 @@ const pushBranch =
       return { success: false, error: commitResult.error };
     }
     // Push it
-    const pushResult = await gitService.pushRepository(repository);
+    const pushResult = await gitService.pushRepository(repository, pushOptions);
     return pushResult;
+  };
+
+const pushBranchAndCreateMr =
+  (
+    gitService: GitService,
+    gitForgeService: GitForgeService,
+    pushOptions: {
+      credentials: ForgeGitCredentials;
+      repositoryUrl: string;
+    },
+  ) =>
+  async (
+    task: Task,
+    repository: GitRepository,
+  ): Promise<Result<void, Error>> => {
+    const commitResult = await gitService.commitRepository(
+      repository,
+      commitMessage(task),
+    );
+    if (commitResult.success === false) {
+      return { success: false, error: commitResult.error };
+    }
+    const pushResult = await gitService.pushRepository(repository, pushOptions);
+    if (pushResult.success === false) {
+      return { success: false, error: pushResult.error };
+    }
+    const mainBranchResult = await gitService.detectMainBranch(repository);
+    if (mainBranchResult.success === false) {
+      return { success: false, error: mainBranchResult.error };
+    }
+    const mainBranch = mainBranchResult.value;
+    const createMrResult = await gitForgeService.createMergeRequest({
+      sourceBranch: repository.branch,
+      targetBranch: mainBranch,
+      title: task.title,
+      description: task.description,
+    });
+    if (createMrResult.success === false) {
+      return { success: false, error: createMrResult.error };
+    }
+    return { success: true, value: undefined };
   };
 
 export interface Workflow {
@@ -100,18 +163,44 @@ export interface Workflow {
   ): Promise<Result<void, Error>>;
 }
 
+export interface WorkflowServices {
+  gitService: GitService;
+  gitForgeService?: GitForgeService;
+  pushOptions?: {
+    credentials: ForgeGitCredentials;
+    repositoryUrl: string;
+  };
+}
+
 /**
  * For the workflow config, construct the set of callbacks to properly drive that workflow
  */
 export const realiseWorkflowConfiguration = (
   workflowConfig: WorkflowConfiguration,
-  services: { gitService: GitService },
+  services: WorkflowServices,
 ): Workflow => {
   const onTaskCompleted = match(workflowConfig.onTaskCompleted)
-    .with("push-branch", () => pushBranch(services.gitService))
-    .with("merge-immediately", () =>
-      commitAndPushThenMergeToMaster(services.gitService),
+    .with("push-branch", () =>
+      pushBranch(services.gitService, services.pushOptions),
     )
+    .with("merge-immediately", () =>
+      commitAndPushThenMergeToMaster(services.gitService, services.pushOptions),
+    )
+    .with("push-branch-and-create-mr", () => {
+      if (
+        services.gitForgeService === undefined ||
+        services.pushOptions === undefined
+      ) {
+        throw new Error(
+          "Project must have forge credentials configured for push-branch-and-create-mr workflow",
+        );
+      }
+      return pushBranchAndCreateMr(
+        services.gitService,
+        services.gitForgeService,
+        services.pushOptions,
+      );
+    })
     .exhaustive();
 
   return { onTaskCompleted };

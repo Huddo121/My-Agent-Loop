@@ -2,13 +2,51 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import simpleGit, { type SimpleGit } from "simple-git";
 import type { AbsoluteFilePath } from "../file-system/FilePath";
+import type { ForgeType } from "../forge/types";
+import type { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
 import type { GitBranch, GitRepository } from "./GitRepository";
+
+export interface ForgeGitCredentials {
+  forgeType: ForgeType;
+  token: ProtectedString;
+}
+
+/**
+ * Builds an authenticated HTTPS URL for clone/push/fetch.
+ * GitLab: https://oauth2:TOKEN@host/path.git
+ * GitHub: https://x-access-token:TOKEN@host/path.git
+ * Do not log or serialize the returned string.
+ */
+export function buildAuthenticatedUrl(
+  repositoryUrl: string,
+  forgeType: ForgeType,
+  token: ProtectedString,
+): string {
+  try {
+    const url = new URL(repositoryUrl);
+    const secret = token.getSecretValue();
+    if (forgeType === "gitlab") {
+      url.username = "oauth2";
+      url.password = secret;
+    } else if (forgeType === "github") {
+      url.username = "x-access-token";
+      url.password = secret;
+    } else {
+      throw new Error(`Unsupported forge type: ${forgeType}`);
+    }
+    return url.toString();
+  } catch {
+    return repositoryUrl;
+  }
+}
 
 export interface CheckoutOptions {
   repositoryUrl: string;
   targetDirectory: AbsoluteFilePath;
   branch: GitBranch;
+  /** When set, clone/fetch use token-based auth. Origin remote is left as plain URL after clone. */
+  credentials?: ForgeGitCredentials;
 }
 
 export interface GitService {
@@ -26,7 +64,10 @@ export interface GitService {
     repository: GitRepository,
     message: string,
   ): Promise<Result<void>>;
-  pushRepository(repository: GitRepository): Promise<Result<void>>;
+  pushRepository(
+    repository: GitRepository,
+    options?: { credentials: ForgeGitCredentials; repositoryUrl: string },
+  ): Promise<Result<void>>;
   mergeBranchInToCurrentBranch(
     repository: GitRepository,
     branch: GitBranch,
@@ -97,7 +138,14 @@ export class SimpleGitService implements GitService {
   async checkoutRepository(
     options: CheckoutOptions,
   ): Promise<Result<GitRepository>> {
-    const { repositoryUrl, targetDirectory, branch } = options;
+    const { repositoryUrl, targetDirectory, branch, credentials } = options;
+    const urlToUse = credentials
+      ? buildAuthenticatedUrl(
+          repositoryUrl,
+          credentials.forgeType,
+          credentials.token,
+        )
+      : repositoryUrl;
 
     try {
       // Ensure parent directory exists
@@ -115,16 +163,30 @@ export class SimpleGitService implements GitService {
         // Clone the repository using a git instance bound to the parent directory
         // This ensures git commands execute in the correct context, not the My Agent Loop repo
         const parentGit = this.getGitForPath(parentDir);
-        await parentGit.clone(repositoryUrl, path.basename(targetDirectory));
+        await parentGit.clone(urlToUse, path.basename(targetDirectory));
         console.info("Cloned new copy of repository to ", targetDirectory);
       }
 
       // Now get the git instance (directory definitely exists at this point)
       const repoGit = this.getGitForPath(targetDirectory);
 
+      // If we used authenticated URL for clone, set origin back to plain URL so we don't persist tokens
+      if (!isExistingRepo && credentials) {
+        await repoGit.remote(["set-url", "origin", repositoryUrl]);
+      }
+
       if (isExistingRepo) {
-        // Fetch latest changes for existing repo
-        await repoGit.fetch();
+        // Fetch latest changes for existing repo (temporarily use auth URL if we have credentials)
+        if (credentials) {
+          await repoGit.remote(["set-url", "origin", urlToUse]);
+          try {
+            await repoGit.fetch();
+          } finally {
+            await repoGit.remote(["set-url", "origin", repositoryUrl]);
+          }
+        } else {
+          await repoGit.fetch();
+        }
         console.info(
           "Fetched latest changes from repository to ",
           targetDirectory,
@@ -227,40 +289,60 @@ export class SimpleGitService implements GitService {
 
   /**
    * Pushes the repository for a task to its remote.
+   * When options.credentials is provided, the remote URL is temporarily set to an authenticated URL, then restored.
    */
-  async pushRepository(repository: GitRepository): Promise<Result<void>> {
-    try {
-      const repoPath = repository.path;
+  async pushRepository(
+    repository: GitRepository,
+    options?: { credentials: ForgeGitCredentials; repositoryUrl: string },
+  ): Promise<Result<void>> {
+    const repoPath = repository.path;
 
-      if (!fs.existsSync(repoPath)) {
-        return {
-          success: false,
-          error: new Error(
-            `Repository not found at '${repository.path}'. Call checkoutRepository first.`,
-          ),
-        };
-      }
-
-      const repoGit = this.getGitForPath(repoPath);
-      const branchSummary = await repoGit.branchLocal();
-      const currentBranch = branchSummary.current;
-
-      if (!currentBranch) {
-        return {
-          success: false,
-          error: new Error(
-            `No branch checked out for repository at '${repository.path}'. Cannot push.`,
-          ),
-        };
-      }
-
-      // Use --set-upstream to ensure the remote tracking branch is set on first push
-      await repoGit.push("origin", currentBranch, ["--set-upstream"]);
-
+    if (!fs.existsSync(repoPath)) {
       return {
-        success: true,
-        value: undefined,
+        success: false,
+        error: new Error(
+          `Repository not found at '${repository.path}'. Call checkoutRepository first.`,
+        ),
       };
+    }
+
+    const repoGit = this.getGitForPath(repoPath);
+    const branchSummary = await repoGit.branchLocal();
+    const currentBranch = branchSummary.current;
+
+    if (!currentBranch) {
+      return {
+        success: false,
+        error: new Error(
+          `No branch checked out for repository at '${repository.path}'. Cannot push.`,
+        ),
+      };
+    }
+
+    const plainUrl = options?.repositoryUrl;
+    const credentials = options?.credentials;
+    const authenticatedUrl =
+      credentials && plainUrl
+        ? buildAuthenticatedUrl(
+            plainUrl,
+            credentials.forgeType,
+            credentials.token,
+          )
+        : null;
+
+    try {
+      if (authenticatedUrl && plainUrl) {
+        await repoGit.remote(["set-url", "origin", authenticatedUrl]);
+      }
+      try {
+        // Use --set-upstream to ensure the remote tracking branch is set on first push
+        await repoGit.push("origin", currentBranch, ["--set-upstream"]);
+        return { success: true, value: undefined };
+      } finally {
+        if (authenticatedUrl && plainUrl) {
+          await repoGit.remote(["set-url", "origin", plainUrl]);
+        }
+      }
     } catch (error) {
       return {
         success: false,

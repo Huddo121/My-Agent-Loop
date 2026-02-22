@@ -1,5 +1,6 @@
 import type { ProjectId, TaskId } from "@mono/api";
 import { FastMCP } from "fastmcp";
+import { forgeMcpTools } from "./forge/forge-mcp-handlers";
 import { projectsMcpTools } from "./projects/projects-mcp-handlers";
 import type { Services } from "./services";
 import { tasksMcpTools } from "./tasks/tasks-mcp-handlers";
@@ -46,6 +47,7 @@ const mcpServer = new FastMCP<McpSessionData>({
 
 mcpServer.addTools(tasksMcpTools);
 mcpServer.addTools(projectsMcpTools);
+mcpServer.addTools(forgeMcpTools);
 
 export const startMcp = (services: Services) =>
   withMcpServices(services, () =>

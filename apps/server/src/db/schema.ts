@@ -12,6 +12,8 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
   "failed",
 ]);
 
+export const forgeTypeEnum = pg.pgEnum("forge_type", ["gitlab", "github"]);
+
 export const projectsTable = pg.pgTable("projects", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
   name: pg.text().notNull(),
@@ -19,6 +21,18 @@ export const projectsTable = pg.pgTable("projects", {
   repositoryUrl: pg.text().notNull(),
   workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
   queueState: queueStateEnum().notNull().default("idle"),
+  forgeType: forgeTypeEnum(),
+  forgeBaseUrl: pg.text(),
+});
+
+export const projectForgeSecretsTable = pg.pgTable("project_forge_secrets", {
+  id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+  projectId: pg
+    .uuid()
+    .references(() => projectsTable.id)
+    .notNull()
+    .unique(),
+  encryptedToken: pg.text().notNull(),
 });
 
 export const tasksTable = pg.pgTable("tasks", {

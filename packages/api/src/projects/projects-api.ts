@@ -8,7 +8,11 @@ import { projectIdSchema, shortCodeCodec } from "./projects-model";
 // TODO: The Version of the workflow configuration should not be exposed over the API, only stored in the DB.
 export const workflowConfigurationDtoSchema = z.object({
   version: z.literal("1"),
-  onTaskCompleted: z.enum(["push-branch", "merge-immediately"]),
+  onTaskCompleted: z.enum([
+    "push-branch",
+    "merge-immediately",
+    "push-branch-and-create-mr",
+  ]),
 });
 export type WorkflowConfigurationDto = z.infer<
   typeof workflowConfigurationDtoSchema
@@ -23,6 +27,8 @@ export const queueStateDtoSchema = z.enum([
 ]);
 export type QueueStateDto = z.infer<typeof queueStateDtoSchema>;
 
+export const forgeTypeSchema = z.enum(["gitlab", "github"]);
+
 export const projectDtoSchema = z.object({
   id: projectIdSchema,
   name: z.string(),
@@ -30,22 +36,32 @@ export const projectDtoSchema = z.object({
   repositoryUrl: z.string(),
   workflowConfiguration: workflowConfigurationDtoSchema,
   queueState: queueStateDtoSchema,
+  forgeType: forgeTypeSchema.nullable(),
+  forgeBaseUrl: z.string().nullable(),
+  hasForgeToken: z.boolean(),
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
 
-export const createProjectRequestSchema = projectDtoSchema.omit({
-  id: true,
-  queueState: true,
+export const createProjectRequestSchema = z.object({
+  name: z.string(),
+  shortCode: shortCodeCodec,
+  repositoryUrl: z.string(),
+  workflowConfiguration: workflowConfigurationDtoSchema,
+  forgeType: forgeTypeSchema,
+  forgeBaseUrl: z.string().url(),
+  forgeToken: z.string(),
 });
-
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
-export const updateProjectRequestSchema = projectDtoSchema
-  .omit({
-    id: true,
-    queueState: true,
-  })
-  .partial();
+export const updateProjectRequestSchema = z.object({
+  name: z.string().optional(),
+  shortCode: shortCodeCodec.optional(),
+  repositoryUrl: z.string().optional(),
+  workflowConfiguration: workflowConfigurationDtoSchema.optional(),
+  forgeType: forgeTypeSchema.nullable().optional(),
+  forgeBaseUrl: z.string().url().nullable().optional(),
+  forgeToken: z.string().nullish(),
+});
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 
 const runModeSchema = z.enum(["single", "loop"]);
@@ -63,7 +79,7 @@ export const runStartedResponseSchema = z.object({
 export type RunStartedResponse = z.infer<typeof runStartedResponseSchema>;
 
 export const runFailureResponseSchema = z.object({
-  reason: z.literal([
+  reason: z.enum([
     "no-tasks-available",
     "cannot-loop-with-review-workflow",
     "project-already-processing-tasks",
@@ -87,6 +103,21 @@ export const stopQueueResponseSchema = z.object({
   project: projectDtoSchema,
 });
 export type StopQueueResponse = z.infer<typeof stopQueueResponseSchema>;
+
+export const testForgeConnectionSuccessSchema = z.object({
+  success: z.literal(true),
+});
+export type TestForgeConnectionSuccess = z.infer<
+  typeof testForgeConnectionSuccessSchema
+>;
+
+export const testForgeConnectionFailureSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+});
+export type TestForgeConnectionFailure = z.infer<
+  typeof testForgeConnectionFailureSchema
+>;
 
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
@@ -116,6 +147,10 @@ export const projectsApi = Endpoint.multi({
           .input(stopQueueRequestSchema)
           .output(200, stopQueueResponseSchema)
           .output(400, stopQueueFailureResponseSchema)
+          .output(404, notFoundSchema),
+        "test-forge-connection": Endpoint.post()
+          .output(200, testForgeConnectionSuccessSchema)
+          .output(400, testForgeConnectionFailureSchema)
           .output(404, notFoundSchema),
       },
     }),

@@ -40,9 +40,11 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleDialogSubmit = (createProjectRequest: CreateProjectRequest) => {
+  const handleDialogSubmit = (
+    request: CreateProjectRequest | import("@mono/api").UpdateProjectRequest,
+  ) => {
     // TODO: Wait for that to complete before returning
-    onCreateProject(createProjectRequest);
+    onCreateProject(request as CreateProjectRequest);
   };
 
   return (

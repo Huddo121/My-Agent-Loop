@@ -1,6 +1,8 @@
 import {
   type CreateProjectRequest,
+  type ProjectId,
   shortCodeCodec,
+  type UpdateProjectRequest,
   type WorkflowConfigurationDto,
 } from "@mono/api";
 import { useEffect, useState } from "react";
@@ -21,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { useTestForgeConnection } from "~/lib/projects/useProjects";
+import type { ForgeTypeDto } from "~/types";
 
 export type ProjectDialogMode = "create" | "update";
 
@@ -32,13 +36,20 @@ export type ProjectDialogProps = {
   initialShortCode?: string;
   initialRepositoryUrl?: string;
   initialWorkflowConfiguration?: WorkflowConfigurationDto;
-  onSubmit: (createProjectRequest: CreateProjectRequest) => void;
+  initialForgeType?: ForgeTypeDto | null;
+  initialForgeBaseUrl?: string | null;
+  initialHasForgeToken?: boolean;
+  initialProjectId?: ProjectId;
+  onSubmit: (request: CreateProjectRequest | UpdateProjectRequest) => void;
 };
 
 const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
   version: "1",
   onTaskCompleted: "push-branch",
 };
+
+const defaultForgeBaseUrl = (forgeType: ForgeTypeDto) =>
+  forgeType === "gitlab" ? "https://gitlab.com" : "https://github.com";
 
 export function ProjectDialog({
   open,
@@ -48,6 +59,10 @@ export function ProjectDialog({
   initialShortCode = "",
   initialRepositoryUrl = "",
   initialWorkflowConfiguration = defaultWorkflowConfiguration,
+  initialForgeType = null,
+  initialForgeBaseUrl = null,
+  initialHasForgeToken = false,
+  initialProjectId,
   onSubmit,
 }: ProjectDialogProps) {
   // TODO: Switch to using react-hook-form
@@ -56,6 +71,18 @@ export function ProjectDialog({
   const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
   const [workflowConfiguration, setWorkflowConfiguration] =
     useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
+  const [forgeType, setForgeType] = useState<ForgeTypeDto>(
+    initialForgeType ?? "gitlab",
+  );
+  const [forgeBaseUrl, setForgeBaseUrl] = useState(
+    initialForgeBaseUrl ?? defaultForgeBaseUrl(initialForgeType ?? "gitlab"),
+  );
+  const [forgeToken, setForgeToken] = useState("");
+  const [testResult, setTestResult] = useState<
+    { success: true } | { success: false; error: string } | null
+  >(null);
+
+  const testForgeConnection = useTestForgeConnection();
 
   useEffect(() => {
     if (open) {
@@ -63,6 +90,13 @@ export function ProjectDialog({
       setShortCode(initialShortCode);
       setRepositoryUrl(initialRepositoryUrl);
       setWorkflowConfiguration(initialWorkflowConfiguration);
+      setForgeType(initialForgeType ?? "gitlab");
+      setForgeBaseUrl(
+        initialForgeBaseUrl ??
+          defaultForgeBaseUrl(initialForgeType ?? "gitlab"),
+      );
+      setForgeToken("");
+      setTestResult(null);
     }
   }, [
     open,
@@ -70,20 +104,59 @@ export function ProjectDialog({
     initialShortCode,
     initialRepositoryUrl,
     initialWorkflowConfiguration,
+    initialForgeType,
+    initialForgeBaseUrl,
   ]);
+
+  const handleTestConnection = () => {
+    if (initialProjectId === undefined) return;
+    setTestResult(null);
+    testForgeConnection.mutate(
+      { projectId: initialProjectId },
+      {
+        onSuccess: (result) => setTestResult(result),
+        onError: () =>
+          setTestResult({ success: false, error: "Request failed" }),
+      },
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
-      onSubmit({
-        name: name.trim(),
-        shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
-        repositoryUrl,
-        workflowConfiguration,
-      });
+      if (mode === "create") {
+        onSubmit({
+          name: name.trim(),
+          shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+          repositoryUrl,
+          workflowConfiguration,
+          forgeType,
+          forgeBaseUrl: forgeBaseUrl.trim(),
+          forgeToken: forgeToken.trim(),
+        });
+      } else {
+        const update: UpdateProjectRequest = {
+          name: name.trim(),
+          shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+          repositoryUrl,
+          workflowConfiguration,
+          forgeType,
+          forgeBaseUrl: forgeBaseUrl.trim(),
+        };
+        if (forgeToken.trim()) {
+          update.forgeToken = forgeToken.trim();
+        }
+        onSubmit(update);
+      }
       onOpenChange(false);
     }
   };
+
+  const canSubmit =
+    name.trim() &&
+    shortCode.trim() &&
+    repositoryUrl.trim() &&
+    (mode === "update" || forgeToken.trim());
 
   const title = mode === "create" ? "Create Project" : "Update Project";
   const description =
@@ -132,6 +205,92 @@ export function ProjectDialog({
                 className="mt-1"
               />
             </div>
+            <hr />
+            <h2 className="text-lg font-medium mb-1">Git Forge</h2>
+            <div>
+              <label
+                htmlFor="forge-type"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Forge type
+              </label>
+              <Select
+                value={forgeType}
+                onValueChange={(value: ForgeTypeDto) => {
+                  setForgeType(value);
+                  setForgeBaseUrl(defaultForgeBaseUrl(value));
+                }}
+              >
+                <SelectTrigger id="forge-type" className="mt-1 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gitlab">GitLab</SelectItem>
+                  <SelectItem value="github">GitHub</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="forge-base-url"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Base URL
+              </label>
+              <Input
+                id="forge-base-url"
+                placeholder="https://gitlab.com"
+                value={forgeBaseUrl}
+                onChange={(e) => setForgeBaseUrl(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="forge-token"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Token
+              </label>
+              <Input
+                id="forge-token"
+                type="password"
+                placeholder={
+                  mode === "update" && initialHasForgeToken
+                    ? "Token configured"
+                    : "Personal access token"
+                }
+                value={forgeToken}
+                onChange={(e) => setForgeToken(e.target.value)}
+                className="mt-1"
+              />
+              {mode === "update" &&
+                (initialHasForgeToken || forgeToken) &&
+                initialProjectId && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestConnection}
+                      disabled={testForgeConnection.isPending}
+                    >
+                      {testForgeConnection.isPending
+                        ? "Testing…"
+                        : "Test Connection"}
+                    </Button>
+                    {testResult !== null &&
+                      (testResult.success ? (
+                        <span className="text-sm text-green-600">Success</span>
+                      ) : (
+                        <span className="text-sm text-destructive">
+                          {testResult.error}
+                        </span>
+                      ))}
+                  </div>
+                )}
+            </div>
+            <hr />
             <div>
               <label
                 htmlFor="short-code"
@@ -165,7 +324,12 @@ export function ProjectDialog({
               </p>
               <Select
                 value={workflowConfiguration.onTaskCompleted}
-                onValueChange={(value: "push-branch" | "merge-immediately") =>
+                onValueChange={(
+                  value:
+                    | "push-branch"
+                    | "merge-immediately"
+                    | "push-branch-and-create-mr",
+                ) =>
                   setWorkflowConfiguration({
                     ...workflowConfiguration,
                     onTaskCompleted: value,
@@ -178,6 +342,9 @@ export function ProjectDialog({
                 <SelectContent>
                   <SelectItem value="push-branch">
                     <p>Push task branch for review</p>
+                  </SelectItem>
+                  <SelectItem value="push-branch-and-create-mr">
+                    <p>Push branch and create merge request</p>
                   </SelectItem>
                   <SelectItem value="merge-immediately">
                     <p>Merge task branch immediately</p>
@@ -194,7 +361,7 @@ export function ProjectDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || !shortCode.trim()}>
+            <Button type="submit" disabled={!canSubmit}>
               {submitLabel}
             </Button>
           </DialogFooter>

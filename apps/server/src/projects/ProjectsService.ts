@@ -1,4 +1,5 @@
 import type { ProjectId, ProjectShortCode } from "@mono/api";
+import type { ForgeType } from "../forge/types";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
 export type QueueState =
@@ -15,11 +16,19 @@ export interface Project {
   repositoryUrl: string;
   workflowConfiguration: WorkflowConfiguration;
   queueState: QueueState;
+  forgeType: ForgeType | null;
+  forgeBaseUrl: string | null;
 }
 
-export type CreateProject = Omit<Project, "id" | "queueState">;
+export type CreateProject = Omit<Project, "id" | "queueState"> & {
+  forgeType: ForgeType;
+  forgeBaseUrl: string;
+};
 
-export type UpdateProject = Partial<Omit<Project, "id" | "queueState">>;
+export type UpdateProject = Partial<Omit<Project, "id" | "queueState">> & {
+  forgeType?: ForgeType;
+  forgeBaseUrl?: string;
+};
 
 export interface ProjectsService {
   getAllProjects(): Promise<Project[]>;

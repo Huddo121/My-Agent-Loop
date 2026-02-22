@@ -5,6 +5,8 @@ import type {
   WorkflowConfigurationDto,
 } from "@mono/api";
 
+export type ForgeTypeDto = "gitlab" | "github";
+
 export type Project = {
   id: ProjectId;
   name: string;
@@ -12,6 +14,9 @@ export type Project = {
   repositoryUrl: string;
   workflowConfiguration: WorkflowConfigurationDto;
   queueState: QueueStateDto;
+  forgeType: ForgeTypeDto | null;
+  forgeBaseUrl: string | null;
+  hasForgeToken: boolean;
 };
 
 export type NewProject = {

@@ -180,3 +180,29 @@ export function useStopQueue() {
     },
   });
 }
+
+/**
+ * Hook to test forge connection for a project.
+ */
+export function useTestForgeConnection() {
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+    }: {
+      projectId: ProjectId;
+    }): Promise<{ success: true } | { success: false; error: string }> => {
+      const response = await apiClient.projects[":projectId"][
+        "test-forge-connection"
+      ].POST({
+        pathParams: { projectId },
+      });
+      if (response.status === 200) {
+        return response.responseBody;
+      }
+      if (response.status === 400) {
+        return response.responseBody;
+      }
+      throw new Error("Failed to test forge connection");
+    },
+  });
+}

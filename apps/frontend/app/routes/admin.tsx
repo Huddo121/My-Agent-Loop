@@ -63,7 +63,9 @@ export default function AdminRoute() {
                     {queueStats?.queues.map((queue) => (
                       <div key={queue.name} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-4">
-                          <h3 className="font-semibold text-lg">{queue.name}</h3>
+                          <h3 className="font-semibold text-lg">
+                            {queue.name}
+                          </h3>
                           <Button
                             variant="destructive"
                             size="sm"

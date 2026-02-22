@@ -20,6 +20,8 @@ const fromProjectEntity = (
     repositoryUrl: project.repositoryUrl,
     workflowConfiguration: project.workflowConfiguration,
     queueState: project.queueState,
+    forgeType: project.forgeType,
+    forgeBaseUrl: project.forgeBaseUrl,
   };
 };
 
@@ -56,6 +58,8 @@ export class DatabaseProjectService implements ProjectsService {
         shortCode: project.shortCode,
         repositoryUrl: project.repositoryUrl,
         workflowConfiguration: project.workflowConfiguration,
+        forgeType: project.forgeType ?? undefined,
+        forgeBaseUrl: project.forgeBaseUrl ?? undefined,
       })
       .returning();
 

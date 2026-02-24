@@ -7,7 +7,7 @@ import {
   getProjectPathFromRepositoryUrl,
 } from "../forge";
 import type { ForgeSecretRepository } from "../forge-secrets";
-import type { ForgeGitCredentials, GitService } from "../git/GitService";
+import type { GitService } from "../git/GitService";
 import type { ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type {
@@ -165,12 +165,6 @@ export class BackgroundWorkflowProcessor {
             }
 
             let gitForgeService: GitForgeService | undefined;
-            let pushOptions:
-              | {
-                  credentials: ForgeGitCredentials;
-                  repositoryUrl: string;
-                }
-              | undefined;
             if (project.forgeType !== null && project.forgeBaseUrl !== null) {
               const secret = await this.forgeSecretRepository.getForgeSecret(
                 project.id,
@@ -185,13 +179,6 @@ export class BackgroundWorkflowProcessor {
                   token: secret,
                   projectPath,
                 });
-                pushOptions = {
-                  credentials: {
-                    forgeType: project.forgeType,
-                    token: secret,
-                  },
-                  repositoryUrl: project.repositoryUrl,
-                };
               }
             }
 
@@ -200,7 +187,6 @@ export class BackgroundWorkflowProcessor {
               {
                 gitService: this.gitService,
                 gitForgeService,
-                pushOptions,
               },
             );
 

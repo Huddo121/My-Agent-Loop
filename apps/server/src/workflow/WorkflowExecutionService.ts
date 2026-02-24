@@ -62,20 +62,28 @@ export class WorkflowExecutionService {
 
     const repositoryPath = AbsoluteFilePath.joinPath(taskTempDirectory, "code");
 
-    let credentials: ForgeGitCredentials | undefined;
-    if (project.forgeType !== null && project.forgeBaseUrl !== null) {
-      const secret = await this.forgeSecretRepository.getForgeSecret(
-        project.id,
-      );
-      if (secret !== undefined) {
-        credentials = {
-          forgeType: project.forgeType,
-          token: secret,
-        };
-      }
+    if (project.forgeType === null || project.forgeBaseUrl === null) {
+      return {
+        success: false,
+        error: new Error(
+          `Project ${project.id} is missing forge configuration (forgeType or forgeBaseUrl)`,
+        ),
+      };
     }
 
-    // Check out code to temporary folder
+    const secret = await this.forgeSecretRepository.getForgeSecret(project.id);
+    if (secret === undefined) {
+      return {
+        success: false,
+        error: new Error(`No forge secret found for project ${project.id}`),
+      };
+    }
+
+    const credentials: ForgeGitCredentials = {
+      forgeType: project.forgeType,
+      token: secret,
+    };
+
     const checkoutResult = await this.gitService.checkoutRepository({
       repositoryUrl: project.repositoryUrl,
       targetDirectory: repositoryPath,

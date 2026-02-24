@@ -9,6 +9,7 @@ import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
 import {
   createGitForgeService,
+  defaultForgeBaseUrl,
   getProjectPathFromRepositoryUrl,
 } from "../forge";
 import type { Services } from "../services";
@@ -36,13 +37,17 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     return withNewTransaction(ctx.services.db, async () => {
+      const forgeType = ctx.body.forgeType;
+      const forgeBaseUrl =
+        ctx.body.forgeBaseUrl ?? defaultForgeBaseUrl(forgeType);
+
       const project = await ctx.services.projectsService.createProject({
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
         repositoryUrl: ctx.body.repositoryUrl,
         workflowConfiguration: ctx.body.workflowConfiguration,
-        forgeType: ctx.body.forgeType,
-        forgeBaseUrl: ctx.body.forgeBaseUrl,
+        forgeType,
+        forgeBaseUrl,
       });
       await ctx.services.forgeSecretRepository.upsertForgeSecret(
         project.id,
@@ -108,9 +113,9 @@ export const projectsHandlers: HonoHandlersFor<
         if (ctx.body.workflowConfiguration !== undefined)
           updatePayload.workflowConfiguration = ctx.body.workflowConfiguration;
         if (ctx.body.forgeType !== undefined)
-          updatePayload.forgeType = ctx.body.forgeType ?? undefined;
+          updatePayload.forgeType = ctx.body.forgeType;
         if (ctx.body.forgeBaseUrl !== undefined)
-          updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl ?? undefined;
+          updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
 
         const project = await ctx.services.projectsService.updateProject(
           projectId as ProjectId,
@@ -119,7 +124,7 @@ export const projectsHandlers: HonoHandlersFor<
         if (project === undefined) {
           return notFound();
         }
-        if (ctx.body.forgeToken !== undefined && ctx.body.forgeToken !== null) {
+        if (ctx.body.forgeToken !== undefined) {
           await ctx.services.forgeSecretRepository.upsertForgeSecret(
             projectId as ProjectId,
             ctx.body.forgeToken,
@@ -158,15 +163,6 @@ export const projectsHandlers: HonoHandlersFor<
         );
         if (project === undefined) {
           return notFound();
-        }
-        if (project.forgeType === null || project.forgeBaseUrl === null) {
-          return [
-            400,
-            {
-              success: false as const,
-              error: "Forge is not configured for this project.",
-            },
-          ];
         }
         const secret = await ctx.services.forgeSecretRepository.getForgeSecret(
           projectId as ProjectId,

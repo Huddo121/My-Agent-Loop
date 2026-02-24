@@ -108,13 +108,6 @@ async function getGitForgeServiceOrError(
   if (project === undefined) {
     return { success: false, error: "Project not found" };
   }
-  if (project.forgeType === null || project.forgeBaseUrl === null) {
-    return {
-      success: false,
-      error: "Project does not have forge (GitLab/GitHub) configured.",
-    };
-  }
-
   const secret = await withNewTransaction(services.db, async () =>
     services.forgeSecretRepository.getForgeSecret(projectId),
   );

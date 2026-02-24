@@ -35,8 +35,8 @@ type BaseProjectDialogPropsShared = {
   initialShortCode?: string;
   initialRepositoryUrl?: string;
   initialWorkflowConfiguration?: WorkflowConfigurationDto;
-  initialForgeType?: ForgeTypeDto | null;
-  initialForgeBaseUrl?: string | null;
+  initialForgeType?: ForgeTypeDto;
+  initialForgeBaseUrl?: string;
   initialHasForgeToken?: boolean;
 };
 
@@ -86,8 +86,8 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialShortCode = "",
     initialRepositoryUrl = "",
     initialWorkflowConfiguration = defaultWorkflowConfiguration,
-    initialForgeType = null,
-    initialForgeBaseUrl = null,
+    initialForgeType,
+    initialForgeBaseUrl,
     initialHasForgeToken = false,
     initialProjectId: _initialProjectId,
   } = props;
@@ -97,11 +97,10 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
   const [workflowConfiguration, setWorkflowConfiguration] =
     useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
-  const [forgeType, setForgeType] = useState<ForgeTypeDto>(
-    initialForgeType ?? "gitlab",
-  );
+  const effectiveForgeType = initialForgeType ?? "gitlab";
+  const [forgeType, setForgeType] = useState<ForgeTypeDto>(effectiveForgeType);
   const [forgeBaseUrl, setForgeBaseUrl] = useState(
-    initialForgeBaseUrl ?? defaultForgeBaseUrl(initialForgeType ?? "gitlab"),
+    initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType),
   );
   const [forgeToken, setForgeToken] = useState("");
   const [testResult, setTestResult] = useState<
@@ -116,10 +115,10 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
       setShortCode(initialShortCode);
       setRepositoryUrl(initialRepositoryUrl);
       setWorkflowConfiguration(initialWorkflowConfiguration);
-      setForgeType(initialForgeType ?? "gitlab");
+      const resetForgeType = initialForgeType ?? "gitlab";
+      setForgeType(resetForgeType);
       setForgeBaseUrl(
-        initialForgeBaseUrl ??
-          defaultForgeBaseUrl(initialForgeType ?? "gitlab"),
+        initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType),
       );
       setForgeToken("");
       setTestResult(null);

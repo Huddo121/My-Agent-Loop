@@ -58,8 +58,8 @@ export class DatabaseProjectService implements ProjectsService {
         shortCode: project.shortCode,
         repositoryUrl: project.repositoryUrl,
         workflowConfiguration: project.workflowConfiguration,
-        forgeType: project.forgeType ?? undefined,
-        forgeBaseUrl: project.forgeBaseUrl ?? undefined,
+        forgeType: project.forgeType,
+        forgeBaseUrl: project.forgeBaseUrl,
       })
       .returning();
 

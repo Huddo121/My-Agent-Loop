@@ -36,8 +36,8 @@ export const projectDtoSchema = z.object({
   repositoryUrl: z.string(),
   workflowConfiguration: workflowConfigurationDtoSchema,
   queueState: queueStateDtoSchema,
-  forgeType: forgeTypeSchema.nullable(),
-  forgeBaseUrl: z.string().nullable(),
+  forgeType: forgeTypeSchema,
+  forgeBaseUrl: z.string(),
   hasForgeToken: z.boolean(),
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
@@ -48,7 +48,7 @@ export const createProjectRequestSchema = z.object({
   repositoryUrl: z.string(),
   workflowConfiguration: workflowConfigurationDtoSchema,
   forgeType: forgeTypeSchema,
-  forgeBaseUrl: z.string().url(),
+  forgeBaseUrl: z.string().url().optional(),
   forgeToken: z.string(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
@@ -58,9 +58,9 @@ export const updateProjectRequestSchema = z.object({
   shortCode: shortCodeCodec.optional(),
   repositoryUrl: z.string().optional(),
   workflowConfiguration: workflowConfigurationDtoSchema.optional(),
-  forgeType: forgeTypeSchema.nullable().optional(),
-  forgeBaseUrl: z.string().url().nullable().optional(),
-  forgeToken: z.string().nullish(),
+  forgeType: forgeTypeSchema.optional(),
+  forgeBaseUrl: z.string().url().optional(),
+  forgeToken: z.string().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 

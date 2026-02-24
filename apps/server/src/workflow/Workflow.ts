@@ -141,7 +141,7 @@ export interface Workflow {
 
 export interface WorkflowServices {
   gitService: GitService;
-  gitForgeService?: GitForgeService;
+  gitForgeService: GitForgeService;
 }
 
 /**
@@ -156,17 +156,9 @@ export const realiseWorkflowConfiguration = (
     .with("merge-immediately", () =>
       commitAndPushThenMergeToMaster(services.gitService),
     )
-    .with("push-branch-and-create-mr", () => {
-      if (services.gitForgeService === undefined) {
-        throw new Error(
-          "Project must have a forge service configured for push-branch-and-create-mr workflow",
-        );
-      }
-      return pushBranchAndCreateMr(
-        services.gitService,
-        services.gitForgeService,
-      );
-    })
+    .with("push-branch-and-create-mr", () =>
+      pushBranchAndCreateMr(services.gitService, services.gitForgeService),
+    )
     .exhaustive();
 
   return { onTaskCompleted };

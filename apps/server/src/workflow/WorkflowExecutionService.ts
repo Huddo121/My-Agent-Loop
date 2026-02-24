@@ -62,15 +62,6 @@ export class WorkflowExecutionService {
 
     const repositoryPath = AbsoluteFilePath.joinPath(taskTempDirectory, "code");
 
-    if (project.forgeType === null || project.forgeBaseUrl === null) {
-      return {
-        success: false,
-        error: new Error(
-          `Project ${project.id} is missing forge configuration (forgeType or forgeBaseUrl)`,
-        ),
-      };
-    }
-
     const secret = await this.forgeSecretRepository.getForgeSecret(project.id);
     if (secret === undefined) {
       return {

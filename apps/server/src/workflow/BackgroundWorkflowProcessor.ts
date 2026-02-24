@@ -1,7 +1,6 @@
 import type { ProjectId } from "@mono/api";
 import { type Job, Worker } from "bullmq";
 import type { Database } from "../db";
-import type { GitForgeService } from "../forge";
 import {
   createGitForgeService,
   getProjectPathFromRepositoryUrl,
@@ -136,6 +135,7 @@ export class BackgroundWorkflowProcessor {
               RunId,
               | { reason: "task-not-found" }
               | { reason: "project-not-found" }
+              | { reason: "forge-secret-missing" }
               | { reason: "execution-failed" }
               | { reason: "task-already-completed" }
             >
@@ -164,23 +164,27 @@ export class BackgroundWorkflowProcessor {
               };
             }
 
-            let gitForgeService: GitForgeService | undefined;
-            if (project.forgeType !== null && project.forgeBaseUrl !== null) {
-              const secret = await this.forgeSecretRepository.getForgeSecret(
-                project.id,
-              );
-              if (secret !== undefined) {
-                const projectPath = getProjectPathFromRepositoryUrl(
-                  project.repositoryUrl,
-                );
-                gitForgeService = createGitForgeService({
-                  forgeType: project.forgeType,
-                  forgeBaseUrl: project.forgeBaseUrl,
-                  token: secret,
-                  projectPath,
-                });
-              }
+            const secret = await this.forgeSecretRepository.getForgeSecret(
+              project.id,
+            );
+            if (secret === undefined) {
+              return {
+                success: false,
+                error: {
+                  reason: "forge-secret-missing" as const,
+                },
+              };
             }
+
+            const projectPath = getProjectPathFromRepositoryUrl(
+              project.repositoryUrl,
+            );
+            const gitForgeService = createGitForgeService({
+              forgeType: project.forgeType,
+              forgeBaseUrl: project.forgeBaseUrl,
+              token: secret,
+              projectPath,
+            });
 
             const workflow = realiseWorkflowConfiguration(
               project.workflowConfiguration,

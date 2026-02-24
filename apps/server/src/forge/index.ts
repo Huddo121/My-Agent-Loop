@@ -23,3 +23,4 @@ export type {
   PipelineId,
   PipelineJob,
 } from "./types";
+export { defaultForgeBaseUrl } from "./types";

@@ -14,8 +14,8 @@ export type Project = {
   repositoryUrl: string;
   workflowConfiguration: WorkflowConfigurationDto;
   queueState: QueueStateDto;
-  forgeType: ForgeTypeDto | null;
-  forgeBaseUrl: string | null;
+  forgeType: ForgeTypeDto;
+  forgeBaseUrl: string;
   hasForgeToken: boolean;
 };
 

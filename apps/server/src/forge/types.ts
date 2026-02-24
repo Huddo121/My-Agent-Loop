@@ -3,6 +3,15 @@ import type { ProtectedString } from "../utils/ProtectedString";
 
 export type ForgeType = "gitlab" | "github";
 
+export function defaultForgeBaseUrl(forgeType: ForgeType): string {
+  switch (forgeType) {
+    case "gitlab":
+      return "https://gitlab.com";
+    case "github":
+      return "https://github.com";
+  }
+}
+
 /** Zod schemas for forge IDs (single source of truth; types from z.infer) */
 const forgeIdValueSchema = z
   .string()

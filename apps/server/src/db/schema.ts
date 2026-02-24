@@ -21,8 +21,8 @@ export const projectsTable = pg.pgTable("projects", {
   repositoryUrl: pg.text().notNull(),
   workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
   queueState: queueStateEnum().notNull().default("idle"),
-  forgeType: forgeTypeEnum(),
-  forgeBaseUrl: pg.text(),
+  forgeType: forgeTypeEnum().notNull(),
+  forgeBaseUrl: pg.text().notNull(),
 });
 
 export const projectForgeSecretsTable = pg.pgTable("project_forge_secrets", {

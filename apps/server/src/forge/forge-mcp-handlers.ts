@@ -2,6 +2,7 @@ import type { ProjectId } from "@mono/api";
 import z from "zod";
 import { getMcpServices } from "../utils/mcp-service-context";
 import type { McpTool, McpTools } from "../utils/mcp-tool";
+import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import {
   createGitForgeService,
@@ -97,10 +98,7 @@ const getCiJobLogParamsSchema = z.object({
 
 async function getGitForgeServiceOrError(
   projectId: ProjectId,
-): Promise<
-  | { success: true; service: ReturnType<typeof createGitForgeService> }
-  | { success: false; error: string }
-> {
+): Promise<Result<ReturnType<typeof createGitForgeService>, string>> {
   const services = getMcpServices();
 
   const project = await withNewTransaction(services.db, async () =>
@@ -133,7 +131,7 @@ async function getGitForgeServiceOrError(
     token: secret,
     projectPath,
   });
-  return { success: true, service };
+  return { success: true, value: service };
 }
 
 async function withForgeService<T>(
@@ -145,7 +143,7 @@ async function withForgeService<T>(
     return JSON.stringify({ error: result.error });
   }
   try {
-    const value = await fn(result.service);
+    const value = await fn(result.value);
     return JSON.stringify(value);
   } catch (e) {
     return JSON.stringify({

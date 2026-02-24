@@ -1,3 +1,4 @@
+import type { ProjectId } from "@mono/api";
 import z from "zod";
 import { getMcpServices } from "../utils/mcp-service-context";
 import type { McpTool, McpTools } from "../utils/mcp-tool";
@@ -6,14 +7,53 @@ import {
   createGitForgeService,
   getProjectPathFromRepositoryUrl,
 } from "./GitForgeService";
-import type { JobId, MergeRequestId, PipelineId } from "./types";
+import {
+  forgeIdSchema,
+  type JobId,
+  type MergeRequestId,
+  type PipelineId,
+} from "./types";
 
+const forgeTypeSchema = z.enum(["gitlab", "github"]);
+
+/** Maps logical kind + platform to the platform-specific kind for forge IDs. */
+function forgeIdKindFor(
+  platform: "gitlab" | "github",
+  logicalKind: "merge-request" | "pipeline" | "job",
+): "merge-request" | "pull-request" | "pipeline" | "workflow-run" | "job" {
+  if (platform === "github" && logicalKind === "merge-request")
+    return "pull-request";
+  if (platform === "github" && logicalKind === "pipeline")
+    return "workflow-run";
+  return logicalKind;
+}
+
+// These extra definitions help specify the specific output based on the inputs.
+function parseForgeId(
+  platform: "gitlab" | "github",
+  kind: "merge-request",
+  value: string,
+): MergeRequestId;
+function parseForgeId(
+  platform: "gitlab" | "github",
+  kind: "pipeline",
+  value: string,
+): PipelineId;
+function parseForgeId(
+  platform: "gitlab" | "github",
+  kind: "job",
+  value: string,
+): JobId;
 function parseForgeId(
   platform: "gitlab" | "github",
   kind: "merge-request" | "pipeline" | "job",
   value: string,
 ): MergeRequestId | PipelineId | JobId {
-  return { platform, kind, value } as MergeRequestId | PipelineId | JobId;
+  return forgeIdSchema.parse({
+    platform,
+    kind: forgeIdKindFor(platform, kind),
+    value,
+  });
 }
 
 const createMergeRequestParamsSchema = z.object({
@@ -23,7 +63,7 @@ const createMergeRequestParamsSchema = z.object({
   description: z.string().optional().describe("MR/PR description"),
 });
 const getMergeRequestParamsSchema = z.object({
-  platform: z.enum(["gitlab", "github"]),
+  platform: forgeTypeSchema,
   id: z.string().describe("MR/PR identifier (e.g. IID for GitLab)"),
 });
 const listMergeRequestsParamsSchema = z
@@ -35,7 +75,7 @@ const listMergeRequestsParamsSchema = z
   })
   .optional();
 const addMergeRequestCommentParamsSchema = z.object({
-  platform: z.enum(["gitlab", "github"]),
+  platform: forgeTypeSchema,
   id: z.string(),
   body: z.string().describe("Comment text"),
 });
@@ -43,20 +83,20 @@ const listCiPipelinesParamsSchema = z.object({
   ref: z.string().optional().describe("Branch or tag name"),
 });
 const getCiPipelineParamsSchema = z.object({
-  platform: z.enum(["gitlab", "github"]),
+  platform: forgeTypeSchema,
   id: z.string(),
 });
 const listCiPipelineJobsParamsSchema = z.object({
-  platform: z.enum(["gitlab", "github"]),
+  platform: forgeTypeSchema,
   pipelineId: z.string(),
 });
 const getCiJobLogParamsSchema = z.object({
-  platform: z.enum(["gitlab", "github"]),
+  platform: forgeTypeSchema,
   jobId: z.string(),
 });
 
 async function getGitForgeServiceOrError(
-  projectId: string,
+  projectId: ProjectId,
 ): Promise<
   | { success: true; service: ReturnType<typeof createGitForgeService> }
   | { success: false; error: string }
@@ -64,9 +104,7 @@ async function getGitForgeServiceOrError(
   const services = getMcpServices();
 
   const project = await withNewTransaction(services.db, async () =>
-    services.projectsService.getProject(
-      projectId as import("@mono/api").ProjectId,
-    ),
+    services.projectsService.getProject(projectId),
   );
   if (project === undefined) {
     return { success: false, error: "Project not found" };
@@ -79,9 +117,7 @@ async function getGitForgeServiceOrError(
   }
 
   const secret = await withNewTransaction(services.db, async () =>
-    services.forgeSecretRepository.getForgeSecret(
-      projectId as import("@mono/api").ProjectId,
-    ),
+    services.forgeSecretRepository.getForgeSecret(projectId),
   );
   if (secret === undefined) {
     return {
@@ -101,7 +137,7 @@ async function getGitForgeServiceOrError(
 }
 
 async function withForgeService<T>(
-  projectId: string,
+  projectId: ProjectId,
   fn: (service: ReturnType<typeof createGitForgeService>) => Promise<T>,
 ): Promise<string> {
   const result = await getGitForgeServiceOrError(projectId);
@@ -154,11 +190,7 @@ export const getMergeRequestMcpHandler = {
       });
     }
     const p = getMergeRequestParamsSchema.parse(params);
-    const mrId = parseForgeId(
-      p.platform,
-      "merge-request",
-      p.id,
-    ) as MergeRequestId;
+    const mrId = parseForgeId(p.platform, "merge-request", p.id);
     return withForgeService(session.projectId, async (service) => {
       const result = await service.getMergeRequest(mrId);
       if (!result.success) throw result.error;
@@ -200,11 +232,7 @@ export const addMergeRequestCommentMcpHandler = {
       });
     }
     const p = addMergeRequestCommentParamsSchema.parse(params);
-    const mrId = parseForgeId(
-      p.platform,
-      "merge-request",
-      p.id,
-    ) as MergeRequestId;
+    const mrId = parseForgeId(p.platform, "merge-request", p.id);
     return withForgeService(session.projectId, async (service) => {
       const result = await service.addMergeRequestComment(mrId, p.body);
       if (!result.success) throw result.error;
@@ -243,7 +271,7 @@ export const getCiPipelineMcpHandler = {
       });
     }
     const p = getCiPipelineParamsSchema.parse(params);
-    const pipelineId = parseForgeId(p.platform, "pipeline", p.id) as PipelineId;
+    const pipelineId = parseForgeId(p.platform, "pipeline", p.id);
     return withForgeService(session.projectId, async (service) => {
       const result = await service.getPipeline(pipelineId);
       if (!result.success) throw result.error;
@@ -263,11 +291,7 @@ export const listCiPipelineJobsMcpHandler = {
       });
     }
     const p = listCiPipelineJobsParamsSchema.parse(params);
-    const pipelineId = parseForgeId(
-      p.platform,
-      "pipeline",
-      p.pipelineId,
-    ) as PipelineId;
+    const pipelineId = parseForgeId(p.platform, "pipeline", p.pipelineId);
     return withForgeService(session.projectId, async (service) => {
       const result = await service.listPipelineJobs(pipelineId);
       if (!result.success) throw result.error;
@@ -287,7 +311,7 @@ export const getCiJobLogMcpHandler = {
       });
     }
     const p = getCiJobLogParamsSchema.parse(params);
-    const jobId = parseForgeId(p.platform, "job", p.jobId) as JobId;
+    const jobId = parseForgeId(p.platform, "job", p.jobId);
     return withForgeService(session.projectId, async (service) => {
       const result = await service.getJobLog(jobId);
       if (!result.success) throw result.error;

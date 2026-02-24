@@ -16,8 +16,8 @@ import type {
 
 function apiUrl(credential: ForgeCredential, path: string): string {
   const base = credential.forgeBaseUrl.replace(/\/$/, "");
-  const projectEnc = encodeURIComponent(credential.projectPath);
-  return `${base}/api/v4/projects/${projectEnc}${path}`;
+  const pathSegment = `/api/v4/projects/${encodeURIComponent(credential.projectPath)}${path.startsWith("/") ? path : `/${path}`}`;
+  return new URL(pathSegment, base).href;
 }
 
 function authHeader(credential: ForgeCredential): string {
@@ -40,6 +40,11 @@ async function fetchJson<T>(
     });
     if (!res.ok) {
       const text = await res.text();
+      console.error("GitLab API error when fetching JSON", {
+        url,
+        status: res.status,
+        text,
+      });
       return {
         success: false,
         error: new Error(`GitLab API ${res.status}: ${text}`),
@@ -48,6 +53,7 @@ async function fetchJson<T>(
     const data = (await res.json()) as T;
     return { success: true, value: data };
   } catch (e) {
+    console.error("GitLab API error when fetching JSON", { url, error: e });
     return {
       success: false,
       error: e instanceof Error ? e : new Error(String(e)),
@@ -65,6 +71,11 @@ async function fetchText(
     });
     if (!res.ok) {
       const text = await res.text();
+      console.error("GitLab API error when fetching text", {
+        url,
+        status: res.status,
+        text,
+      });
       return {
         success: false,
         error: new Error(`GitLab API ${res.status}: ${text}`),
@@ -72,6 +83,7 @@ async function fetchText(
     }
     return { success: true, value: await res.text() };
   } catch (e) {
+    console.error("GitLab API error when fetching text", { url, error: e });
     return {
       success: false,
       error: e instanceof Error ? e : new Error(String(e)),
@@ -167,11 +179,21 @@ export class GitLabServiceImpl implements GitLabService {
     });
     if (!result.ok) {
       const text = await result.text();
+      console.error("GitLab API error when adding merge request note", {
+        url,
+        status: result.status,
+        text,
+      });
       return {
         success: false,
         error: new Error(`GitLab API ${result.status}: ${text}`),
       };
     }
+    console.info("Added merge request note", {
+      url,
+      forge: "gitlab",
+      id: id.value,
+    });
     return { success: true, value: undefined };
   }
 
@@ -180,6 +202,11 @@ export class GitLabServiceImpl implements GitLabService {
     const url = apiUrl(this.credential, `/pipelines${qs}`);
     const result = await fetchJson<RawGitLabPipeline[]>(url, this.credential);
     if (!result.success) return result;
+    console.info("Listed pipelines", {
+      url,
+      forge: "gitlab",
+      ref: String(ref),
+    });
     return {
       success: true,
       value: result.value.map(rawToPipeline),
@@ -190,6 +217,7 @@ export class GitLabServiceImpl implements GitLabService {
     const url = apiUrl(this.credential, `/pipelines/${id.value}`);
     const result = await fetchJson<RawGitLabPipeline>(url, this.credential);
     if (!result.success) return result;
+    console.info("Got pipeline", { url, forge: "gitlab", id: id.value });
     return { success: true, value: rawToPipeline(result.value) };
   }
 
@@ -197,6 +225,11 @@ export class GitLabServiceImpl implements GitLabService {
     const url = apiUrl(this.credential, `/pipelines/${id.value}/jobs`);
     const result = await fetchJson<RawGitLabJob[]>(url, this.credential);
     if (!result.success) return result;
+    console.info("Listed pipeline jobs", {
+      url,
+      forge: "gitlab",
+      id: id.value,
+    });
     return {
       success: true,
       value: result.value.map(rawToJob),
@@ -215,11 +248,17 @@ export class GitLabServiceImpl implements GitLabService {
     });
     if (!result.ok) {
       const text = await result.text();
+      console.info("GitLab API test failed", {
+        url,
+        status: result.status,
+        text,
+      });
       return {
         success: false,
         error: new Error(`GitLab API ${result.status}: ${text}`),
       };
     }
+    console.info("GitLab API test succeeded", { url, forge: "gitlab" });
     return { success: true, value: undefined };
   }
 }

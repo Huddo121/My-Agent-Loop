@@ -1,28 +1,71 @@
+import z from "zod";
 import type { ProtectedString } from "../utils/ProtectedString";
 
-/** Runtime-tagged forge ID base */
-export type ForgeId<Platform extends string, Kind extends string> = {
-  platform: Platform;
-  kind: Kind;
-  value: string;
-};
-
-/** GitLab-specific IDs */
-export type GitLabMergeRequestId = ForgeId<"gitlab", "merge-request">;
-export type GitLabPipelineId = ForgeId<"gitlab", "pipeline">;
-export type GitLabJobId = ForgeId<"gitlab", "job">;
-
-/** GitHub-specific IDs (future) */
-export type GitHubPullRequestId = ForgeId<"github", "pull-request">;
-export type GitHubWorkflowRunId = ForgeId<"github", "workflow-run">;
-export type GitHubJobId = ForgeId<"github", "job">;
-
-/** Union of all forge IDs for a given concept */
-export type MergeRequestId = GitLabMergeRequestId | GitHubPullRequestId;
-export type PipelineId = GitLabPipelineId | GitHubWorkflowRunId;
-export type JobId = GitLabJobId | GitHubJobId;
-
 export type ForgeType = "gitlab" | "github";
+
+/** Zod schemas for forge IDs (single source of truth; types from z.infer) */
+const forgeIdValueSchema = z
+  .string()
+  .min(1, "Forge ID value must be non-empty");
+
+export const gitLabMergeRequestIdSchema = z.object({
+  platform: z.literal("gitlab"),
+  kind: z.literal("merge-request"),
+  value: forgeIdValueSchema,
+});
+export const gitLabPipelineIdSchema = z.object({
+  platform: z.literal("gitlab"),
+  kind: z.literal("pipeline"),
+  value: forgeIdValueSchema,
+});
+export const gitLabJobIdSchema = z.object({
+  platform: z.literal("gitlab"),
+  kind: z.literal("job"),
+  value: forgeIdValueSchema,
+});
+export const githubPullRequestIdSchema = z.object({
+  platform: z.literal("github"),
+  kind: z.literal("pull-request"),
+  value: forgeIdValueSchema,
+});
+export const githubWorkflowRunIdSchema = z.object({
+  platform: z.literal("github"),
+  kind: z.literal("workflow-run"),
+  value: forgeIdValueSchema,
+});
+export const githubJobIdSchema = z.object({
+  platform: z.literal("github"),
+  kind: z.literal("job"),
+  value: forgeIdValueSchema,
+});
+
+export const mergeRequestIdSchema = z.union([
+  gitLabMergeRequestIdSchema,
+  githubPullRequestIdSchema,
+]);
+export const pipelineIdSchema = z.union([
+  gitLabPipelineIdSchema,
+  githubWorkflowRunIdSchema,
+]);
+export const jobIdSchema = z.union([gitLabJobIdSchema, githubJobIdSchema]);
+
+/** Union of any forge ID – use for parsing when kind is determined at runtime */
+export const forgeIdSchema = z.union([
+  mergeRequestIdSchema,
+  pipelineIdSchema,
+  jobIdSchema,
+]);
+
+export type GitLabMergeRequestId = z.infer<typeof gitLabMergeRequestIdSchema>;
+export type GitLabPipelineId = z.infer<typeof gitLabPipelineIdSchema>;
+export type GitLabJobId = z.infer<typeof gitLabJobIdSchema>;
+export type GitHubPullRequestId = z.infer<typeof githubPullRequestIdSchema>;
+export type GitHubWorkflowRunId = z.infer<typeof githubWorkflowRunIdSchema>;
+export type GitHubJobId = z.infer<typeof githubJobIdSchema>;
+export type MergeRequestId = z.infer<typeof mergeRequestIdSchema>;
+export type PipelineId = z.infer<typeof pipelineIdSchema>;
+export type JobId = z.infer<typeof jobIdSchema>;
+export type ForgeId = z.infer<typeof forgeIdSchema>;
 
 /** Credential passed to forge and git operations */
 export interface ForgeCredential {

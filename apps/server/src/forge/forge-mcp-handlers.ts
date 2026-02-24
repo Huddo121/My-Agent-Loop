@@ -1,7 +1,8 @@
 import type { ProjectId } from "@mono/api";
 import z from "zod";
 import { getMcpServices } from "../utils/mcp-service-context";
-import type { McpTool, McpTools } from "../utils/mcp-tool";
+import type { McpTools } from "../utils/mcp-tool";
+import { withRequiredProjectId } from "../utils/mcp-tool";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import {
@@ -152,19 +153,14 @@ async function withForgeService<T>(
   }
 }
 
-export const createMergeRequestMcpHandler = {
+export const createMergeRequestMcpHandler = withRequiredProjectId({
   name: "create_merge_request",
   description:
     "Create a merge request (MR) or pull request (PR) for the current branch",
   parameters: createMergeRequestParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = createMergeRequestParamsSchema.parse(params);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.createMergeRequest({
         sourceBranch: p.sourceBranch,
         targetBranch: p.targetBranch,
@@ -175,148 +171,113 @@ export const createMergeRequestMcpHandler = {
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const getMergeRequestMcpHandler = {
+export const getMergeRequestMcpHandler = withRequiredProjectId({
   name: "get_merge_request",
   description: "Get merge request / pull request details by ID",
   parameters: getMergeRequestParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = getMergeRequestParamsSchema.parse(params);
     const mrId = parseForgeId(p.platform, "merge-request", p.id);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.getMergeRequest(mrId);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const listMergeRequestsMcpHandler = {
+export const listMergeRequestsMcpHandler = withRequiredProjectId({
   name: "list_merge_requests",
   description: "List merge requests / pull requests for the project",
   parameters: listMergeRequestsParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const opts =
       params !== undefined && params !== null
         ? listMergeRequestsParamsSchema.parse(params)
         : undefined;
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.listMergeRequests(opts);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const addMergeRequestCommentMcpHandler = {
+export const addMergeRequestCommentMcpHandler = withRequiredProjectId({
   name: "add_merge_request_comment",
   description: "Add a comment to a merge request / pull request",
   parameters: addMergeRequestCommentParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = addMergeRequestCommentParamsSchema.parse(params);
     const mrId = parseForgeId(p.platform, "merge-request", p.id);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.addMergeRequestComment(mrId, p.body);
       if (!result.success) throw result.error;
       return undefined;
     });
   },
-} satisfies McpTool;
+});
 
-export const listCiPipelinesMcpHandler = {
+export const listCiPipelinesMcpHandler = withRequiredProjectId({
   name: "list_ci_pipelines",
   description: "List CI pipelines for a ref (branch/tag)",
   parameters: listCiPipelinesParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = listCiPipelinesParamsSchema.parse(params);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.listPipelines(p.ref);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const getCiPipelineMcpHandler = {
+export const getCiPipelineMcpHandler = withRequiredProjectId({
   name: "get_ci_pipeline",
   description: "Get CI pipeline details by ID",
   parameters: getCiPipelineParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = getCiPipelineParamsSchema.parse(params);
     const pipelineId = parseForgeId(p.platform, "pipeline", p.id);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.getPipeline(pipelineId);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const listCiPipelineJobsMcpHandler = {
+export const listCiPipelineJobsMcpHandler = withRequiredProjectId({
   name: "list_ci_pipeline_jobs",
   description: "List jobs in a CI pipeline",
   parameters: listCiPipelineJobsParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = listCiPipelineJobsParamsSchema.parse(params);
     const pipelineId = parseForgeId(p.platform, "pipeline", p.pipelineId);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.listPipelineJobs(pipelineId);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
-export const getCiJobLogMcpHandler = {
+export const getCiJobLogMcpHandler = withRequiredProjectId({
   name: "get_ci_job_log",
   description: "Get the log output of a specific CI job",
   parameters: getCiJobLogParamsSchema,
-  execute: async (params: unknown, { session }) => {
-    if (session?.projectId === undefined) {
-      return JSON.stringify({
-        error: "Project ID not provided. X-MAL-Project-ID header is required.",
-      });
-    }
+  execute: async (params: unknown, _context, projectId) => {
     const p = getCiJobLogParamsSchema.parse(params);
     const jobId = parseForgeId(p.platform, "job", p.jobId);
-    return withForgeService(session.projectId, async (service) => {
+    return withForgeService(projectId, async (service) => {
       const result = await service.getJobLog(jobId);
       if (!result.success) throw result.error;
       return result.value;
     });
   },
-} satisfies McpTool;
+});
 
 export const forgeMcpTools = [
   createMergeRequestMcpHandler,

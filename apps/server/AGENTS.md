@@ -25,7 +25,7 @@ When adding MCP tools, follow the pattern in `src/projects/projects-mcp-handlers
 - Define each tool as an object `satisfies McpTool` (from `src/utils/mcp-tool.ts`)
 - Export a list typed as `McpTools` (the type erasure helper for `addTools`)
 - Access services via `getMcpServices()` (from `src/utils/mcp-service-context.ts`) -- this uses `AsyncLocalStorage`
-- Access the project ID from `session?.projectId` (set from the `X-MAL-Project-ID` header)
+- For tools that require a project context, use `withRequiredProjectId` from `src/utils/mcp-tool.ts` so the `X-MAL-Project-ID` check is centralized; the inner `execute` receives `(args, context, projectId)`.
 - Tool `execute` functions return `string` (JSON-serialized results)
 - Register the tools in `src/mcp.ts` via `mcpServer.addTools(...)`
 

@@ -21,6 +21,9 @@ const envSchema = z.object({
     .default("development"),
 
   OPENROUTER_API_KEY: z.string().optional(),
+
+  // Forge token encryption (32-byte key as 64 hex chars or 44 base64 chars)
+  FORGE_ENCRYPTION_KEY: z.string().nonempty(),
 });
 
 export type Env = z.infer<typeof envSchema>;

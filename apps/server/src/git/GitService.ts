@@ -1,14 +1,49 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import simpleGit, { type SimpleGit } from "simple-git";
+import { match } from "ts-pattern";
 import type { AbsoluteFilePath } from "../file-system/FilePath";
+import type { ForgeType } from "../forge/types";
+import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
 import type { GitBranch, GitRepository } from "./GitRepository";
+
+export interface ForgeGitCredentials {
+  forgeType: ForgeType;
+  token: ProtectedString;
+}
+
+/**
+ * Builds an authenticated HTTPS URL for clone/push/fetch.
+ * GitLab: https://oauth2:TOKEN@host/path.git
+ * GitHub: https://x-access-token:TOKEN@host/path.git
+ * Returns a ProtectedString; use getSecretValue() only at the point of use (e.g. passing to git).
+ */
+export function buildAuthenticatedUrl(
+  repositoryUrl: string,
+  forgeType: ForgeType,
+  token: ProtectedString,
+): ProtectedString {
+  try {
+    const url = new URL(repositoryUrl);
+    const secret = token.getSecretValue();
+    const username = match(forgeType)
+      .with("gitlab", () => "oauth2" as const)
+      .with("github", () => "x-access-token" as const)
+      .exhaustive();
+    url.username = username;
+    url.password = secret;
+    return new ProtectedString(url.toString());
+  } catch {
+    return new ProtectedString(repositoryUrl);
+  }
+}
 
 export interface CheckoutOptions {
   repositoryUrl: string;
   targetDirectory: AbsoluteFilePath;
   branch: GitBranch;
+  credentials: ForgeGitCredentials;
 }
 
 export interface GitService {
@@ -97,7 +132,12 @@ export class SimpleGitService implements GitService {
   async checkoutRepository(
     options: CheckoutOptions,
   ): Promise<Result<GitRepository>> {
-    const { repositoryUrl, targetDirectory, branch } = options;
+    const { repositoryUrl, targetDirectory, branch, credentials } = options;
+    const authenticatedUrl = buildAuthenticatedUrl(
+      repositoryUrl,
+      credentials.forgeType,
+      credentials.token,
+    ).getSecretValue();
 
     try {
       // Ensure parent directory exists
@@ -112,18 +152,14 @@ export class SimpleGitService implements GitService {
         fs.existsSync(targetDirectory) && fs.existsSync(gitDir);
 
       if (!isExistingRepo) {
-        // Clone the repository using a git instance bound to the parent directory
-        // This ensures git commands execute in the correct context, not the My Agent Loop repo
         const parentGit = this.getGitForPath(parentDir);
-        await parentGit.clone(repositoryUrl, path.basename(targetDirectory));
+        await parentGit.clone(authenticatedUrl, path.basename(targetDirectory));
         console.info("Cloned new copy of repository to ", targetDirectory);
       }
 
-      // Now get the git instance (directory definitely exists at this point)
       const repoGit = this.getGitForPath(targetDirectory);
 
       if (isExistingRepo) {
-        // Fetch latest changes for existing repo
         await repoGit.fetch();
         console.info(
           "Fetched latest changes from repository to ",
@@ -225,42 +261,34 @@ export class SimpleGitService implements GitService {
     }
   }
 
-  /**
-   * Pushes the repository for a task to its remote.
-   */
   async pushRepository(repository: GitRepository): Promise<Result<void>> {
-    try {
-      const repoPath = repository.path;
+    const repoPath = repository.path;
 
-      if (!fs.existsSync(repoPath)) {
-        return {
-          success: false,
-          error: new Error(
-            `Repository not found at '${repository.path}'. Call checkoutRepository first.`,
-          ),
-        };
-      }
-
-      const repoGit = this.getGitForPath(repoPath);
-      const branchSummary = await repoGit.branchLocal();
-      const currentBranch = branchSummary.current;
-
-      if (!currentBranch) {
-        return {
-          success: false,
-          error: new Error(
-            `No branch checked out for repository at '${repository.path}'. Cannot push.`,
-          ),
-        };
-      }
-
-      // Use --set-upstream to ensure the remote tracking branch is set on first push
-      await repoGit.push("origin", currentBranch, ["--set-upstream"]);
-
+    if (!fs.existsSync(repoPath)) {
       return {
-        success: true,
-        value: undefined,
+        success: false,
+        error: new Error(
+          `Repository not found at '${repository.path}'. Call checkoutRepository first.`,
+        ),
       };
+    }
+
+    const repoGit = this.getGitForPath(repoPath);
+    const branchSummary = await repoGit.branchLocal();
+    const currentBranch = branchSummary.current;
+
+    if (!currentBranch) {
+      return {
+        success: false,
+        error: new Error(
+          `No branch checked out for repository at '${repository.path}'. Cannot push.`,
+        ),
+      };
+    }
+
+    try {
+      await repoGit.push("origin", currentBranch, ["--set-upstream"]);
+      return { success: true, value: undefined };
     } catch (error) {
       return {
         success: false,

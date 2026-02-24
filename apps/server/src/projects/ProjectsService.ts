@@ -1,4 +1,5 @@
 import type { ProjectId, ProjectShortCode } from "@mono/api";
+import type { ForgeType } from "../forge/types";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
 export type QueueState =
@@ -15,6 +16,8 @@ export interface Project {
   repositoryUrl: string;
   workflowConfiguration: WorkflowConfiguration;
   queueState: QueueState;
+  forgeType: ForgeType;
+  forgeBaseUrl: string;
 }
 
 export type CreateProject = Omit<Project, "id" | "queueState">;

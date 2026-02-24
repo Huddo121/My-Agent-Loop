@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
+import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
-import type { GitService } from "../git/GitService";
+import type { ForgeGitCredentials, GitService } from "../git/GitService";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
@@ -31,6 +32,7 @@ export class WorkflowExecutionService {
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
     private readonly openCodeConfigService: OpenCodeConfigService,
+    private readonly forgeSecretRepository: ForgeSecretRepository,
   ) {}
 
   async executeWorkflow(
@@ -60,11 +62,24 @@ export class WorkflowExecutionService {
 
     const repositoryPath = AbsoluteFilePath.joinPath(taskTempDirectory, "code");
 
-    // Check out code to temporary folder
+    const secret = await this.forgeSecretRepository.getForgeSecret(project.id);
+    if (secret === undefined) {
+      return {
+        success: false,
+        error: new Error(`No forge secret found for project ${project.id}`),
+      };
+    }
+
+    const credentials: ForgeGitCredentials = {
+      forgeType: project.forgeType,
+      token: secret,
+    };
+
     const checkoutResult = await this.gitService.checkoutRepository({
       repositoryUrl: project.repositoryUrl,
       targetDirectory: repositoryPath,
       branch: `tasks/task-${task.id}-${runId}` as GitBranch,
+      credentials,
     });
 
     if (checkoutResult.success === false) {

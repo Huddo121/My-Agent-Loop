@@ -3,6 +3,10 @@ import { type Database, db } from "./db";
 import { env } from "./env";
 import type { RelativeFilePath } from "./file-system/FilePath";
 import { LocalFileSystemService } from "./file-system/FileSystemService";
+import {
+  DefaultForgeSecretRepository,
+  type ForgeSecretRepository,
+} from "./forge-secrets";
 import { type GitService, SimpleGitService } from "./git/GitService";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
@@ -14,6 +18,10 @@ import {
   type SandboxService,
 } from "./sandbox/SandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
+import {
+  DefaultEncryptionService,
+  type EncryptionService,
+} from "./utils/EncryptionService";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
 import { OpenCodeConfigService } from "./workflow/OpenCodeConfigService";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
@@ -35,7 +43,16 @@ export interface Services {
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
   runsService: RunsService;
+  encryptionService: EncryptionService;
+  forgeSecretRepository: ForgeSecretRepository;
 }
+
+const encryptionService = new DefaultEncryptionService(
+  env.FORGE_ENCRYPTION_KEY,
+);
+const forgeSecretRepository = new DefaultForgeSecretRepository(
+  encryptionService,
+);
 
 const gitService = new SimpleGitService();
 const sandboxService = new DockerSandboxService(
@@ -76,6 +93,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   sandboxService,
   fileSystemService,
   openCodeConfigService,
+  forgeSecretRepository,
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
@@ -87,6 +105,7 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   workflowExecutionService,
   gitService,
   db,
+  forgeSecretRepository,
 );
 
 export const services: Services = {
@@ -100,4 +119,6 @@ export const services: Services = {
   workflowQueues,
   backgroundWorkflowProcessor,
   runsService,
+  encryptionService,
+  forgeSecretRepository,
 };

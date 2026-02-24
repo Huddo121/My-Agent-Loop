@@ -32,7 +32,7 @@ import {
 } from "~/components/ui/tooltip";
 import { useProjectsContext } from "~/lib/projects";
 import type { NewTask, Project, Task, UpdateTask } from "~/types";
-import { ProjectDialog } from "../projects";
+import { EditProjectDialog } from "../projects";
 import { ButtonGroup } from "../ui/button-group";
 import { SortableTaskCard } from "./SortableTaskCard";
 import { TaskDialog } from "./TaskDialog";
@@ -232,21 +232,21 @@ export function TaskQueue({
               </Tooltip>
               {project.workflowConfiguration.onTaskCompleted ===
                 "merge-immediately" && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => handleStartRun("loop")}
-                        disabled={startRun.isPending || isProcessingLoop}
-                      >
-                        <RepeatIcon className="size-4" />
-                        <span className="sr-only">Start looping over tasks</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Start looping over tasks</TooltipContent>
-                  </Tooltip>
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => handleStartRun("loop")}
+                      disabled={startRun.isPending || isProcessingLoop}
+                    >
+                      <RepeatIcon className="size-4" />
+                      <span className="sr-only">Start looping over tasks</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Start looping over tasks</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -334,14 +334,10 @@ export function TaskQueue({
         onSubmit={handleAddTask}
         task={editingTask}
       />
-      <ProjectDialog
+      <EditProjectDialog
         open={projectDialogOpen}
         onOpenChange={setProjectDialogOpen}
-        mode={"update"}
-        initialName={project.name}
-        initialShortCode={project.shortCode}
-        initialRepositoryUrl={project.repositoryUrl}
-        initialWorkflowConfiguration={project.workflowConfiguration}
+        project={project}
         onSubmit={handleUpdateProject}
       />
     </div>

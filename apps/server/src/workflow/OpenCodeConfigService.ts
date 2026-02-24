@@ -109,6 +109,6 @@ export class OpenCodeConfigService {
     //   return "openrouter/qwen/qwen3-coder:free";
     // }
 
-    return "opencode/kimi-k2.5-free";
+    return "opencode/minimax-m2.5-free";
   }
 }

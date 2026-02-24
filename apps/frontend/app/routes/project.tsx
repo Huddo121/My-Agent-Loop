@@ -6,10 +6,7 @@ import { ConnectedProjectSidebar } from "~/components/projects/ProjectSidebar";
 import { EmptyState, TaskQueue } from "~/components/tasks";
 import { useCreateTask, useMoveTask, useTasks } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
-import {
-  ProjectsProvider,
-  useProjectsContext,
-} from "~/lib/projects";
+import { ProjectsProvider, useProjectsContext } from "~/lib/projects";
 import type { NewTask, Task } from "~/types";
 
 export function meta() {

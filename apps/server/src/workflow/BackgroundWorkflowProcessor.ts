@@ -1,6 +1,11 @@
 import type { ProjectId } from "@mono/api";
 import { type Job, Worker } from "bullmq";
 import type { Database } from "../db";
+import {
+  createGitForgeService,
+  getProjectPathFromRepositoryUrl,
+} from "../forge";
+import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitService } from "../git/GitService";
 import type { ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
@@ -48,6 +53,7 @@ export class BackgroundWorkflowProcessor {
     private readonly workflowExecutionService: WorkflowExecutionService,
     /* Just passed through */ private readonly gitService: GitService,
     private readonly db: Database,
+    private readonly forgeSecretRepository: ForgeSecretRepository,
   ) {
     this.runWorker = new Worker(RUN_QUEUE, (job) => this.processRun(job), {
       connection: workflowQueues.redisConnectionOptions,
@@ -129,6 +135,7 @@ export class BackgroundWorkflowProcessor {
               RunId,
               | { reason: "task-not-found" }
               | { reason: "project-not-found" }
+              | { reason: "forge-secret-missing" }
               | { reason: "execution-failed" }
               | { reason: "task-already-completed" }
             >
@@ -157,10 +164,33 @@ export class BackgroundWorkflowProcessor {
               };
             }
 
+            const secret = await this.forgeSecretRepository.getForgeSecret(
+              project.id,
+            );
+            if (secret === undefined) {
+              return {
+                success: false,
+                error: {
+                  reason: "forge-secret-missing" as const,
+                },
+              };
+            }
+
+            const projectPath = getProjectPathFromRepositoryUrl(
+              project.repositoryUrl,
+            );
+            const gitForgeService = createGitForgeService({
+              forgeType: project.forgeType,
+              forgeBaseUrl: project.forgeBaseUrl,
+              token: secret,
+              projectPath,
+            });
+
             const workflow = realiseWorkflowConfiguration(
               project.workflowConfiguration,
               {
                 gitService: this.gitService,
+                gitForgeService,
               },
             );
 

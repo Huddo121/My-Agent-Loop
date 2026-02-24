@@ -7,8 +7,14 @@ import {
 } from "@mono/api";
 import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
+import {
+  createGitForgeService,
+  defaultForgeBaseUrl,
+  getProjectPathFromRepositoryUrl,
+} from "../forge";
 import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
+import { ProtectedString } from "../utils/ProtectedString";
 import { withNewTransaction } from "../utils/transaction-context";
 
 export const projectsHandlers: HonoHandlersFor<
@@ -19,19 +25,59 @@ export const projectsHandlers: HonoHandlersFor<
   GET: async (ctx) => {
     return withNewTransaction(ctx.services.db, async () => {
       const projects = await ctx.services.projectsService.getAllProjects();
-      return ok(projects);
+      const withHasForgeToken = await Promise.all(
+        projects.map(async (p) => ({
+          ...p,
+          hasForgeToken:
+            await ctx.services.forgeSecretRepository.hasForgeSecret(p.id),
+        })),
+      );
+      return ok(withHasForgeToken);
     });
   },
   POST: async (ctx) => {
     return withNewTransaction(ctx.services.db, async () => {
+      const forgeType = ctx.body.forgeType;
+      const forgeBaseUrl =
+        ctx.body.forgeBaseUrl ?? defaultForgeBaseUrl(forgeType);
+
       const project = await ctx.services.projectsService.createProject({
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
         repositoryUrl: ctx.body.repositoryUrl,
         workflowConfiguration: ctx.body.workflowConfiguration,
+        forgeType,
+        forgeBaseUrl,
       });
-      return ok(project);
+      await ctx.services.forgeSecretRepository.upsertForgeSecret(
+        project.id,
+        ctx.body.forgeToken,
+      );
+      const hasForgeToken = true;
+      return ok({
+        ...project,
+        hasForgeToken,
+      });
     });
+  },
+  "test-forge-connection": async (ctx) => {
+    const { forgeType, forgeBaseUrl, forgeToken, repositoryUrl } = ctx.body;
+    const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const credential = {
+      forgeType,
+      forgeBaseUrl,
+      token: new ProtectedString(forgeToken),
+      projectPath,
+    };
+    const gitForgeService = createGitForgeService(credential);
+    const result = await gitForgeService.testConnection();
+    if (result.success) {
+      return ok({ success: true as const });
+    }
+    return [
+      400,
+      { success: false as const, error: result.error.message },
+    ] as const;
   },
   ":projectId": {
     GET: async (ctx) => {
@@ -43,25 +89,52 @@ export const projectsHandlers: HonoHandlersFor<
         if (project === undefined) {
           return notFound();
         }
-        return ok(project);
+        const hasForgeToken =
+          await ctx.services.forgeSecretRepository.hasForgeSecret(
+            projectId as ProjectId,
+          );
+        return ok({
+          ...project,
+          hasForgeToken,
+        });
       });
     },
     PATCH: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
       return withNewTransaction(ctx.services.db, async () => {
+        const updatePayload: Parameters<
+          typeof ctx.services.projectsService.updateProject
+        >[1] = {};
+        if (ctx.body.name !== undefined) updatePayload.name = ctx.body.name;
+        if (ctx.body.shortCode !== undefined)
+          updatePayload.shortCode = ctx.body.shortCode;
+        if (ctx.body.repositoryUrl !== undefined)
+          updatePayload.repositoryUrl = ctx.body.repositoryUrl;
+        if (ctx.body.workflowConfiguration !== undefined)
+          updatePayload.workflowConfiguration = ctx.body.workflowConfiguration;
+        if (ctx.body.forgeType !== undefined)
+          updatePayload.forgeType = ctx.body.forgeType;
+        if (ctx.body.forgeBaseUrl !== undefined)
+          updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
+
         const project = await ctx.services.projectsService.updateProject(
           projectId as ProjectId,
-          {
-            name: ctx.body.name,
-            shortCode: ctx.body.shortCode,
-            repositoryUrl: ctx.body.repositoryUrl,
-            workflowConfiguration: ctx.body.workflowConfiguration,
-          },
+          updatePayload,
         );
         if (project === undefined) {
           return notFound();
         }
-        return ok(project);
+        if (ctx.body.forgeToken !== undefined) {
+          await ctx.services.forgeSecretRepository.upsertForgeSecret(
+            projectId as ProjectId,
+            ctx.body.forgeToken,
+          );
+        }
+        const hasForgeToken =
+          await ctx.services.forgeSecretRepository.hasForgeSecret(
+            projectId as ProjectId,
+          );
+        return ok({ ...project, hasForgeToken });
       });
     },
     DELETE: async (ctx) => {
@@ -73,10 +146,52 @@ export const projectsHandlers: HonoHandlersFor<
         if (project === undefined) {
           return notFound();
         }
-        return ok(project);
+        // hasForgeSecret may still be true if no CASCADE; we report pre-delete state for consistency
+        const hadForgeToken =
+          await ctx.services.forgeSecretRepository.hasForgeSecret(
+            projectId as ProjectId,
+          );
+        return ok({ ...project, hasForgeToken: hadForgeToken });
       });
     },
     tasks: tasksHandlers,
+    "test-forge-connection": async (ctx) => {
+      const { projectId } = ctx.hono.req.param();
+      return withNewTransaction(ctx.services.db, async () => {
+        const project = await ctx.services.projectsService.getProject(
+          projectId as ProjectId,
+        );
+        if (project === undefined) {
+          return notFound();
+        }
+        const secret = await ctx.services.forgeSecretRepository.getForgeSecret(
+          projectId as ProjectId,
+        );
+        if (secret === undefined) {
+          return [
+            400,
+            {
+              success: false as const,
+              error: "No forge token configured for this project.",
+            },
+          ];
+        }
+        const projectPath = getProjectPathFromRepositoryUrl(
+          project.repositoryUrl,
+        );
+        const gitForgeService = createGitForgeService({
+          forgeType: project.forgeType,
+          forgeBaseUrl: project.forgeBaseUrl,
+          token: secret,
+          projectPath,
+        });
+        const result = await gitForgeService.testConnection();
+        if (result.success) {
+          return ok({ success: true as const });
+        }
+        return [400, { success: false as const, error: result.error.message }];
+      });
+    },
     run: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
 
@@ -90,10 +205,11 @@ export const projectsHandlers: HonoHandlersFor<
           return notFound("The project could not be found");
         }
 
-        if (
-          project.workflowConfiguration.onTaskCompleted === "push-branch" &&
-          mode === "loop"
-        ) {
+        const isReviewWorkflow =
+          project.workflowConfiguration.onTaskCompleted === "push-branch" ||
+          project.workflowConfiguration.onTaskCompleted ===
+            "push-branch-and-create-mr";
+        if (isReviewWorkflow && mode === "loop") {
           console.warn(
             "Can not start workflow because the project is configured to use a review workflow",
             { projectId },
@@ -101,8 +217,10 @@ export const projectsHandlers: HonoHandlersFor<
           return [400, { reason: "cannot-loop-with-review-workflow" }] as const;
         }
 
-        const workflowResult =
-          await ctx.services.workflowManager.startWorkflow(project.id, mode);
+        const workflowResult = await ctx.services.workflowManager.startWorkflow(
+          project.id,
+          mode,
+        );
 
         if (workflowResult.success === false) {
           return match(workflowResult.error)
@@ -131,7 +249,10 @@ export const projectsHandlers: HonoHandlersFor<
                 "Can not start workflow because the project is already processing tasks",
                 { projectId },
               );
-              return [400, { reason: "project-already-processing-tasks" }] as const;
+              return [
+                400,
+                { reason: "project-already-processing-tasks" },
+              ] as const;
             })
             .exhaustive();
         }
@@ -145,9 +266,14 @@ export const projectsHandlers: HonoHandlersFor<
           return notFound("The project could not be found");
         }
 
+        const hasForgeToken =
+          await ctx.services.forgeSecretRepository.hasForgeSecret(
+            projectId as ProjectId,
+          );
+
         return ok({
           runId: runIdSchema.parse(workflowResult.value),
-          project: updatedProject,
+          project: { ...updatedProject, hasForgeToken },
         });
       });
     },
@@ -203,7 +329,12 @@ export const projectsHandlers: HonoHandlersFor<
           hasExecutingRuns,
         });
 
-        return ok({ project: updatedProject });
+        const hasForgeToken =
+          await ctx.services.forgeSecretRepository.hasForgeSecret(
+            projectId as ProjectId,
+          );
+
+        return ok({ project: { ...updatedProject, hasForgeToken } });
       });
     },
   },

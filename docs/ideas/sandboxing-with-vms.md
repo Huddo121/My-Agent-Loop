@@ -14,6 +14,9 @@ I'd like to be able to give agents access to Docker in order for them to be able
 
 It's pretty easy to freeze the state of a virtual machine, or even just its file system. Being able to sleep an agent if it needs human help (something I think might be interesting, or possibly annoying, I dunno) without it having to sit around actively waiting might be useful. Especially if I can detect this situation, wait some time, then sleep that agent and switch to a new one instead in order to progress through the task queue. It might also be interesting to think about forking an agent run, much like some AI chat apps can do. If an agent gets to a point where there are multiple paths forward, trying all of the paths might be fruitful.
 
-## Not running git in the context of the outer system
+# Resources
 
-At the moment I run some git commands in reaction to things that happen during the agent loop, such as pusing code after an agent exits. This is a bit naive, I could easily trigger post-commit hooks running on my server machine. This isn't really what I want, I want the agent to be in an environment that is as much as possible the same as if I were running the agent harness myself, on my laptop.
+- https://www.luiscardoso.dev/blog/sandboxes-for-ai
+- https://www.shayon.dev/post/2026/52/lets-discuss-sandbox-isolation/
+  - I was starting to consider gVisor based on this and the previous blog post, but this blog mentioned a feature that I really want, and it makes sense that it's not in gVisor:
+    > Snapshotting is a feature worth noting. You can capture a running VM’s state including CPU registers, memory, and devices, and restore it later. This enables warm pools where you boot a VM once, install dependencies, snapshot it, and restore clones in milliseconds instead of booting fresh each time. This is how some platforms achieve incredibly fast cold starts even with full VM isolation.

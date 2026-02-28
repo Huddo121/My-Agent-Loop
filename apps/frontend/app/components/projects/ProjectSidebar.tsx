@@ -3,7 +3,6 @@ import { LoaderIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
-import { useCreateProject } from "~/lib/projects/useProjects";
 import type { Project } from "~/types";
 import { useProjectsContext } from "../../lib/projects";
 import { Kbd } from "../ui/kbd";
@@ -119,11 +118,8 @@ export const ProjectSidebar = ({
 
 export const ConnectedProjectSidebar = () => {
   const navigate = useNavigate();
-  // Fetch projects from the backend
-  const { projects, currentProject, isLoadingProjects } = useProjectsContext();
-
-  // Mutations for projects
-  const createProjectMutation = useCreateProject();
+  const { projects, currentProject, isLoadingProjects, createProject } =
+    useProjectsContext();
 
   const handleSelectProject = useCallback(
     (project: Project) => {
@@ -134,13 +130,13 @@ export const ConnectedProjectSidebar = () => {
 
   const handleCreateProject = useCallback(
     (createProjectRequest: CreateProjectRequest) => {
-      createProjectMutation.mutate(createProjectRequest, {
+      createProject.mutate(createProjectRequest, {
         onSuccess: (newProject) => {
           navigate(`/projects/${newProject.id}`);
         },
       });
     },
-    [createProjectMutation, navigate],
+    [createProject, navigate],
   );
 
   return (

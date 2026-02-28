@@ -4,6 +4,7 @@ import {
   ok,
   type ProjectId,
   runIdSchema,
+  type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
@@ -17,14 +18,20 @@ import { tasksHandlers } from "../tasks/tasks-handlers";
 import { ProtectedString } from "../utils/ProtectedString";
 import { withNewTransaction } from "../utils/transaction-context";
 
+type WorkspaceProjectsApi =
+  MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"];
+
 export const projectsHandlers: HonoHandlersFor<
-  ["projects"],
-  MyAgentLoopApi["projects"],
+  ["workspaces", ":workspaceId", "projects"],
+  WorkspaceProjectsApi,
   Services
 > = {
   GET: async (ctx) => {
+    const { workspaceId } = ctx.hono.req.param();
     return withNewTransaction(ctx.services.db, async () => {
-      const projects = await ctx.services.projectsService.getAllProjects();
+      const projects = await ctx.services.projectsService.getAllProjects(
+        workspaceId as WorkspaceId,
+      );
       const withHasForgeToken = await Promise.all(
         projects.map(async (p) => ({
           ...p,
@@ -36,12 +43,14 @@ export const projectsHandlers: HonoHandlersFor<
     });
   },
   POST: async (ctx) => {
+    const { workspaceId } = ctx.hono.req.param();
     return withNewTransaction(ctx.services.db, async () => {
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
         ctx.body.forgeBaseUrl ?? defaultForgeBaseUrl(forgeType);
 
       const project = await ctx.services.projectsService.createProject({
+        workspaceId: workspaceId as WorkspaceId,
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
         repositoryUrl: ctx.body.repositoryUrl,
@@ -225,9 +234,8 @@ export const projectsHandlers: HonoHandlersFor<
         if (workflowResult.success === false) {
           return match(workflowResult.error)
             .returnType<
-              // TODO: Fix this verbose monstrosity in Cerato
               ResponsesForEndpoint<
-                MyAgentLoopApi["projects"]["children"][":projectId"]["children"]["run"]
+                WorkspaceProjectsApi["children"][":projectId"]["children"]["run"]
               >
             >()
             .with({ reason: "no-tasks-available" }, () => {

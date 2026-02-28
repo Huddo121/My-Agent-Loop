@@ -7,6 +7,7 @@ import { EmptyState, TaskQueue } from "~/components/tasks";
 import { useCreateTask, useMoveTask, useTasks } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
 import { ProjectsProvider, useProjectsContext } from "~/lib/projects";
+import { useWorkspaceContext } from "~/lib/workspaces";
 import type { NewTask, Task } from "~/types";
 
 export function meta() {
@@ -21,6 +22,8 @@ export function meta() {
 
 export const ProjectPage = () => {
   const navigate = useNavigate();
+  const { currentWorkspace } = useWorkspaceContext();
+  const workspaceId = currentWorkspace?.id ?? null;
   const { projects, currentProject, isLoadingProjects } = useProjectsContext();
 
   // Redirect to first project if invalid project ID
@@ -32,18 +35,19 @@ export const ProjectPage = () => {
 
   // Fetch tasks for the selected project
   const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
+    workspaceId,
     currentProject?.id ?? null,
   );
 
-  // TODO: The fact that these have null in their type signatures is a failure
-  // Mutation for creating tasks
-  const createTaskMutation = useCreateTask(currentProject?.id ?? null);
-
-  // Mutation for updating tasks
-  const updateTaskMutation = useUpdateTask(currentProject?.id ?? null);
-
-  // Mutation for moving tasks
-  const moveTaskMutation = useMoveTask(currentProject?.id ?? null);
+  const createTaskMutation = useCreateTask(
+    workspaceId,
+    currentProject?.id ?? null,
+  );
+  const updateTaskMutation = useUpdateTask(
+    workspaceId,
+    currentProject?.id ?? null,
+  );
+  const moveTaskMutation = useMoveTask(workspaceId, currentProject?.id ?? null);
 
   const handleMoveTask = useCallback(
     (taskId: TaskId, request: MoveTaskRequest, optimisticTasks: Task[]) => {

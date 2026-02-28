@@ -1,4 +1,4 @@
-import type { ProjectId } from "@mono/api";
+import type { ProjectId, WorkspaceId } from "@mono/api";
 import { CheckCircle2Icon } from "lucide-react";
 import { forwardRef } from "react";
 import { Button } from "~/components/ui/button";
@@ -9,6 +9,7 @@ import type { Task } from "~/types";
 
 export type TaskCardProps = {
   task: Task;
+  workspaceId: WorkspaceId | null;
   projectId: ProjectId;
   isDragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
@@ -17,11 +18,11 @@ export type TaskCardProps = {
 
 export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
   function TaskCard(
-    { task, projectId, isDragging, dragHandleProps, onEdit },
+    { task, workspaceId, projectId, isDragging, dragHandleProps, onEdit },
     ref,
   ) {
     const isCompleted = task.completedOn != null;
-    const completeTask = useCompleteTask(projectId);
+    const completeTask = useCompleteTask(workspaceId, projectId);
 
     const handleCompleteTask = () => {
       if (!isCompleted) {

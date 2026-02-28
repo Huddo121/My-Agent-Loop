@@ -31,6 +31,8 @@ import {
 } from "./workflow/WorkflowManager";
 import { WorkflowMessengerService } from "./workflow/WorkflowMessengerService";
 import { WorkflowQueues } from "./workflow/workflow-queues";
+import { DatabaseWorkspacesService } from "./workspaces/DatabaseWorkspacesService";
+import type { WorkspacesService } from "./workspaces/WorkspacesService";
 
 export interface Services {
   db: Database;
@@ -42,6 +44,7 @@ export interface Services {
   workflowExecutionService: WorkflowExecutionService;
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
+  workspacesService: WorkspacesService;
   runsService: RunsService;
   encryptionService: EncryptionService;
   forgeSecretRepository: ForgeSecretRepository;
@@ -61,6 +64,7 @@ const sandboxService = new DockerSandboxService(
 );
 
 const taskQueue = new DatabaseTaskQueue();
+const workspacesService = new DatabaseWorkspacesService();
 const projectsService = new DatabaseProjectService();
 
 const fileSystemService = new LocalFileSystemService(
@@ -116,6 +120,7 @@ export const services: Services = {
   workflowManager,
   workflowExecutionService,
   projectsService,
+  workspacesService,
   workflowQueues,
   backgroundWorkflowProcessor,
   runsService,

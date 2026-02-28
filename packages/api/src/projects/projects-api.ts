@@ -3,6 +3,7 @@ import z from "zod";
 import { notFoundSchema } from "../common-schemas";
 import { runIdSchema } from "../runs/runs-model";
 import { tasksApi } from "../tasks/tasks-api";
+import { workspaceIdSchema } from "../workspaces/workspaces-model";
 import { projectIdSchema, shortCodeCodec } from "./projects-model";
 
 // TODO: The Version of the workflow configuration should not be exposed over the API, only stored in the DB.
@@ -31,6 +32,7 @@ export const forgeTypeSchema = z.enum(["gitlab", "github"]);
 
 export const projectDtoSchema = z.object({
   id: projectIdSchema,
+  workspaceId: workspaceIdSchema,
   name: z.string(),
   shortCode: shortCodeCodec,
   repositoryUrl: z.string(),

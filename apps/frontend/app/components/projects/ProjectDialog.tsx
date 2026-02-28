@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
+import { useWorkspaceContext } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
 
 export type ProjectDialogMode = "create" | "update";
@@ -107,7 +108,10 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     { success: true } | { success: false; error: string } | null
   >(null);
 
-  const testForgeConnection = useTestForgeConnectionWithCredentials();
+  const { currentWorkspace } = useWorkspaceContext();
+  const testForgeConnection = useTestForgeConnectionWithCredentials(
+    currentWorkspace?.id ?? null,
+  );
 
   useEffect(() => {
     if (open) {

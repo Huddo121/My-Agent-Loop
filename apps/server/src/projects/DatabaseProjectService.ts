@@ -1,5 +1,5 @@
-import type { ProjectId, ProjectShortCode } from "@mono/api";
-import { asc, eq } from "drizzle-orm";
+import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
+import { and, asc, eq } from "drizzle-orm";
 import { projectsTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
 import type {
@@ -15,6 +15,7 @@ const fromProjectEntity = (
 ): Project => {
   return {
     id: project.id as ProjectId,
+    workspaceId: project.workspaceId as WorkspaceId,
     name: project.name,
     shortCode: project.shortCode as ProjectShortCode,
     repositoryUrl: project.repositoryUrl,
@@ -26,11 +27,12 @@ const fromProjectEntity = (
 };
 
 export class DatabaseProjectService implements ProjectsService {
-  async getAllProjects(): Promise<Project[]> {
+  async getAllProjects(workspaceId: WorkspaceId): Promise<Project[]> {
     const tx = getTransaction();
     const projects = await tx
       .select()
       .from(projectsTable)
+      .where(eq(projectsTable.workspaceId, workspaceId))
       .orderBy(asc(projectsTable.id));
     return projects.map(fromProjectEntity);
   }
@@ -54,6 +56,7 @@ export class DatabaseProjectService implements ProjectsService {
     const [newProject] = await tx
       .insert(projectsTable)
       .values({
+        workspaceId: project.workspaceId,
         name: project.name,
         shortCode: project.shortCode,
         repositoryUrl: project.repositoryUrl,
@@ -67,13 +70,19 @@ export class DatabaseProjectService implements ProjectsService {
   }
 
   async getProjectByShortCode(
+    workspaceId: WorkspaceId,
     shortCode: ProjectShortCode,
   ): Promise<Project | undefined> {
     const tx = getTransaction();
     const [project] = await tx
       .select()
       .from(projectsTable)
-      .where(eq(projectsTable.shortCode, shortCode));
+      .where(
+        and(
+          eq(projectsTable.workspaceId, workspaceId),
+          eq(projectsTable.shortCode, shortCode),
+        ),
+      );
 
     if (!project) {
       return undefined;

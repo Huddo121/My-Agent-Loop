@@ -1,17 +1,19 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { ProjectId } from "@mono/api";
+import type { ProjectId, WorkspaceId } from "@mono/api";
 import type { Task } from "~/types";
 import { TaskCard } from "./TaskCard";
 
 export type SortableTaskCardProps = {
   task: Task;
+  workspaceId: WorkspaceId | null;
   projectId: ProjectId;
   onEdit: (task: Task) => void;
 };
 
 export function SortableTaskCard({
   task,
+  workspaceId,
   projectId,
   onEdit,
 }: SortableTaskCardProps) {
@@ -33,6 +35,7 @@ export function SortableTaskCard({
     <div ref={setNodeRef} style={style} {...attributes}>
       <TaskCard
         task={task}
+        workspaceId={workspaceId}
         projectId={projectId}
         isDragging={isDragging}
         dragHandleProps={listeners}

@@ -13,6 +13,8 @@ import {
   FloatingSidebarTrigger,
   SidebarProvider,
 } from "./components/ui/sidebar";
+import { WorkspaceSetup } from "./components/workspaces";
+import { useWorkspaceContext, WorkspaceProvider } from "./lib/workspaces";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -56,11 +58,32 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+function AppContent() {
+  const { needsSetup, isLoadingWorkspaces } = useWorkspaceContext();
+  if (isLoadingWorkspaces) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+  if (needsSetup) {
+    return <WorkspaceSetup />;
+  }
+  return (
+    <>
+      <Outlet />
+      <FloatingSidebarTrigger />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <Providers>
-      <Outlet />
-      <FloatingSidebarTrigger />
+      <WorkspaceProvider>
+        <AppContent />
+      </WorkspaceProvider>
     </Providers>
   );
 }

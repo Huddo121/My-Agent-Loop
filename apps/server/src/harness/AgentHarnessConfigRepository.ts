@@ -9,6 +9,10 @@ export interface AgentHarnessConfigRepository {
   getWorkspaceConfig(workspaceId: WorkspaceId): Promise<AgentHarnessId | null>;
   getProjectConfig(projectId: ProjectId): Promise<AgentHarnessId | null>;
   getTaskConfig(taskId: TaskId): Promise<AgentHarnessId | null>;
+  /** Fetch the task-level harness config (not resolved) for multiple tasks in one query. */
+  getTaskConfigs(
+    taskIds: TaskId[],
+  ): Promise<Map<TaskId, AgentHarnessId | null>>;
   setWorkspaceConfig(
     workspaceId: WorkspaceId,
     agentHarnessId: AgentHarnessId | null,
@@ -26,17 +30,6 @@ export interface AgentHarnessConfigRepository {
     projectId: ProjectId,
     workspaceId: WorkspaceId,
   ): Promise<AgentHarnessId>;
-  /** Resolve harness for many tasks of one project (project + workspace config known). */
-  resolveHarnessIdsForTasks(
-    projectId: ProjectId,
-    workspaceId: WorkspaceId,
-    taskIds: TaskId[],
-  ): Promise<Map<TaskId, AgentHarnessId>>;
-  /** Resolve harness for many projects in one workspace. */
-  resolveHarnessIdsForProjects(
-    workspaceId: WorkspaceId,
-    projectIds: ProjectId[],
-  ): Promise<Map<ProjectId, AgentHarnessId>>;
 }
 
 export class DatabaseAgentHarnessConfigRepository
@@ -122,6 +115,26 @@ export class DatabaseAgentHarnessConfigRepository
     }
   }
 
+  async getTaskConfigs(
+    taskIds: TaskId[],
+  ): Promise<Map<TaskId, AgentHarnessId | null>> {
+    if (taskIds.length === 0) return new Map();
+    const tx = getTransaction();
+    const rows = await tx
+      .select({
+        taskId: agentHarnessConfigurationTable.taskId,
+        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+      })
+      .from(agentHarnessConfigurationTable)
+      .where(inArray(agentHarnessConfigurationTable.taskId, taskIds));
+    const map = new Map<TaskId, AgentHarnessId | null>();
+    for (const taskId of taskIds) {
+      const row = rows.find((r) => r.taskId === taskId);
+      map.set(taskId, (row?.agentHarnessId ?? null) as AgentHarnessId | null);
+    }
+    return map;
+  }
+
   async resolveHarnessId(
     taskId: TaskId,
     projectId: ProjectId,
@@ -133,53 +146,5 @@ export class DatabaseAgentHarnessConfigRepository
       this.getWorkspaceConfig(workspaceId),
     ]);
     return taskConfig ?? projectConfig ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
-  }
-
-  async resolveHarnessIdsForTasks(
-    projectId: ProjectId,
-    workspaceId: WorkspaceId,
-    taskIds: TaskId[],
-  ): Promise<Map<TaskId, AgentHarnessId>> {
-    if (taskIds.length === 0) return new Map();
-    const tx = getTransaction();
-    const taskConfigs = await tx
-      .select({
-        taskId: agentHarnessConfigurationTable.taskId,
-        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
-      })
-      .from(agentHarnessConfigurationTable)
-      .where(inArray(agentHarnessConfigurationTable.taskId, taskIds));
-    const projectConfig = await this.getProjectConfig(projectId);
-    const workspaceConfig = await this.getWorkspaceConfig(workspaceId);
-    const fallback = projectConfig ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
-    const map = new Map<TaskId, AgentHarnessId>();
-    for (const taskId of taskIds) {
-      const taskRow = taskConfigs.find((r) => r.taskId === taskId);
-      map.set(taskId, (taskRow?.agentHarnessId ?? fallback) as AgentHarnessId);
-    }
-    return map;
-  }
-
-  async resolveHarnessIdsForProjects(
-    workspaceId: WorkspaceId,
-    projectIds: ProjectId[],
-  ): Promise<Map<ProjectId, AgentHarnessId>> {
-    if (projectIds.length === 0) return new Map();
-    const tx = getTransaction();
-    const projectConfigs = await tx
-      .select({
-        projectId: agentHarnessConfigurationTable.projectId,
-        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
-      })
-      .from(agentHarnessConfigurationTable)
-      .where(inArray(agentHarnessConfigurationTable.projectId, projectIds));
-    const workspaceConfig = await this.getWorkspaceConfig(workspaceId);
-    const fallback = workspaceConfig ?? DEFAULT_HARNESS_ID;
-    const map = new Map<ProjectId, AgentHarnessId>();
-    for (const projectId of projectIds) {
-      const row = projectConfigs.find((r) => r.projectId === projectId);
-      map.set(projectId, (row?.agentHarnessId ?? fallback) as AgentHarnessId);
-    }
-    return map;
   }
 }

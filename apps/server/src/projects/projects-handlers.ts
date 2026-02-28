@@ -1,4 +1,5 @@
 import {
+  badUserInput,
   type MyAgentLoopApi,
   notFound,
   ok,
@@ -49,12 +50,9 @@ export const projectsHandlers: HonoHandlersFor<
       ctx.body.agentHarnessId !== null &&
       !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
     ) {
-      return [
-        400,
-        {
-          error: `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-        },
-      ] as const;
+      return badUserInput(
+        `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+      );
     }
     return withNewTransaction(ctx.services.db, async () => {
       const forgeType = ctx.body.forgeType;
@@ -128,12 +126,9 @@ export const projectsHandlers: HonoHandlersFor<
         ctx.body.agentHarnessId !== null &&
         !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
       ) {
-        return [
-          400,
-          {
-            error: `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-          },
-        ] as const;
+        return badUserInput(
+          `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+        );
       }
       return withNewTransaction(ctx.services.db, async () => {
         const updatePayload: Parameters<

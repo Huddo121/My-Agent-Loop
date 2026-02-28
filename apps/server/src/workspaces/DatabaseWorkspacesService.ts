@@ -6,8 +6,6 @@ import { getTransaction } from "../utils/transaction-context";
 import type { CreateWorkspace, UpdateWorkspace, Workspace } from "./Workspace";
 import type { WorkspacesService } from "./WorkspacesService";
 
-const DEFAULT_HARNESS_ID: AgentHarnessId = "opencode";
-
 function toWorkspace(
   row: typeof workspacesTable.$inferSelect,
   agentHarnessId: AgentHarnessId | null,
@@ -17,7 +15,6 @@ function toWorkspace(
     name: row.name,
     createdAt: row.createdAt,
     agentHarnessId,
-    resolvedAgentHarnessId: agentHarnessId ?? DEFAULT_HARNESS_ID,
   };
 }
 

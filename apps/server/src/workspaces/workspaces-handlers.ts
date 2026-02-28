@@ -1,4 +1,10 @@
-import { type MyAgentLoopApi, notFound, ok, type WorkspaceId } from "@mono/api";
+import {
+  badUserInput,
+  type MyAgentLoopApi,
+  notFound,
+  ok,
+  type WorkspaceId,
+} from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
 import { projectsHandlers } from "../projects/projects-handlers";
 import type { Services } from "../services";
@@ -45,14 +51,9 @@ export const workspacesHandlers: HonoHandlersFor<
         body.agentHarnessId !== null &&
         !ctx.services.harnessAuthService.isAvailable(body.agentHarnessId)
       ) {
-        return [
-          400,
-          {
-            result: "error",
-            code: "bad-user-input",
-            message: `Agent harness "${body.agentHarnessId}" is not available (API key not configured).`,
-          },
-        ] as const;
+        return badUserInput(
+          `Agent harness "${body.agentHarnessId}" is not available (API key not configured).`,
+        );
       }
       return withNewTransaction(ctx.services.db, async () => {
         const workspace = await ctx.services.workspacesService.updateWorkspace(
@@ -78,7 +79,7 @@ export const workspacesHandlers: HonoHandlersFor<
           if (workspace === undefined) {
             return notFound();
           }
-          const harnesses = ctx.services.harnessRegistry.getAll().map((h) => ({
+          const harnesses = ctx.services.harnesses.map((h) => ({
             id: h.id,
             displayName: h.displayName,
             isAvailable: ctx.services.harnessAuthService.isAvailable(h.id),

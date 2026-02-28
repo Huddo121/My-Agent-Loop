@@ -1,6 +1,6 @@
 import { Endpoint } from "cerato";
 import z from "zod";
-import { notFoundSchema } from "../common-schemas";
+import { badUserInputSchema, notFoundSchema } from "../common-schemas";
 import { agentHarnessIdSchema } from "../harnesses/harnesses-model";
 import { runIdSchema } from "../runs/runs-model";
 import { tasksApi } from "../tasks/tasks-api";
@@ -43,7 +43,6 @@ export const projectDtoSchema = z.object({
   forgeBaseUrl: z.string(),
   hasForgeToken: z.boolean(),
   agentHarnessId: agentHarnessIdSchema.nullable(),
-  resolvedAgentHarnessId: agentHarnessIdSchema,
 });
 export type ProjectDto = z.infer<typeof projectDtoSchema>;
 
@@ -137,14 +136,12 @@ export type TestForgeConnectionRequest = z.infer<
   typeof testForgeConnectionRequestSchema
 >;
 
-const harnessErrorSchema = z.object({ error: z.string() });
-
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
   POST: Endpoint.post()
     .input(createProjectRequestSchema)
     .output(200, projectDtoSchema)
-    .output(400, harnessErrorSchema),
+    .output(400, badUserInputSchema),
   children: {
     "test-forge-connection": Endpoint.post()
       .input(testForgeConnectionRequestSchema)
@@ -157,7 +154,7 @@ export const projectsApi = Endpoint.multi({
       PATCH: Endpoint.patch()
         .input(updateProjectRequestSchema)
         .output(200, projectDtoSchema)
-        .output(400, harnessErrorSchema)
+        .output(400, badUserInputSchema)
         .output(404, notFoundSchema),
       DELETE: Endpoint.delete()
         .output(200, projectDtoSchema)

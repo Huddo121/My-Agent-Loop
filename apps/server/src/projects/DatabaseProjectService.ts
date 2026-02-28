@@ -16,12 +16,9 @@ import type {
   UpdateProject,
 } from "./ProjectsService";
 
-const DEFAULT_HARNESS_ID: AgentHarnessId = "opencode";
-
 function toProject(
   row: typeof projectsTable.$inferSelect,
   agentHarnessId: AgentHarnessId | null,
-  resolvedAgentHarnessId: AgentHarnessId,
 ): Project {
   return {
     id: row.id as ProjectId,
@@ -34,7 +31,6 @@ function toProject(
     forgeType: row.forgeType,
     forgeBaseUrl: row.forgeBaseUrl,
     agentHarnessId,
-    resolvedAgentHarnessId,
   };
 }
 
@@ -48,15 +44,11 @@ export class DatabaseProjectService implements ProjectsService {
       .from(projectsTable)
       .where(eq(projectsTable.workspaceId, workspaceId))
       .orderBy(asc(projectsTable.id));
-    const workspaceConfig =
-      await this.harnessConfig.getWorkspaceConfig(workspaceId);
     const result: Project[] = [];
     for (const row of rows) {
       const id = row.id as ProjectId;
       const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
-      const resolvedAgentHarnessId =
-        agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
-      result.push(toProject(row, agentHarnessId, resolvedAgentHarnessId));
+      result.push(toProject(row, agentHarnessId));
     }
     return result;
   }
@@ -73,12 +65,7 @@ export class DatabaseProjectService implements ProjectsService {
     }
 
     const agentHarnessId = await this.harnessConfig.getProjectConfig(projectId);
-    const workspaceConfig = await this.harnessConfig.getWorkspaceConfig(
-      row.workspaceId as WorkspaceId,
-    );
-    const resolvedAgentHarnessId =
-      agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
-    return toProject(row, agentHarnessId, resolvedAgentHarnessId);
+    return toProject(row, agentHarnessId);
   }
 
   async createProject(project: CreateProject): Promise<Project> {
@@ -131,11 +118,7 @@ export class DatabaseProjectService implements ProjectsService {
 
     const id = row.id as ProjectId;
     const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
-    const workspaceConfig =
-      await this.harnessConfig.getWorkspaceConfig(workspaceId);
-    const resolvedAgentHarnessId =
-      agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
-    return toProject(row, agentHarnessId, resolvedAgentHarnessId);
+    return toProject(row, agentHarnessId);
   }
 
   async updateProject(

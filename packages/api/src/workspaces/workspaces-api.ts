@@ -11,7 +11,6 @@ export const workspaceDtoSchema = z.object({
   name: z.string(),
   createdAt: isoDatetimeToDate,
   agentHarnessId: agentHarnessIdSchema.nullable(),
-  resolvedAgentHarnessId: agentHarnessIdSchema,
 });
 export type WorkspaceDto = z.infer<typeof workspaceDtoSchema>;
 

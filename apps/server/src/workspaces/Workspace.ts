@@ -5,7 +5,6 @@ export interface Workspace {
   name: string;
   createdAt: Date;
   agentHarnessId: AgentHarnessId | null;
-  resolvedAgentHarnessId: AgentHarnessId;
 }
 
 export type CreateWorkspace = { name: string };

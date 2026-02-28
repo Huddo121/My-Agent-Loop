@@ -1,7 +1,7 @@
 import { Endpoint } from "cerato";
 import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
-import { notFoundSchema } from "../common-schemas";
+import { badUserInputSchema, notFoundSchema } from "../common-schemas";
 import { agentHarnessIdSchema } from "../harnesses/harnesses-model";
 import { taskIdSchema } from "./tasks-model";
 
@@ -12,7 +12,6 @@ export const taskDtoSchema = z.object({
   completedOn: isoDatetimeToDate.nullish(),
   position: z.number().nullish(),
   agentHarnessId: agentHarnessIdSchema.nullable(),
-  resolvedAgentHarnessId: agentHarnessIdSchema,
 });
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 
@@ -49,14 +48,12 @@ export const moveTaskRequestSchema = z.union([
 ]);
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 
-const harnessErrorSchema = z.object({ error: z.string() });
-
 export const tasksApi = Endpoint.multi({
   GET: Endpoint.get().output(200, z.array(taskDtoSchema)),
   POST: Endpoint.post()
     .input(createTaskRequestSchema)
     .output(200, taskDtoSchema)
-    .output(400, harnessErrorSchema),
+    .output(400, badUserInputSchema),
   children: {
     ":taskId": Endpoint.multi({
       GET: Endpoint.get()
@@ -65,7 +62,7 @@ export const tasksApi = Endpoint.multi({
       PUT: Endpoint.put()
         .input(updateTaskRequestSchema)
         .output(200, taskDtoSchema)
-        .output(400, harnessErrorSchema)
+        .output(400, badUserInputSchema)
         .output(404, notFoundSchema),
       children: {
         complete: Endpoint.post()

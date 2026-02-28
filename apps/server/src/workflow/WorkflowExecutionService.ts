@@ -5,7 +5,7 @@ import type { FileSystemService } from "../file-system/FileSystemService";
 import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { ForgeGitCredentials, GitService } from "../git/GitService";
-import type { HarnessRegistry } from "../harness";
+import type { AgentHarness } from "../harness";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../harness/HarnessAuthService";
 import type { Project } from "../projects/ProjectsService";
@@ -36,7 +36,7 @@ export class WorkflowExecutionService {
     private readonly gitService: GitService,
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
-    private readonly harnessRegistry: HarnessRegistry,
+    private readonly harnesses: readonly AgentHarness[],
     private readonly harnessConfig: AgentHarnessConfigRepository,
     private readonly harnessAuthService: HarnessAuthService,
     private readonly forgeSecretRepository: ForgeSecretRepository,
@@ -114,11 +114,11 @@ export class WorkflowExecutionService {
         ),
       };
     }
-    const harness = this.harnessRegistry.get(harnessId);
+    const harness = this.harnesses.find((h) => h.id === harnessId);
     if (harness === undefined) {
       return {
         success: false,
-        error: new Error(`Harness ${harnessId} not found in registry`),
+        error: new Error(`Harness "${harnessId}" is not registered`),
       };
     }
 

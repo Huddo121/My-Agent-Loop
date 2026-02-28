@@ -25,17 +25,11 @@ export interface Project {
   forgeType: ForgeType;
   forgeBaseUrl: string;
   agentHarnessId: AgentHarnessId | null;
-  resolvedAgentHarnessId: AgentHarnessId;
 }
 
-export type CreateProject = Omit<
-  Project,
-  "id" | "queueState" | "resolvedAgentHarnessId"
-> & { resolvedAgentHarnessId?: never };
+export type CreateProject = Omit<Project, "id" | "queueState">;
 
-export type UpdateProject = Partial<
-  Omit<Project, "id" | "queueState" | "resolvedAgentHarnessId">
->;
+export type UpdateProject = Partial<Omit<Project, "id" | "queueState">>;
 
 export interface ProjectsService {
   getAllProjects(workspaceId: WorkspaceId): Promise<Project[]>;

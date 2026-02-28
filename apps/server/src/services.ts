@@ -8,7 +8,7 @@ import {
   type ForgeSecretRepository,
 } from "./forge-secrets";
 import { type GitService, SimpleGitService } from "./git/GitService";
-import { HarnessRegistry } from "./harness";
+import type { AgentHarness } from "./harness";
 import {
   type AgentHarnessConfigRepository,
   DatabaseAgentHarnessConfigRepository,
@@ -58,7 +58,7 @@ export interface Services {
   forgeSecretRepository: ForgeSecretRepository;
   agentHarnessConfigRepository: AgentHarnessConfigRepository;
   harnessAuthService: HarnessAuthService;
-  harnessRegistry: HarnessRegistry;
+  harnesses: readonly AgentHarness[];
 }
 
 const encryptionService = new DefaultEncryptionService(
@@ -97,8 +97,7 @@ const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
-const harnessRegistry = new HarnessRegistry();
-harnessRegistry.register(new OpenCodeHarness());
+const harnesses: readonly AgentHarness[] = [new OpenCodeHarness()];
 
 const workflowMessengerService = new WorkflowMessengerService();
 
@@ -116,7 +115,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   gitService,
   sandboxService,
   fileSystemService,
-  harnessRegistry,
+  harnesses,
   agentHarnessConfigRepository,
   harnessAuthService,
   forgeSecretRepository,
@@ -148,7 +147,7 @@ export const services: Services = {
   forgeSecretRepository,
   agentHarnessConfigRepository,
   harnessAuthService,
-  harnessRegistry,
+  harnesses,
   workflowQueues,
   backgroundWorkflowProcessor,
 };

@@ -29,7 +29,11 @@ if [ -f /harness-setup.sh ]; then
 fi
 
 # Run the agent (injected by the workflow via AGENT_RUN_COMMAND)
-eval "${AGENT_RUN_COMMAND:-echo 'AGENT_RUN_COMMAND not set'}"
+if [ -z "${AGENT_RUN_COMMAND:-}" ]; then
+  echo "AGENT_RUN_COMMAND not set"
+  exit 1
+fi
+eval "$AGENT_RUN_COMMAND"
 AGENT_EXIT_CODE=$?
 
 # Run teardown script if it exists (with 1 minute timeout)

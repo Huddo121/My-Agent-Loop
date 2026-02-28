@@ -1,5 +1,5 @@
 import type { AgentHarnessId } from "@mono/api";
-import { ProtectedString } from "../utils/ProtectedString";
+import type { ProtectedString } from "../utils/ProtectedString";
 
 export interface HarnessAuthService {
   isAvailable(harnessId: AgentHarnessId): boolean;
@@ -13,11 +13,11 @@ const HARNESS_ENV_KEYS: Record<AgentHarnessId, keyof EnvForHarnessAuth> = {
   "codex-cli": "OPENAI_API_KEY",
 };
 
-type EnvForHarnessAuth = {
-  OPENROUTER_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
-  CURSOR_API_KEY?: string;
-  OPENAI_API_KEY?: string;
+export type EnvForHarnessAuth = {
+  OPENROUTER_API_KEY?: ProtectedString;
+  ANTHROPIC_API_KEY?: ProtectedString;
+  CURSOR_API_KEY?: ProtectedString;
+  OPENAI_API_KEY?: ProtectedString;
 };
 
 export class EnvHarnessAuthService implements HarnessAuthService {
@@ -28,14 +28,11 @@ export class EnvHarnessAuthService implements HarnessAuthService {
       return true;
     }
     const key = HARNESS_ENV_KEYS[harnessId];
-    const value = this.env[key];
-    return value !== undefined && value.length > 0;
+    return this.env[key] !== undefined;
   }
 
   getCredential(harnessId: AgentHarnessId): ProtectedString | undefined {
     const keyName = HARNESS_ENV_KEYS[harnessId];
-    const value = this.env[keyName];
-    if (value === undefined || value.length === 0) return undefined;
-    return new ProtectedString(value);
+    return this.env[keyName];
   }
 }

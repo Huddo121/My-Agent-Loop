@@ -7,7 +7,6 @@ import { EmptyState, TaskQueue } from "~/components/tasks";
 import { useCreateTask, useMoveTask, useTasks } from "~/hooks";
 import { useUpdateTask } from "~/hooks/useTasks";
 import { ProjectsProvider, useProjectsContext } from "~/lib/projects";
-import { useWorkspaceContext } from "~/lib/workspaces";
 import type { NewTask, Task } from "~/types";
 
 export function meta() {
@@ -22,9 +21,8 @@ export function meta() {
 
 export const ProjectPage = () => {
   const navigate = useNavigate();
-  const { currentWorkspace } = useWorkspaceContext();
-  const workspaceId = currentWorkspace?.id ?? null;
   const { projects, currentProject, isLoadingProjects } = useProjectsContext();
+  const projectId = currentProject?.id ?? null;
 
   // Redirect to first project if invalid project ID
   useEffect(() => {
@@ -33,21 +31,11 @@ export const ProjectPage = () => {
     }
   }, [projects, isLoadingProjects, currentProject, navigate]);
 
-  // Fetch tasks for the selected project
-  const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
-    workspaceId,
-    currentProject?.id ?? null,
-  );
-
-  const createTaskMutation = useCreateTask(
-    workspaceId,
-    currentProject?.id ?? null,
-  );
-  const updateTaskMutation = useUpdateTask(
-    workspaceId,
-    currentProject?.id ?? null,
-  );
-  const moveTaskMutation = useMoveTask(workspaceId, currentProject?.id ?? null);
+  const { data: fetchedTasks = [], isLoading: isLoadingTasks } =
+    useTasks(projectId);
+  const createTaskMutation = useCreateTask(projectId);
+  const updateTaskMutation = useUpdateTask(projectId);
+  const moveTaskMutation = useMoveTask(projectId);
 
   const handleMoveTask = useCallback(
     (taskId: TaskId, request: MoveTaskRequest, optimisticTasks: Task[]) => {

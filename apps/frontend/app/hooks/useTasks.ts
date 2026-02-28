@@ -1,61 +1,49 @@
-import type {
-  MoveTaskRequest,
-  ProjectId,
-  TaskId,
-  WorkspaceId,
-} from "@mono/api";
+import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { NewTask, Task, UpdateTask } from "~/types";
 
 const tasksQueryKey = (projectId: ProjectId | null) =>
   ["tasks", projectId] as const;
 
 /**
- * Hook to fetch tasks for a specific project.
+ * Hook to fetch tasks for a specific project. Must be used inside CurrentWorkspaceProvider.
  */
-export function useTasks(
-  workspaceId: WorkspaceId | null,
-  projectId: ProjectId | null,
-) {
+export function useTasks(projectId: ProjectId | null) {
+  const workspace = useCurrentWorkspace();
   return useQuery({
     queryKey: tasksQueryKey(projectId),
     queryFn: async (): Promise<Task[]> => {
-      if (workspaceId === null || projectId === null) {
-        throw new Error("Workspace ID and Project ID are required");
-      }
+      if (projectId === null) throw new Error("Project ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].tasks.GET({
-        pathParams: { workspaceId, projectId },
+        pathParams: { workspaceId: workspace.id, projectId },
       });
       if (response.status === 200) {
         return response.responseBody as Task[];
       }
       throw new Error("Failed to fetch tasks");
     },
-    enabled: workspaceId !== null && projectId !== null,
+    enabled: projectId !== null,
   });
 }
 
 /**
- * Hook to create a new task for a project.
+ * Hook to create a new task for a project. Must be used inside CurrentWorkspaceProvider.
  */
-export function useCreateTask(
-  workspaceId: WorkspaceId | null,
-  projectId: ProjectId | null,
-) {
+export function useCreateTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (newTask: NewTask): Promise<Task> => {
-      if (!workspaceId || !projectId) {
-        throw new Error("Workspace and project are required");
-      }
+      if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].tasks.POST({
-        pathParams: { workspaceId, projectId },
+        pathParams: { workspaceId: workspace.id, projectId },
         body: newTask,
       });
       if (response.status === 200) {
@@ -74,23 +62,19 @@ export function useCreateTask(
 }
 
 /**
- * Hook to mark a task as completed.
+ * Hook to mark a task as completed. Must be used inside CurrentWorkspaceProvider.
  */
-export function useCompleteTask(
-  workspaceId: WorkspaceId | null,
-  projectId: ProjectId | null,
-) {
+export function useCompleteTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (taskId: TaskId): Promise<Task> => {
-      if (!workspaceId || !projectId) {
-        throw new Error("Workspace and project are required");
-      }
+      if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].tasks[":taskId"].complete.POST({
-        pathParams: { workspaceId, projectId, taskId },
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
       });
       if (response.status === 200) {
         return response.responseBody as Task;
@@ -110,13 +94,11 @@ export function useCompleteTask(
 }
 
 /**
- * Hook to update an existing task.
+ * Hook to update an existing task. Must be used inside CurrentWorkspaceProvider.
  */
-export function useUpdateTask(
-  workspaceId: WorkspaceId | null,
-  projectId: ProjectId | null,
-) {
+export function useUpdateTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -126,13 +108,11 @@ export function useUpdateTask(
       taskId: TaskId;
       task: UpdateTask;
     }): Promise<Task> => {
-      if (!workspaceId || !projectId) {
-        throw new Error("Workspace and project are required");
-      }
+      if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].tasks[":taskId"].PUT({
-        pathParams: { workspaceId, projectId, taskId },
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
         body: task,
       });
       if (response.status === 200) {
@@ -153,14 +133,12 @@ export function useUpdateTask(
 }
 
 /**
- * Hook to move a task within the queue.
+ * Hook to move a task within the queue. Must be used inside CurrentWorkspaceProvider.
  * Supports optimistic updates with rollback on failure.
  */
-export function useMoveTask(
-  workspaceId: WorkspaceId | null,
-  projectId: ProjectId | null,
-) {
+export function useMoveTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -171,13 +149,11 @@ export function useMoveTask(
       request: MoveTaskRequest;
       optimisticTasks: Task[];
     }): Promise<Task> => {
-      if (!workspaceId || !projectId) {
-        throw new Error("Workspace and project are required");
-      }
+      if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].tasks[":taskId"].move.POST({
-        pathParams: { workspaceId, projectId, taskId },
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
         body: request,
       });
       if (response.status === 200) {

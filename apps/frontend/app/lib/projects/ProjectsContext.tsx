@@ -8,7 +8,6 @@ import {
   useStopQueue,
   useUpdateProject,
 } from "~/lib/projects/useProjects";
-import { useWorkspaceContext } from "~/lib/workspaces";
 import type { Project } from "~/types";
 
 /**
@@ -68,8 +67,6 @@ export function ProjectsProvider({
   children,
   projectId,
 }: ProjectsProviderProps) {
-  const { currentWorkspace } = useWorkspaceContext();
-  const workspaceId = currentWorkspace?.id ?? null;
   const currentProjectId = useProjectsStore((s) => s.currentProjectId);
   const selectProject = useProjectsStore((s) => s.selectProject);
 
@@ -80,7 +77,7 @@ export function ProjectsProvider({
   }, [projectId, currentProjectId, selectProject]);
 
   const { data: projects = [], isLoading: isLoadingProjects } =
-    useProjectsQuery(workspaceId);
+    useProjectsQuery();
 
   const selectedProject = useMemo(
     () =>
@@ -90,10 +87,10 @@ export function ProjectsProvider({
     [currentProjectId, projects],
   );
 
-  const createProject = useCreateProject(workspaceId);
-  const updateProject = useUpdateProject(workspaceId);
-  const startRun = useStartRun(workspaceId);
-  const stopQueue = useStopQueue(workspaceId);
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const startRun = useStartRun();
+  const stopQueue = useStopQueue();
 
   const value: ProjectsContextValue = useMemo(
     () => ({

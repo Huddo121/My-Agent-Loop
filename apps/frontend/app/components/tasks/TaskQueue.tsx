@@ -313,7 +313,6 @@ export function TaskQueue({
                     <SortableTaskCard
                       key={task.id}
                       task={task}
-                      workspaceId={project.workspaceId}
                       projectId={project.id}
                       onEdit={handleEditTask}
                     />

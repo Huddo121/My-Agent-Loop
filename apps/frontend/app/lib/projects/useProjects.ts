@@ -6,49 +6,50 @@ import type {
 } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { Project } from "~/types";
 
 //
-// These hooks are expected to be private to the projects directory
+// These hooks are expected to be private to the projects directory.
+// They must be used inside CurrentWorkspaceProvider (e.g. on app routes after the setup gate).
 //
 
-const projectsQueryKey = (workspaceId: WorkspaceId | null) =>
+const projectsQueryKey = (workspaceId: WorkspaceId) =>
   ["projects", workspaceId] as const;
 
 /**
- * Hook to fetch all projects for a workspace.
+ * Hook to fetch all projects for the current workspace.
  */
-export function useProjectsQuery(workspaceId: WorkspaceId | null) {
+export function useProjectsQuery() {
+  const workspace = useCurrentWorkspace();
   return useQuery({
-    queryKey: projectsQueryKey(workspaceId),
+    queryKey: projectsQueryKey(workspace.id),
     queryFn: async (): Promise<Project[]> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects.GET({
-        pathParams: { workspaceId },
+        pathParams: { workspaceId: workspace.id },
       });
       if (response.status === 200) {
         return response.responseBody;
       }
       throw new Error("Failed to fetch projects");
     },
-    enabled: workspaceId !== null,
   });
 }
 
 /**
- * Hook to create a new project.
+ * Hook to create a new project in the current workspace.
  */
-export function useCreateProject(workspaceId: WorkspaceId | null) {
+export function useCreateProject() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (
       createProjectRequest: CreateProjectRequest,
     ): Promise<Project> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects.POST(
         {
-          pathParams: { workspaceId },
+          pathParams: { workspaceId: workspace.id },
           body: createProjectRequest,
         },
       );
@@ -58,21 +59,20 @@ export function useCreateProject(workspaceId: WorkspaceId | null) {
       throw new Error("Failed to create project");
     },
     onSuccess: (newProject) => {
-      if (workspaceId) {
-        queryClient.setQueryData<Project[]>(
-          projectsQueryKey(workspaceId),
-          (old) => {
-            if (!old) return [newProject];
-            return [...old, newProject];
-          },
-        );
-      }
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [newProject];
+          return [...old, newProject];
+        },
+      );
     },
   });
 }
 
-export function useUpdateProject(workspaceId: WorkspaceId | null) {
+export function useUpdateProject() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -82,11 +82,10 @@ export function useUpdateProject(workspaceId: WorkspaceId | null) {
       projectId: ProjectId;
       updateProjectRequest: UpdateProjectRequest;
     }): Promise<Project> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].PATCH({
-        pathParams: { workspaceId, projectId },
+        pathParams: { workspaceId: workspace.id, projectId },
         body: updateProjectRequest,
       });
       if (response.status === 200) {
@@ -98,17 +97,15 @@ export function useUpdateProject(workspaceId: WorkspaceId | null) {
       throw new Error("Failed to update project");
     },
     onSuccess: (updatedProject) => {
-      if (workspaceId) {
-        queryClient.setQueryData<Project[]>(
-          projectsQueryKey(workspaceId),
-          (old) => {
-            if (!old) return [updatedProject];
-            return old.map((p) =>
-              p.id === updatedProject.id ? updatedProject : p,
-            );
-          },
-        );
-      }
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
   });
 }
@@ -116,8 +113,9 @@ export function useUpdateProject(workspaceId: WorkspaceId | null) {
 /**
  * Hook to start a run for a project.
  */
-export function useStartRun(workspaceId: WorkspaceId | null) {
+export function useStartRun() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -127,11 +125,10 @@ export function useStartRun(workspaceId: WorkspaceId | null) {
       projectId: ProjectId;
       mode: "single" | "loop";
     }): Promise<{ runId: string; project: Project }> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].run.POST({
-        pathParams: { workspaceId, projectId },
+        pathParams: { workspaceId: workspace.id, projectId },
         body: { mode },
       });
       if (response.status === 200) {
@@ -143,25 +140,21 @@ export function useStartRun(workspaceId: WorkspaceId | null) {
       throw new Error("Failed to start run");
     },
     onSuccess: (result) => {
-      if (workspaceId) {
-        const updatedProject = result.project;
-        queryClient.setQueryData<Project[]>(
-          projectsQueryKey(workspaceId),
-          (old) => {
-            if (!old) return [updatedProject];
-            return old.map((p) =>
-              p.id === updatedProject.id ? updatedProject : p,
-            );
-          },
-        );
-      }
+      const updatedProject = result.project;
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
     onError: () => {
-      if (workspaceId) {
-        queryClient.invalidateQueries({
-          queryKey: projectsQueryKey(workspaceId),
-        });
-      }
+      queryClient.invalidateQueries({
+        queryKey: projectsQueryKey(workspace.id),
+      });
     },
   });
 }
@@ -169,8 +162,9 @@ export function useStartRun(workspaceId: WorkspaceId | null) {
 /**
  * Hook to stop the queue for a project.
  */
-export function useStopQueue(workspaceId: WorkspaceId | null) {
+export function useStopQueue() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -180,11 +174,10 @@ export function useStopQueue(workspaceId: WorkspaceId | null) {
       projectId: ProjectId;
       stopImmediately: boolean;
     }): Promise<{ project: Project }> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].stop.POST({
-        pathParams: { workspaceId, projectId },
+        pathParams: { workspaceId: workspace.id, projectId },
         body: { stopImmediately },
       });
       if (response.status === 200) {
@@ -199,25 +192,21 @@ export function useStopQueue(workspaceId: WorkspaceId | null) {
       throw new Error("Failed to stop queue");
     },
     onSuccess: (result) => {
-      if (workspaceId) {
-        const updatedProject = result.project;
-        queryClient.setQueryData<Project[]>(
-          projectsQueryKey(workspaceId),
-          (old) => {
-            if (!old) return [updatedProject];
-            return old.map((p) =>
-              p.id === updatedProject.id ? updatedProject : p,
-            );
-          },
-        );
-      }
+      const updatedProject = result.project;
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
     onError: () => {
-      if (workspaceId) {
-        queryClient.invalidateQueries({
-          queryKey: projectsQueryKey(workspaceId),
-        });
-      }
+      queryClient.invalidateQueries({
+        queryKey: projectsQueryKey(workspace.id),
+      });
     },
   });
 }
@@ -227,9 +216,9 @@ export function useStopQueue(workspaceId: WorkspaceId | null) {
  * (e.g. from the project dialog form). Use this to validate credentials
  * before saving; does not rely on server-stored project state.
  */
-export function useTestForgeConnectionWithCredentials(
-  workspaceId: WorkspaceId | null,
-) {
+export function useTestForgeConnectionWithCredentials() {
+  const workspace = useCurrentWorkspace();
+
   return useMutation({
     mutationFn: async (params: {
       forgeType: "gitlab" | "github";
@@ -237,11 +226,10 @@ export function useTestForgeConnectionWithCredentials(
       forgeToken: string;
       repositoryUrl: string;
     }): Promise<{ success: true } | { success: false; error: string }> => {
-      if (!workspaceId) throw new Error("Workspace ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         "test-forge-connection"
       ].POST({
-        pathParams: { workspaceId },
+        pathParams: { workspaceId: workspace.id },
         body: params,
       });
       if (response.status === 200) {

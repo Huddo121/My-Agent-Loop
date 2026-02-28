@@ -15,7 +15,7 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
 export const forgeTypeEnum = pg.pgEnum("forge_type", ["gitlab", "github"]);
 
 export const workspacesTable = pg.pgTable("workspaces", {
-  id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<WorkspaceId>(),
+  id: pg.uuid().primaryKey().defaultRandom().$type<WorkspaceId>(),
   name: pg.text().notNull(),
   createdAt: pg.timestamp().notNull().defaultNow(),
 });

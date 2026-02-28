@@ -55,3 +55,29 @@ Using Zod, schemas can be created for things (e.g. a `userSchema`), which is a p
 ### Result
 
 We use a `Result` type (basically `Either`) in order to properly capture the idea that a function might return a "failed" result that we want to handle.
+
+### DTO / transformation functions must be pure
+
+Functions that map a domain model to a DTO (or vice versa) must be pure: they take data in and
+return data out. They must not accept a `Services` object, make database calls, or call any other
+async dependencies. If the transformation needs data that isn't already on the source object (e.g.
+a config value stored in a separate table), the caller is responsible for fetching it first and
+passing it in as a plain value.
+
+This keeps transformations fast, trivially testable, and free of hidden side-effects.
+
+### HTTP error responses must use the standard error helpers
+
+All `400 Bad Request` responses must be returned using the `badUserInput()` helper from
+`@mono/api`, which produces a body matching `badUserInputSchema`. Inline ad-hoc shapes such as
+`{ error: string }` are not permitted as they break the client's ability to handle errors
+uniformly.
+
+Use the appropriate helper for each status code:
+
+| Status | Helper | Schema |
+|--------|--------|--------|
+| 400 | `badUserInput(message)` | `badUserInputSchema` |
+| 401 | `unauthenticated(message?)` | `unauthenticatedSchema` |
+| 404 | `notFound(message?)` | `notFoundSchema` |
+| 500 | `unexpectedError(message?)` | `unexpectedErrorSchema` |

@@ -3,12 +3,14 @@ import type {
   ProjectShortCode,
   QueueStateDto,
   WorkflowConfigurationDto,
+  WorkspaceId,
 } from "@mono/api";
 
 export type ForgeTypeDto = "gitlab" | "github";
 
 export type Project = {
   id: ProjectId;
+  workspaceId: WorkspaceId;
   name: string;
   shortCode: ProjectShortCode;
   repositoryUrl: string;

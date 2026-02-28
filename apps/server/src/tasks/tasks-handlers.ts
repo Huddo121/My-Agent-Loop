@@ -9,9 +9,12 @@ import type { HonoHandlersFor } from "cerato";
 import type { Services } from "../services";
 import { withNewTransaction } from "../utils/transaction-context";
 
+type WorkspaceProjectsTasksApi =
+  MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
+
 export const tasksHandlers: HonoHandlersFor<
-  ["projects", ":projectId", "tasks"],
-  MyAgentLoopApi["projects"]["children"][":projectId"]["children"]["tasks"],
+  ["workspaces", ":workspaceId", "projects", ":projectId", "tasks"],
+  WorkspaceProjectsTasksApi,
   Services
 > = {
   GET: async (ctx) => {

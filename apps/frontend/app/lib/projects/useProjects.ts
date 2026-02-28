@@ -2,25 +2,32 @@ import type {
   CreateProjectRequest,
   ProjectId,
   UpdateProjectRequest,
+  WorkspaceId,
 } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { Project } from "~/types";
 
 //
-// These hooks are expected to be private to the projects directory
+// These hooks are expected to be private to the projects directory.
+// They must be used inside CurrentWorkspaceProvider (e.g. on app routes after the setup gate).
 //
 
-const PROJECTS_QUERY_KEY = ["projects"] as const;
+const projectsQueryKey = (workspaceId: WorkspaceId) =>
+  ["projects", workspaceId] as const;
 
 /**
- * Hook to fetch all projects.
+ * Hook to fetch all projects for the current workspace.
  */
 export function useProjectsQuery() {
+  const workspace = useCurrentWorkspace();
   return useQuery({
-    queryKey: PROJECTS_QUERY_KEY,
+    queryKey: projectsQueryKey(workspace.id),
     queryFn: async (): Promise<Project[]> => {
-      const response = await apiClient.projects.GET();
+      const response = await apiClient.workspaces[":workspaceId"].projects.GET({
+        pathParams: { workspaceId: workspace.id },
+      });
       if (response.status === 200) {
         return response.responseBody;
       }
@@ -30,35 +37,42 @@ export function useProjectsQuery() {
 }
 
 /**
- * Hook to create a new project.
+ * Hook to create a new project in the current workspace.
  */
 export function useCreateProject() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (
       createProjectRequest: CreateProjectRequest,
     ): Promise<Project> => {
-      const response = await apiClient.projects.POST({
-        body: createProjectRequest,
-      });
+      const response = await apiClient.workspaces[":workspaceId"].projects.POST(
+        {
+          pathParams: { workspaceId: workspace.id },
+          body: createProjectRequest,
+        },
+      );
       if (response.status === 200) {
         return response.responseBody;
       }
       throw new Error("Failed to create project");
     },
     onSuccess: (newProject) => {
-      // Update the projects cache with the new project
-      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
-        if (!old) return [newProject];
-        return [...old, newProject];
-      });
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [newProject];
+          return [...old, newProject];
+        },
+      );
     },
   });
 }
 
 export function useUpdateProject() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -68,8 +82,10 @@ export function useUpdateProject() {
       projectId: ProjectId;
       updateProjectRequest: UpdateProjectRequest;
     }): Promise<Project> => {
-      const response = await apiClient.projects[":projectId"].PATCH({
-        pathParams: { projectId },
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].PATCH({
+        pathParams: { workspaceId: workspace.id, projectId },
         body: updateProjectRequest,
       });
       if (response.status === 200) {
@@ -81,13 +97,15 @@ export function useUpdateProject() {
       throw new Error("Failed to update project");
     },
     onSuccess: (updatedProject) => {
-      // Update the projects cache with the updated project
-      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
-        if (!old) return [updatedProject];
-        return old.map((p) =>
-          p.id === updatedProject.id ? updatedProject : p,
-        );
-      });
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
   });
 }
@@ -97,6 +115,7 @@ export function useUpdateProject() {
  */
 export function useStartRun() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -106,8 +125,10 @@ export function useStartRun() {
       projectId: ProjectId;
       mode: "single" | "loop";
     }): Promise<{ runId: string; project: Project }> => {
-      const response = await apiClient.projects[":projectId"].run.POST({
-        pathParams: { projectId },
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].run.POST({
+        pathParams: { workspaceId: workspace.id, projectId },
         body: { mode },
       });
       if (response.status === 200) {
@@ -119,18 +140,21 @@ export function useStartRun() {
       throw new Error("Failed to start run");
     },
     onSuccess: (result) => {
-      // Update the cache with the project returned from the server
       const updatedProject = result.project;
-      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
-        if (!old) return [updatedProject];
-        return old.map((p) =>
-          p.id === updatedProject.id ? updatedProject : p,
-        );
-      });
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
     onError: () => {
-      // On error, invalidate to refetch and get the real state
-      queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: projectsQueryKey(workspace.id),
+      });
     },
   });
 }
@@ -140,6 +164,7 @@ export function useStartRun() {
  */
 export function useStopQueue() {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -149,8 +174,10 @@ export function useStopQueue() {
       projectId: ProjectId;
       stopImmediately: boolean;
     }): Promise<{ project: Project }> => {
-      const response = await apiClient.projects[":projectId"].stop.POST({
-        pathParams: { projectId },
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].stop.POST({
+        pathParams: { workspaceId: workspace.id, projectId },
         body: { stopImmediately },
       });
       if (response.status === 200) {
@@ -165,18 +192,21 @@ export function useStopQueue() {
       throw new Error("Failed to stop queue");
     },
     onSuccess: (result) => {
-      // Update the cache with the project returned from the server
       const updatedProject = result.project;
-      queryClient.setQueryData<Project[]>(PROJECTS_QUERY_KEY, (old) => {
-        if (!old) return [updatedProject];
-        return old.map((p) =>
-          p.id === updatedProject.id ? updatedProject : p,
-        );
-      });
+      queryClient.setQueryData<Project[]>(
+        projectsQueryKey(workspace.id),
+        (old) => {
+          if (!old) return [updatedProject];
+          return old.map((p) =>
+            p.id === updatedProject.id ? updatedProject : p,
+          );
+        },
+      );
     },
     onError: () => {
-      // On error, invalidate to refetch and get the real state
-      queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: projectsQueryKey(workspace.id),
+      });
     },
   });
 }
@@ -187,6 +217,8 @@ export function useStopQueue() {
  * before saving; does not rely on server-stored project state.
  */
 export function useTestForgeConnectionWithCredentials() {
+  const workspace = useCurrentWorkspace();
+
   return useMutation({
     mutationFn: async (params: {
       forgeType: "gitlab" | "github";
@@ -194,7 +226,10 @@ export function useTestForgeConnectionWithCredentials() {
       forgeToken: string;
       repositoryUrl: string;
     }): Promise<{ success: true } | { success: false; error: string }> => {
-      const response = await apiClient.projects["test-forge-connection"].POST({
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        "test-forge-connection"
+      ].POST({
+        pathParams: { workspaceId: workspace.id },
         body: params,
       });
       if (response.status === 200) {

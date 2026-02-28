@@ -2,9 +2,13 @@
 
 **NB:** Not everything mentioned here is fully implemented
 
+## Workspace
+
+A Workspace is the top-level organisational entity. It contains [Projects](#project) and will later hold user membership and workspace-level configuration. In the current single-tenant flow, a user sets up one workspace when they first run the application; the backend is designed to support multiple workspaces.
+
 ## Project
 
-A Project is a container for tasks, and includes some configuration for how agents will interact with those tasks (the [Workflow](#workflow)).
+A Project is a container for tasks, and includes some configuration for how agents will interact with those tasks (the [Workflow](#workflow)). Each project belongs to a [Workspace](#workspace).
 
 The Project should also be the home for configuration that applies to all the tasks, like what remote repo houses the code being worked on, and what custom base image to use.
 

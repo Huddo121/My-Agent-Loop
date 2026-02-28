@@ -1,24 +1,25 @@
 import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { NewTask, Task, UpdateTask } from "~/types";
 
 const tasksQueryKey = (projectId: ProjectId | null) =>
   ["tasks", projectId] as const;
 
 /**
- * Hook to fetch tasks for a specific project.
+ * Hook to fetch tasks for a specific project. Must be used inside CurrentWorkspaceProvider.
  */
 export function useTasks(projectId: ProjectId | null) {
+  const workspace = useCurrentWorkspace();
   return useQuery({
     queryKey: tasksQueryKey(projectId),
     queryFn: async (): Promise<Task[]> => {
-      // This will only be called when enabled is true (projectId !== null)
-      if (projectId === null) {
-        throw new Error("Project ID is required");
-      }
-      const response = await apiClient.projects[":projectId"].tasks.GET({
-        pathParams: { projectId },
+      if (projectId === null) throw new Error("Project ID is required");
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].tasks.GET({
+        pathParams: { workspaceId: workspace.id, projectId },
       });
       if (response.status === 200) {
         return response.responseBody as Task[];
@@ -30,18 +31,19 @@ export function useTasks(projectId: ProjectId | null) {
 }
 
 /**
- * Hook to create a new task for a project.
+ * Hook to create a new task for a project. Must be used inside CurrentWorkspaceProvider.
  */
 export function useCreateTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (newTask: NewTask): Promise<Task> => {
-      if (!projectId) {
-        throw new Error("No project selected");
-      }
-      const response = await apiClient.projects[":projectId"].tasks.POST({
-        pathParams: { projectId },
+      if (!projectId) throw new Error("Project is required");
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].tasks.POST({
+        pathParams: { workspaceId: workspace.id, projectId },
         body: newTask,
       });
       if (response.status === 200) {
@@ -51,7 +53,6 @@ export function useCreateTask(projectId: ProjectId | null) {
     },
     onSuccess: (newTask) => {
       if (!projectId) return;
-      // Update the tasks cache with the new task
       queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [newTask];
         return [...old, newTask];
@@ -61,20 +62,19 @@ export function useCreateTask(projectId: ProjectId | null) {
 }
 
 /**
- * Hook to mark a task as completed.
+ * Hook to mark a task as completed. Must be used inside CurrentWorkspaceProvider.
  */
 export function useCompleteTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async (taskId: TaskId): Promise<Task> => {
-      if (!projectId) {
-        throw new Error("No project selected");
-      }
-      const response = await apiClient.projects[":projectId"].tasks[
-        ":taskId"
-      ].complete.POST({
-        pathParams: { projectId, taskId },
+      if (!projectId) throw new Error("Project is required");
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].tasks[":taskId"].complete.POST({
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
       });
       if (response.status === 200) {
         return response.responseBody as Task;
@@ -83,7 +83,6 @@ export function useCompleteTask(projectId: ProjectId | null) {
     },
     onSuccess: (updatedTask) => {
       if (!projectId) return;
-      // Update the tasks cache with the updated task
       queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [updatedTask];
         return old.map((task) =>
@@ -95,10 +94,11 @@ export function useCompleteTask(projectId: ProjectId | null) {
 }
 
 /**
- * Hook to update an existing task.
+ * Hook to update an existing task. Must be used inside CurrentWorkspaceProvider.
  */
 export function useUpdateTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -108,13 +108,11 @@ export function useUpdateTask(projectId: ProjectId | null) {
       taskId: TaskId;
       task: UpdateTask;
     }): Promise<Task> => {
-      if (!projectId) {
-        throw new Error("No project selected");
-      }
-      const response = await apiClient.projects[":projectId"].tasks[
-        ":taskId"
-      ].PUT({
-        pathParams: { projectId, taskId },
+      if (!projectId) throw new Error("Project is required");
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].tasks[":taskId"].PUT({
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
         body: task,
       });
       if (response.status === 200) {
@@ -124,7 +122,6 @@ export function useUpdateTask(projectId: ProjectId | null) {
     },
     onSuccess: (updatedTask) => {
       if (!projectId) return;
-      // Update the tasks cache with the updated task
       queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [updatedTask];
         return old.map((task) =>
@@ -136,11 +133,12 @@ export function useUpdateTask(projectId: ProjectId | null) {
 }
 
 /**
- * Hook to move a task within the queue.
+ * Hook to move a task within the queue. Must be used inside CurrentWorkspaceProvider.
  * Supports optimistic updates with rollback on failure.
  */
 export function useMoveTask(projectId: ProjectId | null) {
   const queryClient = useQueryClient();
+  const workspace = useCurrentWorkspace();
 
   return useMutation({
     mutationFn: async ({
@@ -151,13 +149,11 @@ export function useMoveTask(projectId: ProjectId | null) {
       request: MoveTaskRequest;
       optimisticTasks: Task[];
     }): Promise<Task> => {
-      if (!projectId) {
-        throw new Error("No project selected");
-      }
-      const response = await apiClient.projects[":projectId"].tasks[
-        ":taskId"
-      ].move.POST({
-        pathParams: { projectId, taskId },
+      if (!projectId) throw new Error("Project is required");
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ].tasks[":taskId"].move.POST({
+        pathParams: { workspaceId: workspace.id, projectId, taskId },
         body: request,
       });
       if (response.status === 200) {
@@ -173,32 +169,24 @@ export function useMoveTask(projectId: ProjectId | null) {
     onMutate: async ({ optimisticTasks }) => {
       if (!projectId) return;
 
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: tasksQueryKey(projectId) });
-
-      // Snapshot the previous value for potential rollback
       const previousTasks = queryClient.getQueryData<Task[]>(
         tasksQueryKey(projectId),
       );
-
-      // Update the cache with the optimistic value
       queryClient.setQueryData<Task[]>(
         tasksQueryKey(projectId),
         optimisticTasks,
       );
-
       return { previousTasks };
     },
     onError: (_err, _variables, context) => {
       if (!projectId) return;
-      // Roll back to the previous value on error
       if (context?.previousTasks) {
         queryClient.setQueryData<Task[]>(
           tasksQueryKey(projectId),
           context.previousTasks,
         );
       }
-      // Refetch to ensure we're in sync with the server after an error
       queryClient.invalidateQueries({ queryKey: tasksQueryKey(projectId) });
     },
   });

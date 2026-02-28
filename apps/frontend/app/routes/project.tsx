@@ -22,6 +22,7 @@ export function meta() {
 export const ProjectPage = () => {
   const navigate = useNavigate();
   const { projects, currentProject, isLoadingProjects } = useProjectsContext();
+  const projectId = currentProject?.id ?? null;
 
   // Redirect to first project if invalid project ID
   useEffect(() => {
@@ -30,20 +31,11 @@ export const ProjectPage = () => {
     }
   }, [projects, isLoadingProjects, currentProject, navigate]);
 
-  // Fetch tasks for the selected project
-  const { data: fetchedTasks = [], isLoading: isLoadingTasks } = useTasks(
-    currentProject?.id ?? null,
-  );
-
-  // TODO: The fact that these have null in their type signatures is a failure
-  // Mutation for creating tasks
-  const createTaskMutation = useCreateTask(currentProject?.id ?? null);
-
-  // Mutation for updating tasks
-  const updateTaskMutation = useUpdateTask(currentProject?.id ?? null);
-
-  // Mutation for moving tasks
-  const moveTaskMutation = useMoveTask(currentProject?.id ?? null);
+  const { data: fetchedTasks = [], isLoading: isLoadingTasks } =
+    useTasks(projectId);
+  const createTaskMutation = useCreateTask(projectId);
+  const updateTaskMutation = useUpdateTask(projectId);
+  const moveTaskMutation = useMoveTask(projectId);
 
   const handleMoveTask = useCallback(
     (taskId: TaskId, request: MoveTaskRequest, optimisticTasks: Task[]) => {

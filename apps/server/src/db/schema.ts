@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from "@mono/api";
+import type { ProjectId, TaskId, WorkspaceId } from "@mono/api";
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
 import type { RunId } from "../runs/RunId";
@@ -14,16 +14,34 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
 
 export const forgeTypeEnum = pg.pgEnum("forge_type", ["gitlab", "github"]);
 
-export const projectsTable = pg.pgTable("projects", {
-  id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
+export const workspacesTable = pg.pgTable("workspaces", {
+  id: pg.uuid().primaryKey().defaultRandom().$type<WorkspaceId>(),
   name: pg.text().notNull(),
-  shortCode: pg.text().notNull().unique(),
-  repositoryUrl: pg.text().notNull(),
-  workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
-  queueState: queueStateEnum().notNull().default("idle"),
-  forgeType: forgeTypeEnum().notNull(),
-  forgeBaseUrl: pg.text().notNull(),
+  createdAt: pg.timestamp().notNull().defaultNow(),
 });
+
+export const projectsTable = pg.pgTable(
+  "projects",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<ProjectId>(),
+    workspaceId: pg
+      .uuid()
+      .references(() => workspacesTable.id)
+      .notNull(),
+    name: pg.text().notNull(),
+    shortCode: pg.text().notNull(),
+    repositoryUrl: pg.text().notNull(),
+    workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
+    queueState: queueStateEnum().notNull().default("idle"),
+    forgeType: forgeTypeEnum().notNull(),
+    forgeBaseUrl: pg.text().notNull(),
+  },
+  (table) => ({
+    workspaceShortCodeUnique: pg
+      .unique()
+      .on(table.workspaceId, table.shortCode),
+  }),
+);
 
 export const projectForgeSecretsTable = pg.pgTable("project_forge_secrets", {
   id: pg.uuid().primaryKey().default(sql`uuidv7()`),

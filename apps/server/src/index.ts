@@ -3,8 +3,8 @@ import { myAgentLoopApi } from "@mono/api";
 import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { startMcp } from "./mcp";
-import { projectsHandlers } from "./projects/projects-handlers";
 import { services } from "./services";
+import { workspacesHandlers } from "./workspaces/workspaces-handlers";
 
 /** This prevents multiple signals from triggering the shutdown procedure at the same time */
 let isShuttingDown = false;
@@ -36,7 +36,7 @@ const app = createHonoServer(
   myAgentLoopApi,
   {
     admin: adminHandlers,
-    projects: projectsHandlers,
+    workspaces: workspacesHandlers,
   },
   services,
 );

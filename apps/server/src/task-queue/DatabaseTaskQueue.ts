@@ -20,6 +20,7 @@ const fromTaskEntity = (task: typeof tasksTable.$inferSelect): Task => {
     title: task.title,
     description: task.description,
     completedOn: task.completedOn ?? undefined,
+    position: task.position ?? undefined,
   };
 };
 

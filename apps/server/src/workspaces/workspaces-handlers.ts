@@ -37,6 +37,56 @@ export const workspacesHandlers: HonoHandlersFor<
         return ok(workspace);
       });
     },
+    PATCH: async (ctx) => {
+      const { workspaceId } = ctx.hono.req.param();
+      const body = ctx.body;
+      if (
+        body.agentHarnessId !== undefined &&
+        body.agentHarnessId !== null &&
+        !ctx.services.harnessAuthService.isAvailable(body.agentHarnessId)
+      ) {
+        return [
+          400,
+          {
+            result: "error",
+            code: "bad-user-input",
+            message: `Agent harness "${body.agentHarnessId}" is not available (API key not configured).`,
+          },
+        ] as const;
+      }
+      return withNewTransaction(ctx.services.db, async () => {
+        const workspace = await ctx.services.workspacesService.updateWorkspace(
+          workspaceId as WorkspaceId,
+          {
+            name: body.name,
+            agentHarnessId: body.agentHarnessId,
+          },
+        );
+        if (workspace === undefined) {
+          return notFound();
+        }
+        return ok(workspace);
+      });
+    },
+    harnesses: {
+      GET: async (ctx) => {
+        const { workspaceId } = ctx.hono.req.param();
+        return withNewTransaction(ctx.services.db, async () => {
+          const workspace = await ctx.services.workspacesService.getWorkspace(
+            workspaceId as WorkspaceId,
+          );
+          if (workspace === undefined) {
+            return notFound();
+          }
+          const harnesses = ctx.services.harnessRegistry.getAll().map((h) => ({
+            id: h.id,
+            displayName: h.displayName,
+            isAvailable: ctx.services.harnessAuthService.isAvailable(h.id),
+          }));
+          return ok({ harnesses });
+        });
+      },
+    },
     projects: projectsHandlers,
   },
 };

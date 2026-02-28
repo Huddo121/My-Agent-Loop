@@ -19,6 +19,7 @@ export type SanboxInitOptions = {
     containerPath: string;
     mode?: "ro" | "rw";
   }[];
+  env?: Record<string, string>;
   timeoutMs?: number;
 };
 
@@ -140,6 +141,11 @@ export class DockerSandboxService implements SandboxService {
       ),
     ];
 
+    const envArray =
+      options.env === undefined
+        ? undefined
+        : Object.entries(options.env).map(([k, v]) => `${k}=${v}`);
+
     const container = await this.docker.createContainer({
       Image: "my-agent-loop",
       name: options.containerName,
@@ -147,6 +153,7 @@ export class DockerSandboxService implements SandboxService {
       HostConfig: {
         Binds: binds,
       },
+      Env: envArray,
       Cmd: [lifecycleScriptContainerPath],
     });
 

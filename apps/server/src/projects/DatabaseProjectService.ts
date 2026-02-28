@@ -1,6 +1,12 @@
-import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
+import type {
+  AgentHarnessId,
+  ProjectId,
+  ProjectShortCode,
+  WorkspaceId,
+} from "@mono/api";
 import { and, asc, eq } from "drizzle-orm";
 import { projectsTable } from "../db/schema";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import { getTransaction } from "../utils/transaction-context";
 import type {
   CreateProject,
@@ -10,45 +16,69 @@ import type {
   UpdateProject,
 } from "./ProjectsService";
 
-const fromProjectEntity = (
-  project: typeof projectsTable.$inferSelect,
-): Project => {
+const DEFAULT_HARNESS_ID: AgentHarnessId = "opencode";
+
+function toProject(
+  row: typeof projectsTable.$inferSelect,
+  agentHarnessId: AgentHarnessId | null,
+  resolvedAgentHarnessId: AgentHarnessId,
+): Project {
   return {
-    id: project.id as ProjectId,
-    workspaceId: project.workspaceId as WorkspaceId,
-    name: project.name,
-    shortCode: project.shortCode as ProjectShortCode,
-    repositoryUrl: project.repositoryUrl,
-    workflowConfiguration: project.workflowConfiguration,
-    queueState: project.queueState,
-    forgeType: project.forgeType,
-    forgeBaseUrl: project.forgeBaseUrl,
+    id: row.id as ProjectId,
+    workspaceId: row.workspaceId as WorkspaceId,
+    name: row.name,
+    shortCode: row.shortCode as ProjectShortCode,
+    repositoryUrl: row.repositoryUrl,
+    workflowConfiguration: row.workflowConfiguration,
+    queueState: row.queueState,
+    forgeType: row.forgeType,
+    forgeBaseUrl: row.forgeBaseUrl,
+    agentHarnessId,
+    resolvedAgentHarnessId,
   };
-};
+}
 
 export class DatabaseProjectService implements ProjectsService {
+  constructor(private readonly harnessConfig: AgentHarnessConfigRepository) {}
+
   async getAllProjects(workspaceId: WorkspaceId): Promise<Project[]> {
     const tx = getTransaction();
-    const projects = await tx
+    const rows = await tx
       .select()
       .from(projectsTable)
       .where(eq(projectsTable.workspaceId, workspaceId))
       .orderBy(asc(projectsTable.id));
-    return projects.map(fromProjectEntity);
+    const workspaceConfig =
+      await this.harnessConfig.getWorkspaceConfig(workspaceId);
+    const result: Project[] = [];
+    for (const row of rows) {
+      const id = row.id as ProjectId;
+      const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
+      const resolvedAgentHarnessId =
+        agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
+      result.push(toProject(row, agentHarnessId, resolvedAgentHarnessId));
+    }
+    return result;
   }
 
   async getProject(projectId: ProjectId): Promise<Project | undefined> {
     const tx = getTransaction();
-    const [project] = await tx
+    const [row] = await tx
       .select()
       .from(projectsTable)
       .where(eq(projectsTable.id, projectId));
 
-    if (!project) {
+    if (!row) {
       return undefined;
     }
 
-    return fromProjectEntity(project);
+    const agentHarnessId = await this.harnessConfig.getProjectConfig(projectId);
+    const workspaceConfig = await this.harnessConfig.getWorkspaceConfig(
+      row.workspaceId as WorkspaceId,
+    );
+    const resolvedAgentHarnessId =
+      agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
+    return toProject(row, agentHarnessId, resolvedAgentHarnessId);
   }
 
   async createProject(project: CreateProject): Promise<Project> {
@@ -66,7 +96,18 @@ export class DatabaseProjectService implements ProjectsService {
       })
       .returning();
 
-    return fromProjectEntity(newProject);
+    if (
+      project.agentHarnessId !== undefined &&
+      project.agentHarnessId !== null
+    ) {
+      await this.harnessConfig.setProjectConfig(
+        newProject.id as ProjectId,
+        project.agentHarnessId,
+      );
+    }
+    const created = await this.getProject(newProject.id as ProjectId);
+    if (!created) throw new Error("Project not found after create");
+    return created;
   }
 
   async getProjectByShortCode(
@@ -74,7 +115,7 @@ export class DatabaseProjectService implements ProjectsService {
     shortCode: ProjectShortCode,
   ): Promise<Project | undefined> {
     const tx = getTransaction();
-    const [project] = await tx
+    const [row] = await tx
       .select()
       .from(projectsTable)
       .where(
@@ -84,30 +125,50 @@ export class DatabaseProjectService implements ProjectsService {
         ),
       );
 
-    if (!project) {
+    if (!row) {
       return undefined;
     }
 
-    return fromProjectEntity(project);
+    const id = row.id as ProjectId;
+    const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
+    const workspaceConfig =
+      await this.harnessConfig.getWorkspaceConfig(workspaceId);
+    const resolvedAgentHarnessId =
+      agentHarnessId ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
+    return toProject(row, agentHarnessId, resolvedAgentHarnessId);
   }
 
   async updateProject(
     projectId: ProjectId,
-    project: UpdateProject,
+    update: UpdateProject,
   ): Promise<Project | undefined> {
     const tx = getTransaction();
-
-    const [updatedProject] = await tx
-      .update(projectsTable)
-      .set({ ...project })
-      .where(eq(projectsTable.id, projectId))
-      .returning();
-
-    if (!updatedProject) {
-      return undefined;
+    const { agentHarnessId, ...tableUpdate } = update;
+    const tableKeys = [
+      "workspaceId",
+      "name",
+      "shortCode",
+      "repositoryUrl",
+      "workflowConfiguration",
+      "forgeType",
+      "forgeBaseUrl",
+    ] as const;
+    const setPayload: Record<string, unknown> = {};
+    for (const key of tableKeys) {
+      if (key in tableUpdate && tableUpdate[key] !== undefined) {
+        setPayload[key] = tableUpdate[key];
+      }
     }
-
-    return fromProjectEntity(updatedProject);
+    if (Object.keys(setPayload).length > 0) {
+      await tx
+        .update(projectsTable)
+        .set(setPayload as typeof tableUpdate)
+        .where(eq(projectsTable.id, projectId));
+    }
+    if (agentHarnessId !== undefined) {
+      await this.harnessConfig.setProjectConfig(projectId, agentHarnessId);
+    }
+    return this.getProject(projectId);
   }
 
   async updateProjectQueueState(
@@ -125,20 +186,14 @@ export class DatabaseProjectService implements ProjectsService {
       return undefined;
     }
 
-    return fromProjectEntity(updatedProject);
+    return this.getProject(projectId);
   }
 
   async deleteProject(projectId: ProjectId): Promise<Project | undefined> {
+    const project = await this.getProject(projectId);
+    if (!project) return undefined;
     const tx = getTransaction();
-    const [deletedProject] = await tx
-      .delete(projectsTable)
-      .where(eq(projectsTable.id, projectId))
-      .returning();
-
-    if (!deletedProject) {
-      return undefined;
-    }
-
-    return fromProjectEntity(deletedProject);
+    await tx.delete(projectsTable).where(eq(projectsTable.id, projectId));
+    return project;
   }
 }

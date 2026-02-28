@@ -1,4 +1,9 @@
-import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
+import type {
+  AgentHarnessId,
+  ProjectId,
+  ProjectShortCode,
+  WorkspaceId,
+} from "@mono/api";
 import type { ForgeType } from "../forge/types";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
@@ -19,11 +24,18 @@ export interface Project {
   queueState: QueueState;
   forgeType: ForgeType;
   forgeBaseUrl: string;
+  agentHarnessId: AgentHarnessId | null;
+  resolvedAgentHarnessId: AgentHarnessId;
 }
 
-export type CreateProject = Omit<Project, "id" | "queueState">;
+export type CreateProject = Omit<
+  Project,
+  "id" | "queueState" | "resolvedAgentHarnessId"
+> & { resolvedAgentHarnessId?: never };
 
-export type UpdateProject = Partial<Omit<Project, "id" | "queueState">>;
+export type UpdateProject = Partial<
+  Omit<Project, "id" | "queueState" | "resolvedAgentHarnessId">
+>;
 
 export interface ProjectsService {
   getAllProjects(workspaceId: WorkspaceId): Promise<Project[]>;

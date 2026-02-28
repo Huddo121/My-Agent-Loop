@@ -44,6 +44,18 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
+    if (
+      ctx.body.agentHarnessId !== undefined &&
+      ctx.body.agentHarnessId !== null &&
+      !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+    ) {
+      return [
+        400,
+        {
+          error: `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+        },
+      ] as const;
+    }
     return withNewTransaction(ctx.services.db, async () => {
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
@@ -57,6 +69,7 @@ export const projectsHandlers: HonoHandlersFor<
         workflowConfiguration: ctx.body.workflowConfiguration,
         forgeType,
         forgeBaseUrl,
+        agentHarnessId: ctx.body.agentHarnessId ?? null,
       });
       await ctx.services.forgeSecretRepository.upsertForgeSecret(
         project.id,
@@ -110,6 +123,18 @@ export const projectsHandlers: HonoHandlersFor<
     },
     PATCH: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
+      if (
+        ctx.body.agentHarnessId !== undefined &&
+        ctx.body.agentHarnessId !== null &&
+        !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+      ) {
+        return [
+          400,
+          {
+            error: `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+          },
+        ] as const;
+      }
       return withNewTransaction(ctx.services.db, async () => {
         const updatePayload: Parameters<
           typeof ctx.services.projectsService.updateProject
@@ -125,6 +150,8 @@ export const projectsHandlers: HonoHandlersFor<
           updatePayload.forgeType = ctx.body.forgeType;
         if (ctx.body.forgeBaseUrl !== undefined)
           updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
+        if (ctx.body.agentHarnessId !== undefined)
+          updatePayload.agentHarnessId = ctx.body.agentHarnessId;
 
         const project = await ctx.services.projectsService.updateProject(
           projectId as ProjectId,

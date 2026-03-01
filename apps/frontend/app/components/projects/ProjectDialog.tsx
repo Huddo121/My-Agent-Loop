@@ -31,6 +31,8 @@ export type ProjectDialogMode = "create" | "update";
 type BaseProjectDialogPropsShared = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When false, dialog cannot be closed by overlay click, Escape, or Cancel. Default true. */
+  dismissable?: boolean;
   initialName?: string;
   initialShortCode?: string;
   initialRepositoryUrl?: string;
@@ -59,6 +61,8 @@ type BaseProjectDialogProps =
 export type CreateProjectDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When false, dialog cannot be dismissed (e.g. first project setup). Default true. */
+  dismissable?: boolean;
   onSubmit: (request: CreateProjectRequest) => void;
 };
 
@@ -81,6 +85,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const {
     open,
     onOpenChange,
+    dismissable = true,
     mode,
     initialName = "",
     initialShortCode = "",
@@ -199,7 +204,11 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        showCloseButton={dismissable}
+        onInteractOutside={dismissable ? undefined : (e) => e.preventDefault()}
+        onEscapeKeyDown={dismissable ? undefined : (e) => e.preventDefault()}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -384,13 +393,15 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
+            {dismissable && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+            )}
             <Button type="submit" disabled={!canSubmit}>
               {submitLabel}
             </Button>
@@ -404,12 +415,14 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
 export function CreateProjectDialog({
   open,
   onOpenChange,
+  dismissable = true,
   onSubmit,
 }: CreateProjectDialogProps) {
   return (
     <BaseProjectDialog
       open={open}
       onOpenChange={onOpenChange}
+      dismissable={dismissable}
       mode="create"
       onSubmit={onSubmit}
     />

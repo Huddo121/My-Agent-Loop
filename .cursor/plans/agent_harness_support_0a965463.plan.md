@@ -4,58 +4,58 @@ overview: Introduce a pluggable agent harness abstraction so that OpenCode, Clau
 todos:
   - id: core-abstraction
     content: Define AgentHarness interface (returning file contents + container paths, not writing to disk), HarnessRegistry, AgentHarnessId type (in @mono/api), and HarnessPreparationContext (with credentials) in new apps/server/src/harness/ domain folder
-    status: pending
+    status: completed
   - id: extract-opencode
     content: Extract existing OpenCode logic from OpenCodeConfigService into an OpenCodeHarness implementation of the new interface
-    status: pending
+    status: completed
   - id: parameterize-lifecycle
     content: Update lifecycle.sh to run setupCommands then AGENT_RUN_COMMAND env var instead of hardcoded opencode command
-    status: pending
+    status: completed
   - id: sandbox-env-support
     content: Add env support to SanboxInitOptions and DockerSandboxService.createNewSandbox() (pass through to Docker Env config)
-    status: pending
+    status: completed
   - id: refactor-workflow-execution
     content: Refactor WorkflowExecutionService.prepare() to use AgentHarness.prepare() for file generation, then materialise files to disk and create volume mounts. Task file stays in WorkflowExecutionService.
-    status: pending
+    status: completed
   - id: commit-phase-1
     content: "Commit: Phase 1 - Core harness abstraction and OpenCode refactor"
-    status: pending
+    status: completed
   - id: db-schema-config-table
     content: Add agent_harness_configuration table with nullable unique FKs for workspaceId, projectId, taskId and an agentHarnessId column
-    status: pending
+    status: completed
   - id: cascade-resolution
     content: Implement resolveHarnessId cascade query logic (with bulk resolution support for list endpoints) using the configuration table
-    status: pending
+    status: completed
   - id: config-in-dtos
     content: Extend workspace, project, and task DTOs with agentHarnessId (nullable override) and resolvedAgentHarnessId (effective value after cascade). Wire reads/writes through existing GET/PATCH endpoints. Reject writes selecting a harness whose API key is not configured.
-    status: pending
+    status: completed
   - id: workspace-patch-api
     content: Add PATCH endpoint and updateWorkspaceRequestSchema to the workspaces API (currently only has GET and POST)
-    status: pending
+    status: completed
   - id: harnesses-api
     content: Add GET /workspaces/:workspaceId/harnesses endpoint returning available harnesses with auth status
-    status: pending
+    status: completed
   - id: commit-phase-2
     content: "Commit: Phase 2 - Database, API, and cascade resolution"
-    status: pending
+    status: completed
   - id: harness-auth-service
     content: Create HarnessAuthService (or extend ModelProviderService) with ANTHROPIC_API_KEY, CURSOR_API_KEY, OPENAI_API_KEY env vars
-    status: pending
+    status: completed
   - id: claude-code-harness
     content: Implement ClaudeCodeHarness (config generation, MCP setup via setupCommands, run command)
-    status: pending
+    status: completed
   - id: cursor-cli-harness
     content: Implement CursorCliHarness (config generation, .cursor/mcp.json, run command)
-    status: pending
+    status: completed
   - id: codex-cli-harness
     content: Implement CodexCliHarness (config generation, ~/.codex/config.toml, run command)
-    status: pending
+    status: completed
   - id: update-dockerfile
     content: Update Dockerfile to install all four harnesses
-    status: pending
+    status: completed
   - id: commit-phase-3
     content: "Commit: Phase 3 - Auth service, additional harnesses, and Dockerfile"
-    status: pending
+    status: completed
   - id: frontend-workspace-dialog
     content: Add WorkspaceConfigDialog for editing workspace name and default harness selection, triggered from sidebar header
     status: pending

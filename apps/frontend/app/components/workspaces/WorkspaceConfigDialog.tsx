@@ -1,5 +1,4 @@
-import type { AgentHarnessId } from "@mono/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -9,14 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+  HarnessSelect,
+  INHERIT_VALUE,
+  parseHarnessValue,
+} from "~/components/ui/HarnessSelect";
+import { Input } from "~/components/ui/input";
 import {
   useHarnessesQuery,
   useUpdateWorkspace,
@@ -47,6 +44,8 @@ export function WorkspaceConfigDialog({
 
   const harnesses = harnessesData?.harnesses ?? [];
 
+  const systemDefaultDisplayName = useMemo(() => "OpenCode", []);
+
   useEffect(() => {
     if (open) {
       setName(workspace.name);
@@ -56,10 +55,9 @@ export function WorkspaceConfigDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const agentHarnessId: AgentHarnessId | null =
-      harnessValue === SYSTEM_DEFAULT_VALUE
-        ? null
-        : (harnessValue as AgentHarnessId);
+    const agentHarnessId = parseHarnessValue(
+      harnessValue === SYSTEM_DEFAULT_VALUE ? INHERIT_VALUE : harnessValue,
+    );
 
     updateWorkspace.mutate(
       { name: name.trim(), agentHarnessId },
@@ -109,39 +107,25 @@ export function WorkspaceConfigDialog({
               <p className="text-xs text-muted-foreground mt-0.5 mb-1">
                 Used when a project or task does not override it.
               </p>
-              <Select
-                value={harnessValue}
-                onValueChange={setHarnessValue}
-                disabled={isLoadingHarnesses}
-              >
-                <SelectTrigger
+              <div className="mt-1">
+                <HarnessSelect
                   id="workspace-config-harness"
-                  className="mt-1 w-full"
-                >
-                  <SelectValue placeholder="Loading…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SYSTEM_DEFAULT_VALUE}>
-                    System default (OpenCode)
-                  </SelectItem>
-                  {harnesses.map((h) => (
-                    <SelectItem
-                      key={h.id}
-                      value={h.id}
-                      disabled={!h.isAvailable}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{h.displayName}</span>
-                        {!h.isAvailable && (
-                          <span className="text-muted-foreground text-xs font-normal">
-                            — API key not set
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  value={
+                    harnessValue === SYSTEM_DEFAULT_VALUE
+                      ? INHERIT_VALUE
+                      : harnessValue
+                  }
+                  onValueChange={(value) => {
+                    setHarnessValue(
+                      value === INHERIT_VALUE ? SYSTEM_DEFAULT_VALUE : value,
+                    );
+                  }}
+                  harnesses={harnesses}
+                  isLoading={isLoadingHarnesses}
+                  inheritDisplayName={systemDefaultDisplayName}
+                  inheritLabel="System default"
+                />
+              </div>
             </div>
             {updateWorkspace.isError && (
               <p className="text-sm text-destructive">

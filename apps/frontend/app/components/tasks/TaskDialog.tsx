@@ -1,4 +1,3 @@
-import type { AgentHarnessId } from "@mono/api";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -9,19 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  HarnessSelect,
+  INHERIT_VALUE,
+  parseHarnessValue,
+} from "~/components/ui/HarnessSelect";
 import { Input } from "~/components/ui/input";
 import { Kbd, KbdGroup } from "~/components/ui/kbd";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { NewTask, Project, Task } from "~/types";
-
-const INHERIT_VALUE = "__inherit__" as const;
 
 export type TaskDialogProps = {
   open: boolean;
@@ -73,10 +68,7 @@ export function TaskDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      const agentHarnessId: AgentHarnessId | null =
-        harnessValue === INHERIT_VALUE
-          ? null
-          : (harnessValue as AgentHarnessId);
+      const agentHarnessId = parseHarnessValue(harnessValue);
       onSubmit({
         title: title.trim(),
         description: description.trim(),
@@ -90,10 +82,7 @@ export function TaskDialog({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === "Enter" && open && title.trim()) {
         e.preventDefault();
-        const agentHarnessId: AgentHarnessId | null =
-          harnessValue === INHERIT_VALUE
-            ? null
-            : (harnessValue as AgentHarnessId);
+        const agentHarnessId = parseHarnessValue(harnessValue);
         onSubmit({
           title: title.trim(),
           description: description.trim(),
@@ -152,36 +141,15 @@ export function TaskDialog({
               <p className="text-xs text-muted-foreground -mt-1">
                 Overrides the project default for this task only.
               </p>
-              <Select
+              <HarnessSelect
+                id="task-harness"
                 value={harnessValue}
                 onValueChange={setHarnessValue}
-                disabled={isLoadingHarnesses}
-              >
-                <SelectTrigger id="task-harness" className="w-full">
-                  <SelectValue placeholder="Loading…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={INHERIT_VALUE}>
-                    Inherit from project ({inheritDisplayName})
-                  </SelectItem>
-                  {harnesses.map((h) => (
-                    <SelectItem
-                      key={h.id}
-                      value={h.id}
-                      disabled={!h.isAvailable}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{h.displayName}</span>
-                        {!h.isAvailable && (
-                          <span className="text-muted-foreground text-xs font-normal">
-                            — API key not set
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                harnesses={harnesses}
+                isLoading={isLoadingHarnesses}
+                inheritDisplayName={inheritDisplayName}
+                inheritLabel="Inherit from project"
+              />
             </div>
           </div>
           <DialogFooter>

@@ -16,6 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  HarnessSelect,
+  INHERIT_VALUE,
+  parseHarnessValue,
+} from "~/components/ui/HarnessSelect";
 import { Input } from "~/components/ui/input";
 import {
   Select,
@@ -27,8 +32,6 @@ import {
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
-
-const INHERIT_VALUE = "__inherit__" as const;
 
 export type ProjectDialogMode = "create" | "update";
 
@@ -186,10 +189,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
-      const agentHarnessId: AgentHarnessId | null =
-        harnessValue === INHERIT_VALUE
-          ? null
-          : (harnessValue as AgentHarnessId);
+      const agentHarnessId = parseHarnessValue(harnessValue);
 
       if (props.mode === "create") {
         props.onSubmit({
@@ -435,36 +435,17 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
               <p className="text-xs text-muted-foreground mt-0.5 mb-1">
                 Overrides the workspace default for tasks in this project.
               </p>
-              <Select
-                value={harnessValue}
-                onValueChange={setHarnessValue}
-                disabled={isLoadingHarnesses}
-              >
-                <SelectTrigger id="project-harness" className="mt-1 w-full">
-                  <SelectValue placeholder="Loading…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={INHERIT_VALUE}>
-                    Inherit from workspace ({inheritDisplayName})
-                  </SelectItem>
-                  {harnesses.map((h) => (
-                    <SelectItem
-                      key={h.id}
-                      value={h.id}
-                      disabled={!h.isAvailable}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{h.displayName}</span>
-                        {!h.isAvailable && (
-                          <span className="text-muted-foreground text-xs font-normal">
-                            — API key not set
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mt-1">
+                <HarnessSelect
+                  id="project-harness"
+                  value={harnessValue}
+                  onValueChange={setHarnessValue}
+                  harnesses={harnesses}
+                  isLoading={isLoadingHarnesses}
+                  inheritDisplayName={inheritDisplayName}
+                  inheritLabel="Inherit from workspace"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">

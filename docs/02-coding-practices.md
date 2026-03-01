@@ -48,6 +48,14 @@ Branded types mimic the behaviour of nominal types, preventing two values that a
 
 Using the type system to our advantage, we can use `ts-pattern` to ensure that we're handling all the cases we need to. When we add a new case (e.g. failure result from a function) we can ensure that all the call-sites that previously called this function now need to be updated to explicitly handle the newly added failure case.
 
+### Nullability at the edges
+
+Handle null (or optional) values at the boundaries of your code, not in the middle. Prefer APIs that require non-null values so that callers are responsible for ensuring data exists before calling.
+
+- **Hooks and services**: Accept required IDs (e.g. `WorkspaceId`) rather than `WorkspaceId | null`. Callers that have a possibly-null ID should only invoke the hook when the ID is defined (e.g. by only rendering the component that uses the hook when the ID is available), or should resolve the null at the call site before calling.
+- **Components**: Prefer required props (e.g. `workspace: Workspace`) when the component is only ever used in a context where that value is always defined. The parent (the “edge”) then guarantees the value and the child does no null checks.
+- Avoid scattering `if (x == null) return ...` or optional chaining inside shared hooks and presentational components when the null case can be handled once at the call site or by the type system.
+
 ### Runtime parsing
 
 Using Zod, schemas can be created for things (e.g. a `userSchema`), which is a parser of objects. This allows us to ensure data coming from untrusted sources is the right shape and prevent bad data flowing through the system at runtime.

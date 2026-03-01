@@ -20,6 +20,7 @@ This is the frontend for My Agent Loop. The goal with this part of the project i
 - Prefer functional components and hooks
 - When constructing UI, split the pure rendering component and the 'connected' component which manages the data lifecycle (e.g. fetch, refetch, update, etc.)
 - Cerato is used to define the HTTP API, you can find the actual api definition in the `packages/api` package.
+- **Nullability at the edges**: Prefer required props and non-null hook parameters. Handle null/optional values at call sites (e.g. only render a component or call a hook when the value is defined) rather than adding null checks inside shared components and hooks. See `docs/02-coding-practices.md` (Nullability at the edges).
 
 
 ## State management

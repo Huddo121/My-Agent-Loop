@@ -3,7 +3,8 @@ import { LoaderIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
-import type { Project } from "~/types";
+import { useCurrentWorkspace } from "~/lib/workspaces";
+import type { Project, Workspace } from "~/types";
 import { useProjectsContext } from "../../lib/projects";
 import { Kbd } from "../ui/kbd";
 import {
@@ -14,6 +15,7 @@ import {
   SidebarTrigger,
 } from "../ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { WorkspaceConfigDialog } from "../workspaces";
 import { CreateProjectDialog } from "./ProjectDialog";
 import { ProjectListItem } from "./ProjectListItem";
 
@@ -22,6 +24,7 @@ export type ProjectSidebarProps = {
   currentProject: Project | null;
   onSelectProject: (project: Project) => void;
   onCreateProject: (createProjectRequest: CreateProjectRequest) => void;
+  workspace: Workspace;
   isLoading?: boolean;
 };
 
@@ -30,9 +33,11 @@ export const ProjectSidebar = ({
   currentProject: selectedProject,
   onSelectProject,
   onCreateProject,
+  workspace,
   isLoading = false,
 }: ProjectSidebarProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [workspaceConfigOpen, setWorkspaceConfigOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleOpenCreateDialog = () => {
@@ -46,6 +51,35 @@ export const ProjectSidebar = ({
 
   return (
     <Sidebar className="border-r-0" collapsible="icon">
+      <SidebarHeader className="flex flex-col gap-0 border-b border-sidebar-border/60 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="truncate text-sm font-medium text-sidebar-foreground"
+            title={workspace.name}
+          >
+            {workspace.name}
+          </span>
+          <Tooltip>
+            <TooltipContent>Workspace settings</TooltipContent>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-7 shrink-0"
+                onClick={() => setWorkspaceConfigOpen(true)}
+                aria-label="Open workspace settings"
+              >
+                <SettingsIcon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+          </Tooltip>
+        </div>
+        <WorkspaceConfigDialog
+          open={workspaceConfigOpen}
+          onOpenChange={setWorkspaceConfigOpen}
+          workspace={workspace}
+        />
+      </SidebarHeader>
       <SidebarHeader className="flex-row items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Projects</h2>
         <Tooltip>
@@ -118,6 +152,7 @@ export const ProjectSidebar = ({
 
 export const ConnectedProjectSidebar = () => {
   const navigate = useNavigate();
+  const workspace = useCurrentWorkspace();
   const { projects, currentProject, isLoadingProjects, createProject } =
     useProjectsContext();
 
@@ -145,6 +180,7 @@ export const ConnectedProjectSidebar = () => {
       currentProject={currentProject}
       onSelectProject={handleSelectProject}
       onCreateProject={handleCreateProject}
+      workspace={workspace}
       isLoading={isLoadingProjects}
     />
   );

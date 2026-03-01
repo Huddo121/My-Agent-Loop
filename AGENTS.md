@@ -5,6 +5,7 @@ Review the `docs` directory to understand some of the specifics of this project.
 ## Specific guidance for AI Agents
 
 - At a bare minimum, you should read the coding-practices doc
+- Prefer handling null/optional values at the edges (call sites); avoid unnecessary null checks inside shared hooks and components (see "Nullability at the edges" in `docs/02-coding-practices.md`)
 - Don't generate or modify configuration if a tool can do it for you
   - E.g. don't modify package.json to add a dependency, use a `pnpm` command to do it
 - If you modify the documentation, be sure to update the `00-index.md` if necessary

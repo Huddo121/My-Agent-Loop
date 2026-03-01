@@ -58,13 +58,13 @@ todos:
     status: completed
   - id: frontend-workspace-dialog
     content: Add WorkspaceConfigDialog for editing workspace name and default harness selection, triggered from sidebar header
-    status: pending
+    status: completed
   - id: frontend-project-harness
     content: Add harness selector to ProjectDialog with 'Inherit from workspace' option
-    status: pending
+    status: completed
   - id: frontend-task-harness
     content: Add optional harness override to TaskDialog with 'Inherit from project' option
-    status: pending
+    status: completed
   - id: commit-phase-4
     content: "Commit: Phase 4 - Frontend harness selection UI"
     status: pending

@@ -15,6 +15,7 @@ import {
 } from "./harness/AgentHarnessConfigRepository";
 import { ClaudeCodeHarness } from "./harness/ClaudeCodeHarness";
 import { CodexCliHarness } from "./harness/CodexCliHarness";
+import { CursorCliHarness } from "./harness/CursorCliHarness";
 import {
   EnvHarnessAuthService,
   type HarnessAuthService,
@@ -102,6 +103,7 @@ const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 const harnesses: readonly AgentHarness[] = [
   new OpenCodeHarness(),
   new ClaudeCodeHarness(),
+  new CursorCliHarness(),
   new CodexCliHarness(),
 ];
 

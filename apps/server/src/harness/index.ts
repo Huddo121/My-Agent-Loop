@@ -6,4 +6,5 @@ export type {
 } from "./AgentHarness";
 export { ClaudeCodeHarness } from "./ClaudeCodeHarness";
 export { CodexCliHarness } from "./CodexCliHarness";
+export { CursorCliHarness } from "./CursorCliHarness";
 export { OpenCodeHarness } from "./OpenCodeHarness";

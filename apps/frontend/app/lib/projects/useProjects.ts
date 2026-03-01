@@ -56,6 +56,9 @@ export function useCreateProject() {
       if (response.status === 200) {
         return response.responseBody;
       }
+      if (response.status === 400) {
+        throw new Error(response.responseBody.message);
+      }
       throw new Error("Failed to create project");
     },
     onSuccess: (newProject) => {
@@ -90,6 +93,9 @@ export function useUpdateProject() {
       });
       if (response.status === 200) {
         return response.responseBody as Project;
+      }
+      if (response.status === 400) {
+        throw new Error(response.responseBody.message);
       }
       if (response.status === 404) {
         throw new Error("Project not found");

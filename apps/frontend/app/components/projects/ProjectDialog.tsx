@@ -1,11 +1,12 @@
 import {
+  type AgentHarnessId,
   type CreateProjectRequest,
   type ProjectId,
   shortCodeCodec,
   type UpdateProjectRequest,
   type WorkflowConfigurationDto,
 } from "@mono/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -24,7 +25,10 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
+import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
+
+const INHERIT_VALUE = "__inherit__" as const;
 
 export type ProjectDialogMode = "create" | "update";
 
@@ -40,6 +44,8 @@ type BaseProjectDialogPropsShared = {
   initialForgeType?: ForgeTypeDto;
   initialForgeBaseUrl?: string;
   initialHasForgeToken?: boolean;
+  /** Null means inherit from workspace (the default). */
+  initialAgentHarnessId?: AgentHarnessId | null;
 };
 
 type BaseProjectDialogPropsCreate = BaseProjectDialogPropsShared & {
@@ -95,7 +101,21 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialForgeBaseUrl,
     initialHasForgeToken = false,
     initialProjectId: _initialProjectId,
+    initialAgentHarnessId = null,
   } = props;
+
+  const workspace = useCurrentWorkspace();
+  const { data: harnessesData, isLoading: isLoadingHarnesses } =
+    useHarnessesQuery(workspace.id);
+  const harnesses = harnessesData?.harnesses ?? [];
+
+  const inheritDisplayName = useMemo(() => {
+    const wsHarnessId = workspace.agentHarnessId ?? "opencode";
+    return (
+      harnesses.find((h) => h.id === wsHarnessId)?.displayName ?? wsHarnessId
+    );
+  }, [workspace.agentHarnessId, harnesses]);
+
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
@@ -108,6 +128,9 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType),
   );
   const [forgeToken, setForgeToken] = useState("");
+  const [harnessValue, setHarnessValue] = useState<string>(
+    initialAgentHarnessId ?? INHERIT_VALUE,
+  );
   const [testResult, setTestResult] = useState<
     { success: true } | { success: false; error: string } | null
   >(null);
@@ -126,6 +149,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
         initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType),
       );
       setForgeToken("");
+      setHarnessValue(initialAgentHarnessId ?? INHERIT_VALUE);
       setTestResult(null);
     }
   }, [
@@ -136,6 +160,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialWorkflowConfiguration,
     initialForgeType,
     initialForgeBaseUrl,
+    initialAgentHarnessId,
   ]);
 
   const handleTestConnection = () => {
@@ -161,6 +186,11 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
+      const agentHarnessId: AgentHarnessId | null =
+        harnessValue === INHERIT_VALUE
+          ? null
+          : (harnessValue as AgentHarnessId);
+
       if (props.mode === "create") {
         props.onSubmit({
           name: name.trim(),
@@ -170,6 +200,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
           forgeType,
           forgeBaseUrl: forgeBaseUrl.trim(),
           forgeToken: forgeToken.trim(),
+          agentHarnessId,
         });
       } else {
         const update: UpdateProjectRequest = {
@@ -179,6 +210,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
           workflowConfiguration,
           forgeType,
           forgeBaseUrl: forgeBaseUrl.trim(),
+          agentHarnessId,
         };
         if (forgeToken.trim()) {
           update.forgeToken = forgeToken.trim();
@@ -391,6 +423,49 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
                 </SelectContent>
               </Select>
             </div>
+            <hr />
+            <h2 className="text-lg font-medium mb-1">Agent Harness</h2>
+            <div>
+              <label
+                htmlFor="project-harness"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Agent harness
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                Overrides the workspace default for tasks in this project.
+              </p>
+              <Select
+                value={harnessValue}
+                onValueChange={setHarnessValue}
+                disabled={isLoadingHarnesses}
+              >
+                <SelectTrigger id="project-harness" className="mt-1 w-full">
+                  <SelectValue placeholder="Loading…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={INHERIT_VALUE}>
+                    Inherit from workspace ({inheritDisplayName})
+                  </SelectItem>
+                  {harnesses.map((h) => (
+                    <SelectItem
+                      key={h.id}
+                      value={h.id}
+                      disabled={!h.isAvailable}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{h.displayName}</span>
+                        {!h.isAvailable && (
+                          <span className="text-muted-foreground text-xs font-normal">
+                            — API key not set
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter className="mt-4">
             {dismissable && (
@@ -448,6 +523,7 @@ export function EditProjectDialog({
       initialForgeBaseUrl={project.forgeBaseUrl}
       initialHasForgeToken={project.hasForgeToken}
       initialProjectId={project.id}
+      initialAgentHarnessId={project.agentHarnessId}
       onSubmit={onSubmit}
     />
   );

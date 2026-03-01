@@ -13,6 +13,7 @@ import {
   type AgentHarnessConfigRepository,
   DatabaseAgentHarnessConfigRepository,
 } from "./harness/AgentHarnessConfigRepository";
+import { CodexCliHarness } from "./harness/CodexCliHarness";
 import {
   EnvHarnessAuthService,
   type HarnessAuthService,
@@ -97,7 +98,10 @@ const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
-const harnesses: readonly AgentHarness[] = [new OpenCodeHarness()];
+const harnesses: readonly AgentHarness[] = [
+  new OpenCodeHarness(),
+  new CodexCliHarness(),
+];
 
 const workflowMessengerService = new WorkflowMessengerService();
 

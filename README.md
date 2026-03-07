@@ -23,3 +23,5 @@ pnpm install          # Download all of the project's dependencies
 docker compose up -d  # Start any runtime dependencies
 pnpm dev              # Start all the dev processes
 ```
+
+Beans!

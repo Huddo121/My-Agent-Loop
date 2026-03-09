@@ -1,4 +1,10 @@
-# Sandboxing with VMs
+# Sandboxing with VMs (Archived)
+
+> **Status**: This idea has been implemented. See [Firecracker VM Sandboxing Decision](../decisions/firecracker-vm-sandboxing.md) for the full architectural specification.
+
+---
+
+_Archived notes from initial exploration:_
 
 At the moment I'm using Docker for the sandboxing, because it's convenient and in many ways good enough. There's some things I think I might like to do that would not be easy to do well with docker.
 

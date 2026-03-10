@@ -8,6 +8,10 @@ const DEFAULT_HARNESS_ID: AgentHarnessId = "opencode";
 export interface AgentHarnessConfigRepository {
   getWorkspaceConfig(workspaceId: WorkspaceId): Promise<AgentHarnessId | null>;
   getProjectConfig(projectId: ProjectId): Promise<AgentHarnessId | null>;
+  /** Fetch the project-level harness config (not resolved) for multiple projects in one query. */
+  getProjectConfigs(
+    projectIds: ProjectId[],
+  ): Promise<Record<ProjectId, AgentHarnessId | null>>;
   getTaskConfig(taskId: TaskId): Promise<AgentHarnessId | null>;
   /** Fetch the task-level harness config (not resolved) for multiple tasks in one query. */
   getTaskConfigs(
@@ -55,6 +59,26 @@ export class DatabaseAgentHarnessConfigRepository
       .where(eq(agentHarnessConfigurationTable.projectId, projectId))
       .limit(1);
     return row?.agentHarnessId ?? null;
+  }
+
+  async getProjectConfigs(
+    projectIds: ProjectId[],
+  ): Promise<Record<ProjectId, AgentHarnessId | null>> {
+    if (projectIds.length === 0) return {};
+    const tx = getTransaction();
+    const rows = await tx
+      .select({
+        projectId: agentHarnessConfigurationTable.projectId,
+        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+      })
+      .from(agentHarnessConfigurationTable)
+      .where(inArray(agentHarnessConfigurationTable.projectId, projectIds));
+    const map: Record<ProjectId, AgentHarnessId | null> = {};
+    for (const projectId of projectIds) {
+      const row = rows.find((r) => r.projectId === projectId);
+      map[projectId] = (row?.agentHarnessId ?? null) as AgentHarnessId | null;
+    }
+    return map;
   }
 
   async getTaskConfig(taskId: TaskId): Promise<AgentHarnessId | null> {

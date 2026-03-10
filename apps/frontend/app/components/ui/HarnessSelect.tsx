@@ -52,17 +52,17 @@ export function HarnessSelect({
           {inheritLabel} ({inheritDisplayName})
         </SelectItem>
         {sortedHarnesses.map((h) => (
-            <SelectItem key={h.id} value={h.id} disabled={!h.isAvailable}>
-              <span className="flex items-center gap-2">
-                <span>{h.displayName}</span>
-                {!h.isAvailable && (
-                  <span className="text-muted-foreground text-xs font-normal">
-                    — API key not set
-                  </span>
-                )}
-              </span>
-            </SelectItem>
-          ))}
+          <SelectItem key={h.id} value={h.id} disabled={!h.isAvailable}>
+            <span className="flex items-center gap-2">
+              <span>{h.displayName}</span>
+              {!h.isAvailable && (
+                <span className="text-muted-foreground text-xs font-normal">
+                  — API key not set
+                </span>
+              )}
+            </span>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

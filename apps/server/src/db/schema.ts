@@ -60,7 +60,8 @@ export const tasksTable = pg.pgTable("tasks", {
   projectId: pg
     .uuid()
     .references(() => projectsTable.id)
-    .notNull(),
+    .notNull()
+    .$type<ProjectId>(),
   description: pg.text().notNull(),
   createdAt: pg.timestamp().notNull().defaultNow(),
   completedOn: pg.timestamp(),
@@ -76,15 +77,18 @@ export const agentHarnessConfigurationTable = pg.pgTable(
     workspaceId: pg
       .uuid()
       .references(() => workspacesTable.id)
-      .unique(),
+      .unique()
+      .$type<WorkspaceId>(),
     projectId: pg
       .uuid()
       .references(() => projectsTable.id)
-      .unique(),
+      .unique()
+      .$type<ProjectId>(),
     taskId: pg
       .uuid()
       .references(() => tasksTable.id)
-      .unique(),
+      .unique()
+      .$type<TaskId>(),
     agentHarnessId: pg.text().notNull().$type<AgentHarnessId>(),
   },
   (table) => ({

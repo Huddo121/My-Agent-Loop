@@ -44,13 +44,13 @@ export class DatabaseProjectService implements ProjectsService {
       .from(projectsTable)
       .where(eq(projectsTable.workspaceId, workspaceId))
       .orderBy(asc(projectsTable.id));
-    const result: Project[] = [];
-    for (const row of rows) {
+    const projectIds = rows.map((row) => row.id as ProjectId);
+    const harnessConfigs =
+      await this.harnessConfig.getProjectConfigs(projectIds);
+    return rows.map((row) => {
       const id = row.id as ProjectId;
-      const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
-      result.push(toProject(row, agentHarnessId));
-    }
-    return result;
+      return toProject(row, harnessConfigs[id]);
+    });
   }
 
   async getProject(projectId: ProjectId): Promise<Project | undefined> {

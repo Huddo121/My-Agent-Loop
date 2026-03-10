@@ -117,14 +117,6 @@ export type TestForgeConnectionSuccess = z.infer<
   typeof testForgeConnectionSuccessSchema
 >;
 
-export const testForgeConnectionFailureSchema = z.object({
-  success: z.literal(false),
-  error: z.string(),
-});
-export type TestForgeConnectionFailure = z.infer<
-  typeof testForgeConnectionFailureSchema
->;
-
 /** Request body to test forge connection with provided credentials (e.g. from project dialog). */
 export const testForgeConnectionRequestSchema = z.object({
   forgeType: forgeTypeSchema,
@@ -146,7 +138,7 @@ export const projectsApi = Endpoint.multi({
     "test-forge-connection": Endpoint.post()
       .input(testForgeConnectionRequestSchema)
       .output(200, testForgeConnectionSuccessSchema)
-      .output(400, testForgeConnectionFailureSchema),
+      .output(400, badUserInputSchema),
     ":projectId": Endpoint.multi({
       GET: Endpoint.get()
         .output(200, projectDtoSchema)
@@ -173,7 +165,7 @@ export const projectsApi = Endpoint.multi({
           .output(404, notFoundSchema),
         "test-forge-connection": Endpoint.post()
           .output(200, testForgeConnectionSuccessSchema)
-          .output(400, testForgeConnectionFailureSchema)
+          .output(400, badUserInputSchema)
           .output(404, notFoundSchema),
       },
     }),

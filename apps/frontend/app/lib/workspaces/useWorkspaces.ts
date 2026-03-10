@@ -87,7 +87,9 @@ export function useHarnessesQuery(workspaceId: WorkspaceId) {
         },
       );
       if (response.status === 200) return response.responseBody;
-      if (response.status === 404) return { harnesses: [] };
+      if (response.status === 404) {
+        throw new Error("Workspace not found");
+      }
       throw new Error("Failed to fetch harnesses");
     },
   });

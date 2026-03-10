@@ -12,7 +12,7 @@ export interface Sandbox {
   name: string;
 }
 
-export type SanboxInitOptions = {
+export type SandboxInitOptions = {
   containerName?: string;
   volumes?: {
     hostPath: AbsoluteFilePath;
@@ -36,7 +36,7 @@ export type WaitForSandboxToFinishFailure =
   | { reason: "container-not-running" };
 
 export interface SandboxService {
-  createNewSandbox(options: SanboxInitOptions): Promise<Sandbox>;
+  createNewSandbox(options: SandboxInitOptions): Promise<Sandbox>;
   startSandbox(id: SandboxId): Promise<Result<"started", StartSandboxFailure>>;
   stopSandbox(id: SandboxId): Promise<void>;
   waitForSandboxToFinish(
@@ -113,7 +113,7 @@ export class DockerSandboxService implements SandboxService {
     }
   }
 
-  async createNewSandbox(options: SanboxInitOptions): Promise<Sandbox> {
+  async createNewSandbox(options: SandboxInitOptions): Promise<Sandbox> {
     // Get path to lifecycle.sh script
     // Always resolve to absolute path for Docker volume mounting
     const lifecycleScriptPath = absolutePath(import.meta.url, "lifecycle.sh");

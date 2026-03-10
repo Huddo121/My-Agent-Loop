@@ -32,7 +32,6 @@ export function HarnessSelect({
   inheritLabel = "Inherit",
   placeholder = "Loading…",
 }: HarnessSelectProps) {
-  const inheritValue = "__inherit__" as const;
   const sortedHarnesses = [...harnesses].sort((a, b) => {
     if (a.isAvailable === b.isAvailable) return 0;
     return a.isAvailable ? -1 : 1;
@@ -48,7 +47,7 @@ export function HarnessSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={inheritValue}>
+        <SelectItem value={INHERIT_VALUE}>
           {inheritLabel} ({inheritDisplayName})
         </SelectItem>
         {sortedHarnesses.map((h) => (

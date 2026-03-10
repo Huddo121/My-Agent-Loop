@@ -94,10 +94,7 @@ export const projectsHandlers: HonoHandlersFor<
     if (result.success) {
       return ok({ success: true as const });
     }
-    return [
-      400,
-      { success: false as const, error: result.error.message },
-    ] as const;
+    return badUserInput(result.error.message);
   },
   ":projectId": {
     GET: async (ctx) => {
@@ -199,13 +196,7 @@ export const projectsHandlers: HonoHandlersFor<
           projectId as ProjectId,
         );
         if (secret === undefined) {
-          return [
-            400,
-            {
-              success: false as const,
-              error: "No forge token configured for this project.",
-            },
-          ];
+          return badUserInput("No forge token configured for this project.");
         }
         const projectPath = getProjectPathFromRepositoryUrl(
           project.repositoryUrl,
@@ -220,7 +211,7 @@ export const projectsHandlers: HonoHandlersFor<
         if (result.success) {
           return ok({ success: true as const });
         }
-        return [400, { success: false as const, error: result.error.message }];
+        return badUserInput(result.error.message);
       });
     },
     run: async (ctx) => {

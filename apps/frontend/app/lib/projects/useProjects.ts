@@ -242,7 +242,10 @@ export function useTestForgeConnectionWithCredentials() {
         return response.responseBody;
       }
       if (response.status === 400) {
-        return response.responseBody;
+        return {
+          success: false as const,
+          error: response.responseBody.message,
+        };
       }
       throw new Error("Failed to test forge connection");
     },

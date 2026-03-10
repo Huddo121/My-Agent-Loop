@@ -194,11 +194,11 @@ export class WorkflowExecutionService {
     runId: RunId,
     workflow: Workflow,
   ): Promise<Result<void, Error>> {
-    const perpareResult = await this.prepare(project, runId, task);
-    if (perpareResult.success === false) {
-      return { success: false, error: perpareResult.error };
+    const prepareResult = await this.prepare(project, runId, task);
+    if (prepareResult.success === false) {
+      return { success: false, error: prepareResult.error };
     }
-    const { repository, sandbox } = perpareResult.value;
+    const { repository, sandbox } = prepareResult.value;
 
     await this.sandboxService.startSandbox(sandbox.id);
 

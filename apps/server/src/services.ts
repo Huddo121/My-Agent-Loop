@@ -8,9 +8,21 @@ import {
   type ForgeSecretRepository,
 } from "./forge-secrets";
 import { type GitService, SimpleGitService } from "./git/GitService";
+import type { AgentHarness } from "./harness";
+import {
+  type AgentHarnessConfigRepository,
+  DatabaseAgentHarnessConfigRepository,
+} from "./harness/AgentHarnessConfigRepository";
+import { ClaudeCodeHarness } from "./harness/ClaudeCodeHarness";
+import { CodexCliHarness } from "./harness/CodexCliHarness";
+import { CursorCliHarness } from "./harness/CursorCliHarness";
+import {
+  EnvHarnessAuthService,
+  type HarnessAuthService,
+} from "./harness/HarnessAuthService";
+import { OpenCodeHarness } from "./harness/OpenCodeHarness";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
-import { ModelProviderService } from "./providers/ModelProviderServices";
 import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
 import { DockerLoggingService } from "./sandbox/DockerLoggingService";
 import {
@@ -23,7 +35,6 @@ import {
   type EncryptionService,
 } from "./utils/EncryptionService";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
-import { OpenCodeConfigService } from "./workflow/OpenCodeConfigService";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
 import {
   DatabaseWorkflowManager,
@@ -48,6 +59,9 @@ export interface Services {
   runsService: RunsService;
   encryptionService: EncryptionService;
   forgeSecretRepository: ForgeSecretRepository;
+  agentHarnessConfigRepository: AgentHarnessConfigRepository;
+  harnessAuthService: HarnessAuthService;
+  harnesses: readonly AgentHarness[];
 }
 
 const encryptionService = new DefaultEncryptionService(
@@ -64,8 +78,19 @@ const sandboxService = new DockerSandboxService(
 );
 
 const taskQueue = new DatabaseTaskQueue();
-const workspacesService = new DatabaseWorkspacesService();
-const projectsService = new DatabaseProjectService();
+const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
+const harnessAuthService = new EnvHarnessAuthService({
+  OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
+  ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+  CURSOR_API_KEY: env.CURSOR_API_KEY,
+  OPENAI_API_KEY: env.OPENAI_API_KEY,
+});
+const workspacesService = new DatabaseWorkspacesService(
+  agentHarnessConfigRepository,
+);
+const projectsService = new DatabaseProjectService(
+  agentHarnessConfigRepository,
+);
 
 const fileSystemService = new LocalFileSystemService(
   "./.devloop/runs" as RelativeFilePath,
@@ -75,10 +100,12 @@ const runsService = new DatabaseRunsService();
 
 const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
 
-const modelProviderService = new ModelProviderService({
-  openrouter: env.OPENROUTER_API_KEY,
-});
-const openCodeConfigService = new OpenCodeConfigService(modelProviderService);
+const harnesses: readonly AgentHarness[] = [
+  new OpenCodeHarness(),
+  new ClaudeCodeHarness(),
+  new CursorCliHarness(),
+  new CodexCliHarness(),
+];
 
 const workflowMessengerService = new WorkflowMessengerService();
 
@@ -96,7 +123,9 @@ const workflowExecutionService = new WorkflowExecutionService(
   gitService,
   sandboxService,
   fileSystemService,
-  openCodeConfigService,
+  harnesses,
+  agentHarnessConfigRepository,
+  harnessAuthService,
   forgeSecretRepository,
 );
 
@@ -121,9 +150,12 @@ export const services: Services = {
   workflowExecutionService,
   projectsService,
   workspacesService,
-  workflowQueues,
-  backgroundWorkflowProcessor,
   runsService,
   encryptionService,
   forgeSecretRepository,
+  agentHarnessConfigRepository,
+  harnessAuthService,
+  harnesses,
+  workflowQueues,
+  backgroundWorkflowProcessor,
 };

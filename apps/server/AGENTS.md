@@ -32,3 +32,12 @@ When adding MCP tools, follow the pattern in `src/projects/projects-mcp-handlers
 ## Security for secrets
 
 Decrypted secrets (e.g., forge tokens) must always be wrapped in `ProtectedString` (from `src/utils/ProtectedString.ts`). This class overrides `toString()`, `toJSON()`, and `inspect()` to prevent accidental logging or serialization. To access the actual value, call `.getSecretValue()` at the exact point it's needed in plaintext. Never log, serialize to JSON, or return tokens in API responses.
+
+Environment variables that are secrets (e.g. API keys for agent harnesses) must be transformed to `ProtectedString` in `src/env.ts` using the `harnessKey()` helper so they are never plain strings in application code.
+
+## Agent harness configuration
+
+See `docs/decisions/agent-harness-configuration.md` for the full design. Key rules:
+
+- To add a new harness, implement `AgentHarness` and add an instance to the `harnesses` array in `src/services.ts`. No other registration is needed.
+- Only call `resolveHarnessId` from places that care about resolving the effective configuration.

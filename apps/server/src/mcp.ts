@@ -1,14 +1,14 @@
 import type { ProjectId, TaskId } from "@mono/api";
 import { FastMCP } from "fastmcp";
 import { forgeMcpTools } from "./forge/forge-mcp-handlers";
+import {
+  MAL_PROJECT_ID_HEADER,
+  MAL_TASK_ID_HEADER,
+} from "./harness/OpenCodeHarness";
 import { projectsMcpTools } from "./projects/projects-mcp-handlers";
 import type { Services } from "./services";
 import { tasksMcpTools } from "./tasks/tasks-mcp-handlers";
 import { withMcpServices } from "./utils/mcp-service-context";
-import {
-  MAL_PROJECT_ID_HEADER,
-  MAL_TASK_ID_HEADER,
-} from "./workflow/OpenCodeConfigService";
 
 export interface McpSessionData {
   projectId: ProjectId | undefined;

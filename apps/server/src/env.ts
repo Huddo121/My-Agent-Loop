@@ -1,4 +1,17 @@
 import z from "zod";
+import type { Branded } from "./utils/Branded";
+import { ProtectedString } from "./utils/ProtectedString";
+
+export type HarnessApiKey<B extends string> = ProtectedString &
+  Branded<ProtectedString, B>;
+
+const harnessKey = <B extends string>(_brand: B) =>
+  z
+    .string()
+    .optional()
+    .transform((v): HarnessApiKey<B> | undefined =>
+      v ? (new ProtectedString(v) as HarnessApiKey<B>) : undefined,
+    );
 
 const envSchema = z.object({
   // Database
@@ -20,7 +33,10 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
-  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: harnessKey("OpenRouterApiKey"),
+  ANTHROPIC_API_KEY: harnessKey("AnthropicApiKey"),
+  CURSOR_API_KEY: harnessKey("CursorApiKey"),
+  OPENAI_API_KEY: harnessKey("OpenAiApiKey"),
 
   // Forge token encryption (32-byte key as 64 hex chars or 44 base64 chars)
   FORGE_ENCRYPTION_KEY: z.string().nonempty(),

@@ -1,11 +1,12 @@
 import {
+  type AgentHarnessId,
   type CreateProjectRequest,
   type ProjectId,
   shortCodeCodec,
   type UpdateProjectRequest,
   type WorkflowConfigurationDto,
 } from "@mono/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -15,6 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  HarnessSelect,
+  INHERIT_VALUE,
+  parseHarnessValue,
+} from "~/components/ui/HarnessSelect";
 import { Input } from "~/components/ui/input";
 import {
   Select,
@@ -24,6 +30,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
+import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
 
 export type ProjectDialogMode = "create" | "update";
@@ -31,6 +38,8 @@ export type ProjectDialogMode = "create" | "update";
 type BaseProjectDialogPropsShared = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When false, dialog cannot be closed by overlay click, Escape, or Cancel. Default true. */
+  dismissable?: boolean;
   initialName?: string;
   initialShortCode?: string;
   initialRepositoryUrl?: string;
@@ -38,6 +47,8 @@ type BaseProjectDialogPropsShared = {
   initialForgeType?: ForgeTypeDto;
   initialForgeBaseUrl?: string;
   initialHasForgeToken?: boolean;
+  /** Null means inherit from workspace (the default). */
+  initialAgentHarnessId?: AgentHarnessId | null;
 };
 
 type BaseProjectDialogPropsCreate = BaseProjectDialogPropsShared & {
@@ -59,6 +70,8 @@ type BaseProjectDialogProps =
 export type CreateProjectDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When false, dialog cannot be dismissed (e.g. first project setup). Default true. */
+  dismissable?: boolean;
   onSubmit: (request: CreateProjectRequest) => void;
 };
 
@@ -81,6 +94,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const {
     open,
     onOpenChange,
+    dismissable = true,
     mode,
     initialName = "",
     initialShortCode = "",
@@ -90,7 +104,21 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialForgeBaseUrl,
     initialHasForgeToken = false,
     initialProjectId: _initialProjectId,
+    initialAgentHarnessId = null,
   } = props;
+
+  const workspace = useCurrentWorkspace();
+  const { data: harnessesData, isLoading: isLoadingHarnesses } =
+    useHarnessesQuery(workspace.id);
+  const harnesses = harnessesData?.harnesses ?? [];
+
+  const inheritDisplayName = useMemo(() => {
+    const wsHarnessId = workspace.agentHarnessId ?? "opencode";
+    return (
+      harnesses.find((h) => h.id === wsHarnessId)?.displayName ?? wsHarnessId
+    );
+  }, [workspace.agentHarnessId, harnesses]);
+
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
@@ -103,6 +131,9 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType),
   );
   const [forgeToken, setForgeToken] = useState("");
+  const [harnessValue, setHarnessValue] = useState<string>(
+    initialAgentHarnessId ?? INHERIT_VALUE,
+  );
   const [testResult, setTestResult] = useState<
     { success: true } | { success: false; error: string } | null
   >(null);
@@ -121,6 +152,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
         initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType),
       );
       setForgeToken("");
+      setHarnessValue(initialAgentHarnessId ?? INHERIT_VALUE);
       setTestResult(null);
     }
   }, [
@@ -131,6 +163,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialWorkflowConfiguration,
     initialForgeType,
     initialForgeBaseUrl,
+    initialAgentHarnessId,
   ]);
 
   const handleTestConnection = () => {
@@ -156,6 +189,8 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
+      const agentHarnessId = parseHarnessValue(harnessValue);
+
       if (props.mode === "create") {
         props.onSubmit({
           name: name.trim(),
@@ -165,6 +200,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
           forgeType,
           forgeBaseUrl: forgeBaseUrl.trim(),
           forgeToken: forgeToken.trim(),
+          agentHarnessId,
         });
       } else {
         const update: UpdateProjectRequest = {
@@ -174,6 +210,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
           workflowConfiguration,
           forgeType,
           forgeBaseUrl: forgeBaseUrl.trim(),
+          agentHarnessId,
         };
         if (forgeToken.trim()) {
           update.forgeToken = forgeToken.trim();
@@ -199,7 +236,11 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        showCloseButton={dismissable}
+        onInteractOutside={dismissable ? undefined : (e) => e.preventDefault()}
+        onEscapeKeyDown={dismissable ? undefined : (e) => e.preventDefault()}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -382,15 +423,41 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
                 </SelectContent>
               </Select>
             </div>
+            <hr />
+            <h2 className="text-lg font-medium mb-1">Agent Harness</h2>
+            <div>
+              <label
+                htmlFor="project-harness"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Agent harness
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                Overrides the workspace default for tasks in this project.
+              </p>
+              <div className="mt-1">
+                <HarnessSelect
+                  id="project-harness"
+                  value={harnessValue}
+                  onValueChange={setHarnessValue}
+                  harnesses={harnesses}
+                  isLoading={isLoadingHarnesses}
+                  inheritDisplayName={inheritDisplayName}
+                  inheritLabel="Inherit from workspace"
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
+            {dismissable && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+            )}
             <Button type="submit" disabled={!canSubmit}>
               {submitLabel}
             </Button>
@@ -404,12 +471,14 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
 export function CreateProjectDialog({
   open,
   onOpenChange,
+  dismissable = true,
   onSubmit,
 }: CreateProjectDialogProps) {
   return (
     <BaseProjectDialog
       open={open}
       onOpenChange={onOpenChange}
+      dismissable={dismissable}
       mode="create"
       onSubmit={onSubmit}
     />
@@ -435,6 +504,7 @@ export function EditProjectDialog({
       initialForgeBaseUrl={project.forgeBaseUrl}
       initialHasForgeToken={project.hasForgeToken}
       initialProjectId={project.id}
+      initialAgentHarnessId={project.agentHarnessId}
       onSubmit={onSubmit}
     />
   );

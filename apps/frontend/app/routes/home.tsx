@@ -56,6 +56,7 @@ const HomePage = () => {
       <CreateProjectDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        dismissable={projects.length > 0}
         onSubmit={handleCreateProject}
       />
     </>

@@ -5,6 +5,7 @@ export interface Task {
   title: string;
   description: string;
   completedOn?: Date;
+  position?: number | null;
 }
 
 export type NewTask = Pick<Task, "title" | "description">;

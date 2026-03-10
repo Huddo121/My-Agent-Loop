@@ -1,4 +1,7 @@
+import type { TaskDto } from "@mono/api";
 import {
+  type AgentHarnessId,
+  badUserInput,
   type MyAgentLoopApi,
   notFound,
   ok,
@@ -7,10 +10,22 @@ import {
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
 import type { Services } from "../services";
+import type { Task } from "../task-queue/TaskQueue";
 import { withNewTransaction } from "../utils/transaction-context";
 
 type WorkspaceProjectsTasksApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
+
+function toTaskDto(task: Task, agentHarnessId: AgentHarnessId | null): TaskDto {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    completedOn: task.completedOn,
+    position: task.position ?? null,
+    agentHarnessId,
+  };
+}
 
 export const tasksHandlers: HonoHandlersFor<
   ["workspaces", ":workspaceId", "projects", ":projectId", "tasks"],
@@ -23,18 +38,40 @@ export const tasksHandlers: HonoHandlersFor<
       const tasks = await ctx.services.taskQueue.getAllTasks(
         projectId as ProjectId,
       );
-      return ok(tasks);
+      const taskIds = tasks.map((t) => t.id);
+      const harnessConfigs =
+        await ctx.services.agentHarnessConfigRepository.getTaskConfigs(taskIds);
+      const dtos = tasks.map((t) =>
+        toTaskDto(t, harnessConfigs.get(t.id) ?? null),
+      );
+      return ok(dtos);
     });
   },
 
   POST: async (ctx) => {
     const { projectId } = ctx.hono.req.param();
-    return withNewTransaction(ctx.services.db, async () => {
-      const tasks = await ctx.services.taskQueue.addTask(
-        projectId as ProjectId,
-        ctx.body,
+    if (
+      ctx.body.agentHarnessId !== undefined &&
+      ctx.body.agentHarnessId !== null &&
+      !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+    ) {
+      return badUserInput(
+        `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
       );
-      return ok(tasks);
+    }
+    return withNewTransaction(ctx.services.db, async () => {
+      const task = await ctx.services.taskQueue.addTask(
+        projectId as ProjectId,
+        { title: ctx.body.title, description: ctx.body.description },
+      );
+      const agentHarnessId = ctx.body.agentHarnessId ?? null;
+      if (agentHarnessId !== null) {
+        await ctx.services.agentHarnessConfigRepository.setTaskConfig(
+          task.id,
+          agentHarnessId,
+        );
+      }
+      return ok(toTaskDto(task, agentHarnessId));
     });
   },
 
@@ -42,60 +79,93 @@ export const tasksHandlers: HonoHandlersFor<
     GET: async (ctx) => {
       const { taskId } = ctx.hono.req.param();
 
-      const foundTask = await withNewTransaction(ctx.services.db, () =>
-        ctx.services.taskQueue.getTask(taskId as TaskId),
-      );
-
-      if (!foundTask) {
-        return notFound();
-      }
-
-      return [200, foundTask];
+      return withNewTransaction(ctx.services.db, async () => {
+        const task = await ctx.services.taskQueue.getTask(taskId as TaskId);
+        if (!task) {
+          return notFound();
+        }
+        const agentHarnessId =
+          await ctx.services.agentHarnessConfigRepository.getTaskConfig(
+            task.id,
+          );
+        return ok(toTaskDto(task, agentHarnessId));
+      });
     },
 
     PUT: async (ctx) => {
       const { taskId } = ctx.hono.req.param();
-
-      const updatedTask = await withNewTransaction(ctx.services.db, () =>
-        ctx.services.taskQueue.updateTask(taskId as TaskId, ctx.body),
-      );
-
-      if (!updatedTask) {
-        return notFound();
+      if (
+        ctx.body.agentHarnessId !== undefined &&
+        ctx.body.agentHarnessId !== null &&
+        !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+      ) {
+        return badUserInput(
+          `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+        );
       }
-
-      return ok(updatedTask);
+      return withNewTransaction(ctx.services.db, async () => {
+        const task = await ctx.services.taskQueue.updateTask(taskId as TaskId, {
+          title: ctx.body.title,
+          description: ctx.body.description,
+        });
+        if (!task) {
+          return notFound();
+        }
+        const agentHarnessId =
+          ctx.body.agentHarnessId !== undefined
+            ? ctx.body.agentHarnessId
+            : await ctx.services.agentHarnessConfigRepository.getTaskConfig(
+                task.id,
+              );
+        if (ctx.body.agentHarnessId !== undefined) {
+          await ctx.services.agentHarnessConfigRepository.setTaskConfig(
+            task.id,
+            agentHarnessId,
+          );
+        }
+        return ok(toTaskDto(task, agentHarnessId));
+      });
     },
 
     complete: async (ctx) => {
       const { taskId } = ctx.hono.req.param();
 
-      const completedTask = await withNewTransaction(ctx.services.db, () =>
-        ctx.services.taskQueue.completeTask(taskId as TaskId),
-      );
-
-      if (!completedTask) {
-        return notFound();
-      }
-
-      return [200, completedTask];
+      return withNewTransaction(ctx.services.db, async () => {
+        const completedTask = await ctx.services.taskQueue.completeTask(
+          taskId as TaskId,
+        );
+        if (!completedTask) {
+          return notFound();
+        }
+        const agentHarnessId =
+          await ctx.services.agentHarnessConfigRepository.getTaskConfig(
+            completedTask.id,
+          );
+        return ok(toTaskDto(completedTask, agentHarnessId));
+      });
     },
+
     move: async (ctx) => {
-      const { projectId, taskId } = ctx.hono.req.param();
+      const { taskId } = ctx.hono.req.param();
 
-      const movedTask = await withNewTransaction(ctx.services.db, () =>
-        ctx.services.taskQueue.moveTask(taskId as TaskId, ctx.body),
-      );
-
-      if (!movedTask) {
-        console.warn("Can not move task, task not found or already completed", {
-          projectId,
-          taskId,
-        });
-        return notFound();
-      }
-
-      return ok(movedTask);
+      return withNewTransaction(ctx.services.db, async () => {
+        const movedTask = await ctx.services.taskQueue.moveTask(
+          taskId as TaskId,
+          ctx.body,
+        );
+        if (!movedTask) {
+          console.warn(
+            "Can not move task, task not found or already completed",
+            { taskId },
+          );
+          return notFound();
+        }
+        const agentHarnessId =
+          await ctx.services.agentHarnessConfigRepository.getTaskConfig(
+            movedTask.id,
+          );
+        return ok(toTaskDto(movedTask, agentHarnessId));
+      });
     },
   },
 };

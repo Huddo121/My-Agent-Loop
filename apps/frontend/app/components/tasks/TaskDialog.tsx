@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -8,34 +8,59 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  HarnessSelect,
+  INHERIT_VALUE,
+  parseHarnessValue,
+} from "~/components/ui/HarnessSelect";
 import { Input } from "~/components/ui/input";
 import { Kbd, KbdGroup } from "~/components/ui/kbd";
-import type { NewTask, Task } from "~/types";
+import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
+import type { NewTask, Project, Task } from "~/types";
 
 export type TaskDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (task: NewTask) => void;
-  task?: Task; // Optional task for editing mode
+  project: Project;
+  task?: Task;
 };
 
 export function TaskDialog({
   open,
   onOpenChange,
   onSubmit,
+  project,
   task,
 }: TaskDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [harnessValue, setHarnessValue] = useState<string>(INHERIT_VALUE);
+
+  const workspace = useCurrentWorkspace();
+  const { data: harnessesData, isLoading: isLoadingHarnesses } =
+    useHarnessesQuery(workspace.id);
+  const harnesses = harnessesData?.harnesses ?? [];
+
+  const inheritDisplayName = useMemo(() => {
+    const projectHarnessId =
+      project.agentHarnessId ?? workspace.agentHarnessId ?? "opencode";
+    return (
+      harnesses.find((h) => h.id === projectHarnessId)?.displayName ??
+      projectHarnessId
+    );
+  }, [project.agentHarnessId, workspace.agentHarnessId, harnesses]);
 
   useEffect(() => {
     if (open) {
       if (task) {
         setTitle(task.title);
         setDescription(task.description);
+        setHarnessValue(task.agentHarnessId ?? INHERIT_VALUE);
       } else {
         setTitle("");
         setDescription("");
+        setHarnessValue(INHERIT_VALUE);
       }
     }
   }, [open, task]);
@@ -43,9 +68,11 @@ export function TaskDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
+      const agentHarnessId = parseHarnessValue(harnessValue);
       onSubmit({
         title: title.trim(),
         description: description.trim(),
+        agentHarnessId,
       });
       onOpenChange(false);
     }
@@ -55,9 +82,11 @@ export function TaskDialog({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === "Enter" && open && title.trim()) {
         e.preventDefault();
+        const agentHarnessId = parseHarnessValue(harnessValue);
         onSubmit({
           title: title.trim(),
           description: description.trim(),
+          agentHarnessId,
         });
         onOpenChange(false);
       }
@@ -65,7 +94,7 @@ export function TaskDialog({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, title, description, onSubmit, onOpenChange]);
+  }, [open, title, description, harnessValue, onSubmit, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,6 +132,23 @@ export function TaskDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="task-harness" className="text-sm font-medium">
+                Agent Harness
+              </label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Overrides the project default for this task only.
+              </p>
+              <HarnessSelect
+                id="task-harness"
+                value={harnessValue}
+                onValueChange={setHarnessValue}
+                harnesses={harnesses}
+                isLoading={isLoadingHarnesses}
+                inheritDisplayName={inheritDisplayName}
+                inheritLabel="Inherit from project"
               />
             </div>
           </div>

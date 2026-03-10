@@ -1,6 +1,7 @@
-import type { ProjectId, TaskId, WorkspaceId } from "@mono/api";
+import type { AgentHarnessId, ProjectId, TaskId, WorkspaceId } from "@mono/api";
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
+import { check } from "drizzle-orm/pg-core";
 import type { RunId } from "../runs/RunId";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
@@ -59,13 +60,44 @@ export const tasksTable = pg.pgTable("tasks", {
   projectId: pg
     .uuid()
     .references(() => projectsTable.id)
-    .notNull(),
+    .notNull()
+    .$type<ProjectId>(),
   description: pg.text().notNull(),
   createdAt: pg.timestamp().notNull().defaultNow(),
   completedOn: pg.timestamp(),
   /** Where does this task appear in the queue? Only relevant for non-completed tasks. */
   position: pg.doublePrecision(),
 });
+
+/** One row per workspace, project, or task. Exactly one of the FKs is non-null. */
+export const agentHarnessConfigurationTable = pg.pgTable(
+  "agent_harness_configuration",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+    workspaceId: pg
+      .uuid()
+      .references(() => workspacesTable.id)
+      .unique()
+      .$type<WorkspaceId>(),
+    projectId: pg
+      .uuid()
+      .references(() => projectsTable.id)
+      .unique()
+      .$type<ProjectId>(),
+    taskId: pg
+      .uuid()
+      .references(() => tasksTable.id)
+      .unique()
+      .$type<TaskId>(),
+    agentHarnessId: pg.text().notNull().$type<AgentHarnessId>(),
+  },
+  (table) => ({
+    exactlyOneTarget: check(
+      "agent_harness_config_exactly_one_target",
+      sql`(num_nonnulls(${table.workspaceId}, ${table.projectId}, ${table.taskId}) = 1)`,
+    ),
+  }),
+);
 
 export const runStateEnum = pg.pgEnum("run_state", [
   /** The run record is created, but not yet picked up for processing by a worker */

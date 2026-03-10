@@ -1,4 +1,5 @@
 import {
+  badUserInput,
   type MyAgentLoopApi,
   notFound,
   ok,
@@ -44,6 +45,15 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
+    if (
+      ctx.body.agentHarnessId !== undefined &&
+      ctx.body.agentHarnessId !== null &&
+      !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+    ) {
+      return badUserInput(
+        `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+      );
+    }
     return withNewTransaction(ctx.services.db, async () => {
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
@@ -57,6 +67,7 @@ export const projectsHandlers: HonoHandlersFor<
         workflowConfiguration: ctx.body.workflowConfiguration,
         forgeType,
         forgeBaseUrl,
+        agentHarnessId: ctx.body.agentHarnessId ?? null,
       });
       await ctx.services.forgeSecretRepository.upsertForgeSecret(
         project.id,
@@ -83,10 +94,7 @@ export const projectsHandlers: HonoHandlersFor<
     if (result.success) {
       return ok({ success: true as const });
     }
-    return [
-      400,
-      { success: false as const, error: result.error.message },
-    ] as const;
+    return badUserInput(result.error.message);
   },
   ":projectId": {
     GET: async (ctx) => {
@@ -110,6 +118,15 @@ export const projectsHandlers: HonoHandlersFor<
     },
     PATCH: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
+      if (
+        ctx.body.agentHarnessId !== undefined &&
+        ctx.body.agentHarnessId !== null &&
+        !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
+      ) {
+        return badUserInput(
+          `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
+        );
+      }
       return withNewTransaction(ctx.services.db, async () => {
         const updatePayload: Parameters<
           typeof ctx.services.projectsService.updateProject
@@ -125,6 +142,8 @@ export const projectsHandlers: HonoHandlersFor<
           updatePayload.forgeType = ctx.body.forgeType;
         if (ctx.body.forgeBaseUrl !== undefined)
           updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
+        if (ctx.body.agentHarnessId !== undefined)
+          updatePayload.agentHarnessId = ctx.body.agentHarnessId;
 
         const project = await ctx.services.projectsService.updateProject(
           projectId as ProjectId,
@@ -177,13 +196,7 @@ export const projectsHandlers: HonoHandlersFor<
           projectId as ProjectId,
         );
         if (secret === undefined) {
-          return [
-            400,
-            {
-              success: false as const,
-              error: "No forge token configured for this project.",
-            },
-          ];
+          return badUserInput("No forge token configured for this project.");
         }
         const projectPath = getProjectPathFromRepositoryUrl(
           project.repositoryUrl,
@@ -198,7 +211,7 @@ export const projectsHandlers: HonoHandlersFor<
         if (result.success) {
           return ok({ success: true as const });
         }
-        return [400, { success: false as const, error: result.error.message }];
+        return badUserInput(result.error.message);
       });
     },
     run: async (ctx) => {

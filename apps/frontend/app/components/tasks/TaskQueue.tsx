@@ -332,6 +332,7 @@ export function TaskQueue({
           }
         }}
         onSubmit={handleAddTask}
+        project={project}
         task={editingTask}
       />
       <EditProjectDialog

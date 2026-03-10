@@ -1,17 +1,22 @@
 import fs from "node:fs";
+import path from "node:path";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitBranch, GitRepository } from "../git/GitRepository";
 import type { ForgeGitCredentials, GitService } from "../git/GitService";
+import type { AgentHarness } from "../harness";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import type { HarnessAuthService } from "../harness/HarnessAuthService";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
-import type { OpenCodeConfigService } from "./OpenCodeConfigService";
 import type { Workflow } from "./Workflow";
+
+const MCP_SERVER_URL = "http://host.docker.internal:3050/mcp";
 
 const formatTaskFile = (task: Task): string => {
   return `# ${task.title}
@@ -23,7 +28,7 @@ ${task.description}
 /**
  * This class is responsible for the runtime execution of a workflow.
  * It will manage the lifecycle of the sandbox and ensures that all of the files necessary
- *   for the agent to execute are available (i.e. the code, the task, opencode config).
+ *   for the agent to execute are available (i.e. the code, the task, and harness-specific config).
  */
 export class WorkflowExecutionService {
   constructor(
@@ -31,7 +36,9 @@ export class WorkflowExecutionService {
     private readonly gitService: GitService,
     private readonly sandboxService: SandboxService,
     private readonly fileSystemService: FileSystemService,
-    private readonly openCodeConfigService: OpenCodeConfigService,
+    private readonly harnesses: readonly AgentHarness[],
+    private readonly harnessConfig: AgentHarnessConfigRepository,
+    private readonly harnessAuthService: HarnessAuthService,
     private readonly forgeSecretRepository: ForgeSecretRepository,
   ) {}
 
@@ -55,8 +62,6 @@ export class WorkflowExecutionService {
     runId: RunId,
     task: Task,
   ): Promise<Result<{ repository: GitRepository; sandbox: Sandbox }, Error>> {
-    // Prepare files
-    // Create a temporary folder for the run
     const taskTempDirectory =
       await this.fileSystemService.createTemporaryDirectory(runId);
 
@@ -94,51 +99,90 @@ export class WorkflowExecutionService {
       taskTempDirectory,
       "task.txt",
     );
-    // Write out task to file to mount to the container
     fs.writeFileSync(taskFilePath, formatTaskFile(task));
 
-    // Generate a project-scoped OpenCode config for this container
-    const openCodeConfigPath = AbsoluteFilePath.joinPath(
-      taskTempDirectory,
-      "opencode.json",
-    );
-
-    const openCodeConfig = this.openCodeConfigService.generateConfig(
-      project.id,
+    const harnessId = await this.harnessConfig.resolveHarnessId(
       task.id,
+      project.id,
+      project.workspaceId,
     );
-    fs.writeFileSync(
-      openCodeConfigPath,
-      JSON.stringify(openCodeConfig, null, 2),
-    );
+    if (!this.harnessAuthService.isAvailable(harnessId)) {
+      return {
+        success: false,
+        error: new Error(
+          `Agent harness "${harnessId}" is not available (API key not configured).`,
+        ),
+      };
+    }
+    const harness = this.harnesses.find((h) => h.id === harnessId);
+    if (harness === undefined) {
+      return {
+        success: false,
+        error: new Error(`Harness "${harnessId}" is not registered`),
+      };
+    }
 
-    const openCodeAuthConfigPath = AbsoluteFilePath.joinPath(
-      taskTempDirectory,
-      "auth.json",
-    );
-    const openCodeAuthConfig = this.openCodeConfigService.generateAuthConfig();
-    fs.writeFileSync(
-      openCodeAuthConfigPath,
-      JSON.stringify(openCodeAuthConfig, null, 2),
-    );
+    const credential = this.harnessAuthService.getCredential(harnessId);
+    const preparation = harness.prepare({
+      projectId: project.id,
+      taskId: task.id,
+      mcpServerUrl: MCP_SERVER_URL,
+      credentials: credential,
+    });
 
     const repository = checkoutResult.value;
+    const harnessDir = AbsoluteFilePath.joinPath(
+      taskTempDirectory,
+      "harness",
+    ) as AbsoluteFilePath;
+    fs.mkdirSync(harnessDir, { recursive: true });
+
+    const volumes: {
+      hostPath: AbsoluteFilePath;
+      containerPath: string;
+      mode?: "ro" | "rw";
+    }[] = [
+      { hostPath: repository.path, containerPath: "/code" },
+      { hostPath: taskFilePath, containerPath: "/task.txt" },
+    ];
+
+    for (let i = 0; i < preparation.files.length; i++) {
+      const file = preparation.files[i];
+      const slug = path.basename(file.containerPath) || `file-${i}`;
+      const hostPath = AbsoluteFilePath.joinPath(
+        harnessDir,
+        `harness-${i}-${slug}`,
+      ) as AbsoluteFilePath;
+      fs.writeFileSync(hostPath, file.contents);
+      volumes.push({
+        hostPath,
+        containerPath: file.containerPath,
+        mode: file.mode,
+      });
+    }
+
+    const harnessSetupContent =
+      preparation.setupCommands.length > 0
+        ? `set -e\n${preparation.setupCommands.join("\n")}\n`
+        : "";
+    const harnessSetupPath = AbsoluteFilePath.joinPath(
+      taskTempDirectory,
+      "harness-setup.sh",
+    ) as AbsoluteFilePath;
+    fs.writeFileSync(harnessSetupPath, harnessSetupContent);
+    volumes.push({
+      hostPath: harnessSetupPath,
+      containerPath: "/harness-setup.sh",
+    });
+
+    const env: Record<string, string> = {
+      AGENT_RUN_COMMAND: preparation.runCommand,
+      ...preparation.env,
+    };
 
     const sandbox = await this.sandboxService.createNewSandbox({
-      volumes: [
-        { hostPath: repository.path, containerPath: "/code" },
-        { hostPath: taskFilePath, containerPath: "/task.txt" },
-        {
-          hostPath: openCodeConfigPath,
-          // Mounting the default config to the container's config directory allows end users to override the config.
-          // See https://opencode.ai/docs/config/#precedence-order
-          containerPath: "/root/.config/opencode/opencode.json",
-        },
-        {
-          hostPath: openCodeAuthConfigPath,
-          containerPath: "/root/.local/share/opencode/auth.json",
-        },
-      ],
+      volumes,
+      env,
     });
 
     return { success: true, value: { repository, sandbox } };
@@ -150,11 +194,11 @@ export class WorkflowExecutionService {
     runId: RunId,
     workflow: Workflow,
   ): Promise<Result<void, Error>> {
-    const perpareResult = await this.prepare(project, runId, task);
-    if (perpareResult.success === false) {
-      return { success: false, error: perpareResult.error };
+    const prepareResult = await this.prepare(project, runId, task);
+    if (prepareResult.success === false) {
+      return { success: false, error: prepareResult.error };
     }
-    const { repository, sandbox } = perpareResult.value;
+    const { repository, sandbox } = prepareResult.value;
 
     await this.sandboxService.startSandbox(sandbox.id);
 

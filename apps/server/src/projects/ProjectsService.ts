@@ -1,4 +1,9 @@
-import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
+import type {
+  AgentHarnessId,
+  ProjectId,
+  ProjectShortCode,
+  WorkspaceId,
+} from "@mono/api";
 import type { ForgeType } from "../forge/types";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
@@ -19,6 +24,7 @@ export interface Project {
   queueState: QueueState;
   forgeType: ForgeType;
   forgeBaseUrl: string;
+  agentHarnessId: AgentHarnessId | null;
 }
 
 export type CreateProject = Omit<Project, "id" | "queueState">;

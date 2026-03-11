@@ -75,7 +75,10 @@ export class DatabaseWorkspacesService implements WorkspacesService {
         .where(eq(workspacesTable.id, id));
     }
     if (update.agentConfig !== undefined) {
-      await this.harnessConfig.setWorkspaceConfig(id, update.agentConfig ?? null);
+      await this.harnessConfig.setWorkspaceConfig(
+        id,
+        update.agentConfig ?? null,
+      );
     }
 
     return this.getWorkspace(id);

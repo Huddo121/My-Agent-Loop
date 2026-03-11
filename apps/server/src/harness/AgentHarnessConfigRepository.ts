@@ -218,7 +218,9 @@ export class DatabaseAgentHarnessConfigRepository
       this.getWorkspaceConfig(workspaceId),
     ]);
     return (
-      taskConfig ?? projectConfig ?? workspaceConfig ?? {
+      taskConfig ??
+      projectConfig ??
+      workspaceConfig ?? {
         harnessId: DEFAULT_HARNESS_ID,
         modelId: null,
       }

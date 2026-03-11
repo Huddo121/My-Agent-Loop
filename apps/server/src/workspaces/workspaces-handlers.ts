@@ -6,6 +6,7 @@ import {
   type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
+import { validateAgentConfig } from "../harness";
 import { projectsHandlers } from "../projects/projects-handlers";
 import type { Services } from "../services";
 import { withNewTransaction } from "../utils/transaction-context";
@@ -46,21 +47,28 @@ export const workspacesHandlers: HonoHandlersFor<
     PATCH: async (ctx) => {
       const { workspaceId } = ctx.hono.req.param();
       const body = ctx.body;
-      if (
-        body.agentHarnessId !== undefined &&
-        body.agentHarnessId !== null &&
-        !ctx.services.harnessAuthService.isAvailable(body.agentHarnessId)
-      ) {
-        return badUserInput(
-          `Agent harness "${body.agentHarnessId}" is not available (API key not configured).`,
-        );
+      const validationError = validateAgentConfig(body.agentConfig, {
+        harnessAuthService: ctx.services.harnessAuthService,
+        harnesses: ctx.services.harnesses,
+      });
+      if (validationError !== null) {
+        return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
+        const agentConfig =
+          body.agentConfig === undefined
+            ? undefined
+            : body.agentConfig === null
+              ? null
+              : {
+                  harnessId: body.agentConfig.harnessId,
+                  modelId: body.agentConfig.modelId,
+                };
         const workspace = await ctx.services.workspacesService.updateWorkspace(
           workspaceId as WorkspaceId,
           {
             name: body.name,
-            agentHarnessId: body.agentHarnessId,
+            agentConfig,
           },
         );
         if (workspace === undefined) {
@@ -83,6 +91,10 @@ export const workspacesHandlers: HonoHandlersFor<
             id: h.id,
             displayName: h.displayName,
             isAvailable: ctx.services.harnessAuthService.isAvailable(h.id),
+            models: h.models.map((m) => ({
+              id: m.id,
+              displayName: m.displayName,
+            })),
           }));
           return ok({ harnesses });
         });

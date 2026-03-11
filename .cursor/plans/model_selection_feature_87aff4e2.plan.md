@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: server-handlers-validation
     content: Update workspace, project, and task handlers to read `agentConfig` instead of `agentHarnessId`. Add model validation (model must belong to the selected harness). Extract a shared `validateAgentConfig` helper. Update GET harnesses endpoint to include `models`. After this todo, the server should typecheck cleanly.
-    status: pending
+    status: completed
   - id: workflow-execution
     content: Update `WorkflowExecutionService.prepare()` to call `resolveHarnessConfig` instead of `resolveHarnessId`, destructure `{ harnessId, modelId }`, and pass `modelId` into `harness.prepare()`. After this todo, run typecheck for the server -- it should pass.
     status: pending

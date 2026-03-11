@@ -48,8 +48,7 @@ export class ClaudeCodeHarness implements AgentHarness {
     return {
       files: [],
       setupCommands,
-      runCommand:
-        `claude -p "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely." --allowedTools "*"${modelFlag}`,
+      runCommand: `claude -p "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely." --allowedTools "*"${modelFlag}`,
       env,
     };
   }

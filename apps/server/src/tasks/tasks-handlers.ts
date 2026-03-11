@@ -8,10 +8,11 @@ import {
   type TaskId,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
+import { validateAgentConfig } from "../harness";
+import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 import type { Services } from "../services";
 import type { Task } from "../task-queue/TaskQueue";
 import { withNewTransaction } from "../utils/transaction-context";
-import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 
 type WorkspaceProjectsTasksApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
@@ -53,28 +54,30 @@ export const tasksHandlers: HonoHandlersFor<
 
   POST: async (ctx) => {
     const { projectId } = ctx.hono.req.param();
-    if (
-      ctx.body.agentHarnessId !== undefined &&
-      ctx.body.agentHarnessId !== null &&
-      !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
-    ) {
-      return badUserInput(
-        `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-      );
+    const validationError = validateAgentConfig(ctx.body.agentConfig, {
+      harnessAuthService: ctx.services.harnessAuthService,
+      harnesses: ctx.services.harnesses,
+    });
+    if (validationError !== null) {
+      return badUserInput(validationError);
     }
     return withNewTransaction(ctx.services.db, async () => {
       const task = await ctx.services.taskQueue.addTask(
         projectId as ProjectId,
         { title: ctx.body.title, description: ctx.body.description },
       );
-      const agentHarnessId = ctx.body.agentHarnessId ?? null;
-      if (agentHarnessId !== null) {
+      if (ctx.body.agentConfig !== null && ctx.body.agentConfig !== undefined) {
+        const config: ScopedHarnessConfig = {
+          harnessId: ctx.body.agentConfig.harnessId,
+          modelId: ctx.body.agentConfig.modelId,
+        };
         await ctx.services.agentHarnessConfigRepository.setTaskConfig(
           task.id,
-          agentHarnessId,
+          config,
         );
+        return ok(toTaskDto(task, config));
       }
-      return ok(toTaskDto(task, agentHarnessId));
+      return ok(toTaskDto(task, null));
     });
   },
 
@@ -97,14 +100,12 @@ export const tasksHandlers: HonoHandlersFor<
 
     PUT: async (ctx) => {
       const { taskId } = ctx.hono.req.param();
-      if (
-        ctx.body.agentHarnessId !== undefined &&
-        ctx.body.agentHarnessId !== null &&
-        !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
-      ) {
-        return badUserInput(
-          `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-        );
+      const validationError = validateAgentConfig(ctx.body.agentConfig, {
+        harnessAuthService: ctx.services.harnessAuthService,
+        harnesses: ctx.services.harnesses,
+      });
+      if (validationError !== null) {
+        return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
         const task = await ctx.services.taskQueue.updateTask(taskId as TaskId, {
@@ -114,19 +115,27 @@ export const tasksHandlers: HonoHandlersFor<
         if (!task) {
           return notFound();
         }
-        const agentHarnessId =
-          ctx.body.agentHarnessId !== undefined
-            ? ctx.body.agentHarnessId
-            : await ctx.services.agentHarnessConfigRepository.getTaskConfig(
-                task.id,
-              );
-        if (ctx.body.agentHarnessId !== undefined) {
+        let config: ScopedHarnessConfig | null;
+        if (ctx.body.agentConfig === undefined) {
+          config =
+            await ctx.services.agentHarnessConfigRepository.getTaskConfig(
+              task.id,
+            );
+        } else if (ctx.body.agentConfig === null) {
+          config = null;
+        } else {
+          config = {
+            harnessId: ctx.body.agentConfig.harnessId,
+            modelId: ctx.body.agentConfig.modelId,
+          };
+        }
+        if (ctx.body.agentConfig !== undefined) {
           await ctx.services.agentHarnessConfigRepository.setTaskConfig(
             task.id,
-            agentHarnessId,
+            config,
           );
         }
-        return ok(toTaskDto(task, agentHarnessId));
+        return ok(toTaskDto(task, config));
       });
     },
 
@@ -140,11 +149,11 @@ export const tasksHandlers: HonoHandlersFor<
         if (!completedTask) {
           return notFound();
         }
-        const agentHarnessId =
+        const config =
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             completedTask.id,
           );
-        return ok(toTaskDto(completedTask, agentHarnessId));
+        return ok(toTaskDto(completedTask, config));
       });
     },
 
@@ -163,11 +172,11 @@ export const tasksHandlers: HonoHandlersFor<
           );
           return notFound();
         }
-        const agentHarnessId =
+        const config =
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             movedTask.id,
           );
-        return ok(toTaskDto(movedTask, agentHarnessId));
+        return ok(toTaskDto(movedTask, config));
       });
     },
   },

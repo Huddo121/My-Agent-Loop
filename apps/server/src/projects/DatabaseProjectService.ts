@@ -81,13 +81,10 @@ export class DatabaseProjectService implements ProjectsService {
       })
       .returning();
 
-    if (
-      project.agentHarnessId !== undefined &&
-      project.agentHarnessId !== null
-    ) {
+    if (project.agentConfig !== null) {
       await this.harnessConfig.setProjectConfig(
         newProject.id as ProjectId,
-        project.agentHarnessId,
+        project.agentConfig,
       );
     }
     const created = await this.getProject(newProject.id as ProjectId);

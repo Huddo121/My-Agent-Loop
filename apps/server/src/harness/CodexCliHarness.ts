@@ -1,6 +1,7 @@
 import type {
   AgentHarness,
   AgentHarnessPreparation,
+  HarnessModel,
   HarnessPreparationContext,
 } from "./AgentHarness";
 import { MAL_PROJECT_ID_HEADER, MAL_TASK_ID_HEADER } from "./OpenCodeHarness";
@@ -26,6 +27,11 @@ function escapeTomlString(s: string): string {
 export class CodexCliHarness implements AgentHarness {
   readonly id = "codex-cli" as const;
   readonly displayName = "Codex CLI";
+  readonly models: readonly HarnessModel[] = [
+    { id: "gpt-5.4", displayName: "GPT-5.4" },
+    { id: "gpt-5.3-codex-spark", displayName: "Codex Spark" },
+    { id: "o3", displayName: "o3" },
+  ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
     const configToml = this.buildConfigToml(context.mcpServerUrl);
@@ -45,7 +51,7 @@ export class CodexCliHarness implements AgentHarness {
         },
       ],
       setupCommands: [],
-      runCommand: this.getRunCommand(),
+      runCommand: this.getRunCommand(context.modelId),
       env,
     };
   }
@@ -60,7 +66,12 @@ env_http_headers = { "${MAL_PROJECT_ID_HEADER}" = "${ENV_VAR_PROJECT_ID}", "${MA
 `;
   }
 
-  private getRunCommand(): string {
-    return 'codex exec "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely."';
+  private getRunCommand(modelId: string | null): string {
+    const base =
+      'codex exec "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely."';
+    if (modelId === null) {
+      return base;
+    }
+    return `${base} --model ${modelId}`;
   }
 }

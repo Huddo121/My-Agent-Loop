@@ -6,6 +6,7 @@ export interface HarnessPreparationContext {
   taskId: TaskId;
   mcpServerUrl: string;
   credentials: ProtectedString | undefined;
+  modelId: string | null;
 }
 
 export interface HarnessFile {
@@ -21,8 +22,14 @@ export interface AgentHarnessPreparation {
   env?: Record<string, string>;
 }
 
+export type HarnessModel = {
+  readonly id: string;
+  readonly displayName: string;
+};
+
 export interface AgentHarness {
   readonly id: AgentHarnessId;
   readonly displayName: string;
+  readonly models: readonly HarnessModel[];
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation;
 }

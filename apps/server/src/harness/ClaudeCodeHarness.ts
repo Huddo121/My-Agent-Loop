@@ -1,6 +1,7 @@
 import type {
   AgentHarness,
   AgentHarnessPreparation,
+  HarnessModel,
   HarnessPreparationContext,
 } from "./AgentHarness";
 
@@ -21,6 +22,11 @@ const SHELL_VAR = "$";
 export class ClaudeCodeHarness implements AgentHarness {
   readonly id = "claude-code" as const;
   readonly displayName = "Claude Code";
+  readonly models: readonly HarnessModel[] = [
+    { id: "sonnet", displayName: "Claude Sonnet" },
+    { id: "opus", displayName: "Claude Opus" },
+    { id: "haiku", displayName: "Claude Haiku" },
+  ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
     const env: Record<string, string> = {
@@ -36,11 +42,14 @@ export class ClaudeCodeHarness implements AgentHarness {
       `claude mcp add --transport http --header "X-MAL-Project-ID: ${SHELL_VAR}${ENV_VAR_PROJECT_ID}" --header "X-MAL-Task-ID: ${SHELL_VAR}${ENV_VAR_TASK_ID}" ${MCP_SERVER_NAME} "${SHELL_VAR}${ENV_VAR_MCP_SERVER_URL}"`,
     ];
 
+    const modelFlag =
+      context.modelId !== null ? ` --model ${context.modelId}` : "";
+
     return {
       files: [],
       setupCommands,
       runCommand:
-        'claude -p "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely." --allowedTools "*"',
+        `claude -p "Read the task description in the file /task.txt (at the root of the filesystem) and complete the task within the file. If there is an AGENTS.md file in the current directory, ensure you read it and follow its instructions closely." --allowedTools "*"${modelFlag}`,
       env,
     };
   }

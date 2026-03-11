@@ -3,6 +3,7 @@ import type { Auth, Config, McpRemoteConfig } from "@opencode-ai/sdk";
 import type {
   AgentHarness,
   AgentHarnessPreparation,
+  HarnessModel,
   HarnessPreparationContext,
 } from "./AgentHarness";
 
@@ -43,12 +44,21 @@ const baseConfig: Config = {
 export class OpenCodeHarness implements AgentHarness {
   readonly id = "opencode" as const;
   readonly displayName = "OpenCode";
+  readonly models: readonly HarnessModel[] = [
+    { id: "anthropic/claude-sonnet-4.6", displayName: "Claude Sonnet 4.6" },
+    { id: "anthropic/claude-haiku-4.5", displayName: "Claude Haiku 4.5" },
+    {
+      id: "google/gemini-3.1-pro-preview",
+      displayName: "Gemini 3.1 Pro",
+    },
+  ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
     const config = this.buildConfig(
       context.projectId,
       context.taskId,
       context.mcpServerUrl,
+      context.modelId,
     );
     const authConfig = this.buildAuthConfig(context.credentials);
 
@@ -73,6 +83,7 @@ export class OpenCodeHarness implements AgentHarness {
     projectId: ProjectId,
     taskId: TaskId,
     mcpServerUrl: string,
+    modelId: string | null,
   ): Config {
     const mcpServerConfig: McpRemoteConfig = {
       enabled: true,
@@ -88,7 +99,7 @@ export class OpenCodeHarness implements AgentHarness {
       mcp: {
         "my-agent-loop-tools": mcpServerConfig,
       },
-      model: this.selectModel(),
+      model: modelId ?? this.defaultModelId(),
     };
   }
 
@@ -103,7 +114,7 @@ export class OpenCodeHarness implements AgentHarness {
     };
   }
 
-  private selectModel(): string {
+  private defaultModelId(): string {
     return "opencode/minimax-m2.5-free";
   }
 }

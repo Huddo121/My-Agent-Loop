@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: harness-interface-impls
     content: "Update `AgentHarness` interface to include `models: readonly HarnessModel[]` and add `modelId: string | null` to `HarnessPreparationContext`. Update all four harness implementations (OpenCode, Claude Code, Cursor CLI, Codex CLI) to define their model lists (see 'Starter model lists' section) and use `context.modelId` in `prepare()`. Typecheck WILL fail after this todo because `WorkflowExecutionService` hasn't been updated yet."
-    status: pending
+    status: completed
   - id: server-services-dtos
     content: Update server domain models (`Workspace.ts`, `ProjectsService.ts` Project interface) to use `ScopedHarnessConfig | null` instead of `AgentHarnessId | null`. Update `DatabaseProjectService` (`toProject`, `createProject`, `updateProject`), `DatabaseWorkspacesService` (`toWorkspace`, `updateWorkspace`), and task handler `toTaskDto` to handle `ScopedHarnessConfig` and populate the nested `agentConfig` object in responses. Typecheck may still fail until handlers are updated.
     status: pending

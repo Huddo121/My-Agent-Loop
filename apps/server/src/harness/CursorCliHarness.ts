@@ -1,6 +1,7 @@
 import type {
   AgentHarness,
   AgentHarnessPreparation,
+  HarnessModel,
   HarnessPreparationContext,
 } from "./AgentHarness";
 import { MAL_PROJECT_ID_HEADER, MAL_TASK_ID_HEADER } from "./OpenCodeHarness";
@@ -18,6 +19,11 @@ const TASK_PROMPT =
 export class CursorCliHarness implements AgentHarness {
   readonly id = "cursor-cli" as const;
   readonly displayName = "Cursor CLI";
+  readonly models: readonly HarnessModel[] = [
+    { id: "claude-4.6-sonnet", displayName: "Claude 4.6 Sonnet" },
+    { id: "gemini-3-pro", displayName: "Gemini 3 Pro" },
+    { id: "composer-1.5", displayName: "Composer 1.5" },
+  ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
     const mcpJson = this.buildMcpJson(
@@ -30,6 +36,9 @@ export class CursorCliHarness implements AgentHarness {
       env.CURSOR_API_KEY = context.credentials.getSecretValue();
     }
 
+    const modelFlag =
+      context.modelId !== null ? ` --model ${context.modelId}` : "";
+
     return {
       files: [
         {
@@ -38,7 +47,7 @@ export class CursorCliHarness implements AgentHarness {
         },
       ],
       setupCommands: [],
-      runCommand: `agent -p --force "${TASK_PROMPT}"`,
+      runCommand: `agent -p --force "${TASK_PROMPT}"${modelFlag}`,
       env: Object.keys(env).length > 0 ? env : undefined,
     };
   }

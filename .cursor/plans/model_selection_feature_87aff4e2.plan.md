@@ -3,31 +3,31 @@ name: Model Selection Feature
 overview: Add per-harness model selection with the same scoped inheritance pattern (task -> project -> workspace -> harness default) as the existing harness selection, stored in the same DB table and surfaced through the same UI pattern.
 todos:
   - id: api-schemas
-    content: Add `agentModelId` to all DTOs and request schemas in `packages/api/` (workspace, project, task), and add `models` array + `harnessModelSchema` to `harnessListItemSchema` in `workspaces-api.ts`
+    content: "Restructure DTOs in `packages/api/` ONLY: define `agentConfigSchema` and `harnessModelSchema` in the harnesses module, replace flat `agentHarnessId` with nested `agentConfig: { harnessId, modelId } | null` on workspace/project/task DTOs and request schemas, add `models` array to `harnessListItemSchema`. Do NOT update server or frontend consumers -- later todos handle those. Typecheck WILL fail after this todo."
     status: pending
-  - id: db-migration-schema
-    content: Create a DB migration adding nullable `agent_model_id TEXT` column to `agent_harness_configuration`, and update `apps/server/src/db/schema.ts` to include the new column
+  - id: db-schema
+    content: Update `apps/server/src/db/schema.ts` to add nullable `agentModelId` text column to `agentHarnessConfigurationTable`. The user will handle the DB migration separately.
     status: pending
   - id: harness-config-repo
-    content: "Refactor `AgentHarnessConfigRepository` in `apps/server/src/harness/AgentHarnessConfigRepository.ts`: define `ScopedHarnessConfig` type, update all getters to return `ScopedHarnessConfig | null`, update setters to accept `ScopedHarnessConfig | null`, rename `resolveHarnessId` to `resolveHarnessConfig` returning `ScopedHarnessConfig`"
+    content: "Refactor `AgentHarnessConfigRepository` in `apps/server/src/harness/AgentHarnessConfigRepository.ts`: define `ScopedHarnessConfig` type, update all getters to return `ScopedHarnessConfig | null`, update setters to accept `ScopedHarnessConfig | null`, rename `resolveHarnessId` to `resolveHarnessConfig` returning `ScopedHarnessConfig`. Typecheck WILL fail after this todo because callers haven't been updated yet."
     status: pending
   - id: harness-interface-impls
-    content: "Update `AgentHarness` interface to include `models: readonly HarnessModel[]` and add `modelId: string | null` to `HarnessPreparationContext`. Update all four harness implementations (OpenCode, Claude Code, Cursor CLI, Codex CLI) to define their model lists and use `context.modelId` in `prepare()`"
-    status: pending
-  - id: server-handlers-validation
-    content: Add model validation to workspace PATCH, project POST/PATCH, and task POST/PUT handlers. Extract a shared `validateHarnessAndModel` helper. Update the GET harnesses endpoint to include `models` in the response.
+    content: "Update `AgentHarness` interface to include `models: readonly HarnessModel[]` and add `modelId: string | null` to `HarnessPreparationContext`. Update all four harness implementations (OpenCode, Claude Code, Cursor CLI, Codex CLI) to define their model lists (see 'Starter model lists' section) and use `context.modelId` in `prepare()`. Typecheck WILL fail after this todo because `WorkflowExecutionService` hasn't been updated yet."
     status: pending
   - id: server-services-dtos
-    content: Update `DatabaseProjectService` (`toProject`, `createProject`, `updateProject`), workspace service, and task handler `toTaskDto` to handle `ScopedHarnessConfig` and populate `agentModelId` in responses
+    content: Update server domain models (`Workspace.ts`, `ProjectsService.ts` Project interface) to use `ScopedHarnessConfig | null` instead of `AgentHarnessId | null`. Update `DatabaseProjectService` (`toProject`, `createProject`, `updateProject`), `DatabaseWorkspacesService` (`toWorkspace`, `updateWorkspace`), and task handler `toTaskDto` to handle `ScopedHarnessConfig` and populate the nested `agentConfig` object in responses. Typecheck may still fail until handlers are updated.
+    status: pending
+  - id: server-handlers-validation
+    content: Update workspace, project, and task handlers to read `agentConfig` instead of `agentHarnessId`. Add model validation (model must belong to the selected harness). Extract a shared `validateAgentConfig` helper. Update GET harnesses endpoint to include `models`. After this todo, the server should typecheck cleanly.
     status: pending
   - id: workflow-execution
-    content: Update `WorkflowExecutionService.prepare()` to call `resolveHarnessConfig` instead of `resolveHarnessId`, destructure `{ harnessId, modelId }`, and pass `modelId` into `harness.prepare()`
+    content: Update `WorkflowExecutionService.prepare()` to call `resolveHarnessConfig` instead of `resolveHarnessId`, destructure `{ harnessId, modelId }`, and pass `modelId` into `harness.prepare()`. After this todo, run typecheck for the server -- it should pass.
     status: pending
   - id: frontend-model-select
-    content: Create `ModelSelect` component in `apps/frontend/app/components/ui/ModelSelect.tsx` with inherit/default option, model list, and `parseModelValue` helper, following the `HarnessSelect` pattern
+    content: Create `ModelSelect` component in `apps/frontend/app/components/ui/ModelSelect.tsx` with a 'Harness default' option (using a dedicated sentinel, NOT `INHERIT_VALUE`), model list, and `parseModelValue` helper.
     status: pending
   - id: frontend-dialogs
-    content: "Integrate `ModelSelect` into `WorkspaceConfigDialog`, `ProjectDialog`, and `TaskDialog`: add `modelValue` state, show conditionally when harness is explicit, reset on harness change, pass `agentModelId` on submit"
+    content: "Update frontend types (`app/types/task.ts`, `workspace.ts`, `project.ts`) to replace `agentHarnessId` with `agentConfig`. Integrate `ModelSelect` into `WorkspaceConfigDialog`, `ProjectDialog`, and `TaskDialog`: add `modelValue` state, show conditionally when harness is explicit, reset on harness change, submit nested `agentConfig` object (or null for inherit). Update `inheritDisplayName` logic to read from `agentConfig`. After this todo, run typecheck for the full project -- it should pass."
     status: pending
 isProject: false
 ---
@@ -56,17 +56,38 @@ Key files the executor needs to know about:
 ## Design Decisions
 
 - **Same table**: `agentModelId` is a new nullable text column on `agent_harness_configuration`, not a separate table. This keeps harness and model coupled in one row per scope, simplifying queries and ensuring they inherit together.
+- **Nested DTO shape**: The flat `agentHarnessId` field on DTOs is replaced with `agentConfig: { harnessId, modelId } | null`. This makes the coupling structural -- a model cannot be set without a harness, and both inherit together when `agentConfig` is null.
 - **Model is coupled to harness at the same scope**: A user can only select a model when they explicitly set a harness (not "inherit"). If harness is null (inherit), model must also be null. This avoids cross-harness model mismatches.
 - **Resolution returns both**: `resolveHarnessId` is renamed to `resolveHarnessConfig` and returns `{ harnessId: AgentHarnessId; modelId: string | null }`. The first scope with an explicit harness provides both values.
-- **Null model = harness default**: When `modelId` is null, the harness uses its own default (current behaviour). No system-wide default model.
+- **Null model = harness default**: When `modelId` is null, the harness uses its own default (current behaviour). No system-wide default model. In the UI this is shown as "Harness default" (not "Inherit").
 - **Static model lists on harness implementations**: Each `AgentHarness` exposes a `models` array. These are returned inline on the existing `GET /harnesses` endpoint. Updated manually as new models drop.
 - **Model passed through preparation context**: `HarnessPreparationContext` gains `modelId: string | null`. Each harness implementation uses it to configure the CLI (config file field, CLI flag, or env var).
+- **DB migration is user-managed**: The executing agent only updates the Drizzle schema definition. The user handles the actual migration.
 
 ## Implementation Guide
 
-### API schemas (`packages/api/`)
+**Typecheck note for agents**: These todos are designed to be executed sequentially. Early todos (especially `api-schemas`, `harness-config-repo`, and `harness-interface-impls`) intentionally break type-checking by changing interfaces before their callers are updated. Each todo description notes whether typecheck is expected to pass or fail after completion. Do NOT attempt to fix type errors in code that a later todo is responsible for.
 
-Add `agentModelId: z.string().nullable()` to all three DTO schemas (`workspaceDtoSchema`, `projectDtoSchema`, `taskDtoSchema`) and the `.nullable().optional()` variant to all create/update request schemas, following the exact pattern of `agentHarnessId`.
+### API schemas (`packages/api/` only)
+
+This todo ONLY changes files in `packages/api/`. Server and frontend consumers will break (type errors) and are fixed by later todos.
+
+Replace the flat `agentHarnessId` field with a nested `agentConfig` object across all DTOs and request schemas. This naturally enforces the constraint that a model requires an explicit harness.
+
+Define a shared schema in `packages/api/src/harnesses/harnesses-model.ts` and export it from `packages/api/src/harnesses/index.ts`:
+
+```typescript
+export const agentConfigSchema = z.object({
+  harnessId: agentHarnessIdSchema,
+  modelId: z.string().nullable(),
+});
+export type AgentConfig = z.infer<typeof agentConfigSchema>;
+```
+
+Then in each DTO:
+
+- **Response DTOs** (`workspaceDtoSchema`, `projectDtoSchema`, `taskDtoSchema`): replace `agentHarnessId: agentHarnessIdSchema.nullable()` with `agentConfig: agentConfigSchema.nullable()`
+- **Request schemas** (create/update for workspace, project, task): replace `agentHarnessId: agentHarnessIdSchema.nullable().optional()` with `agentConfig: agentConfigSchema.nullable().optional()`
 
 Add a `models` array to `harnessListItemSchema`:
 
@@ -84,12 +105,9 @@ export const harnessListItemSchema = z.object({
 });
 ```
 
-### DB migration and schema
+### DB schema (migration is out of scope)
 
-Add a nullable `agentModelId` text column to the `agent_harness_configuration` table:
-
-- **Migration**: `ALTER TABLE agent_harness_configuration ADD COLUMN agent_model_id TEXT`
-- **Schema** (`[apps/server/src/db/schema.ts](apps/server/src/db/schema.ts)`): add `agentModelId: pg.text().$type<string>()` to the table definition
+Update `[apps/server/src/db/schema.ts](apps/server/src/db/schema.ts)` only -- add `agentModelId: pg.text().$type<string>()` to `agentHarnessConfigurationTable`. The user will handle the actual DB migration separately.
 
 ### `AgentHarnessConfigRepository`
 
@@ -137,31 +155,64 @@ Each harness implementation:
 - **Cursor CLI**: Add `models` array. If `context.modelId` is set, append `--model ${context.modelId}` to the `runCommand`.
 - **Codex CLI**: Add `models` array (OpenAI model IDs). If `context.modelId` is set, append `--model ${context.modelId}` to the `runCommand`.
 
-Populate each `models` array with a reasonable starter set. The user will manually update these over time.
+Populate each `models` array with these starter lists (the user will manually update these over time):
+
+**OpenCode** (OpenRouter model IDs):
+
+- `{ id: "anthropic/claude-sonnet-4.6", displayName: "Claude Sonnet 4.6" }`
+- `{ id: "anthropic/claude-haiku-4.5", displayName: "Claude Haiku 4.5" }`
+- `{ id: "google/gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro" }`
+
+**Claude Code** (Anthropic model IDs -- these are the aliases that always track the latest patch):
+
+- `{ id: "sonnet", displayName: "Claude Sonnet" }`
+- `{ id: "opus", displayName: "Claude Opus" }`
+- `{ id: "haiku", displayName: "Claude Haiku" }`
+
+**Cursor CLI** (verify exact ID strings by checking `agent --list-models` if possible):
+
+- `{ id: "claude-4.6-sonnet", displayName: "Claude 4.6 Sonnet" }`
+- `{ id: "gemini-3-pro", displayName: "Gemini 3 Pro" }`
+- `{ id: "composer-1.5", displayName: "Composer 1.5" }`
+
+**Codex CLI** (OpenAI model IDs):
+
+- `{ id: "gpt-5.4", displayName: "GPT-5.4" }`
+- `{ id: "gpt-5.3-codex-spark", displayName: "Codex Spark" }`
+- `{ id: "o3", displayName: "o3" }`
 
 ### Server handlers
 
 **Validation** (apply in all workspace PATCH, project POST/PATCH, task POST/PUT handlers):
 
-1. If `agentModelId` is non-null but `agentHarnessId` is null or undefined (inherit), return `badUserInput("Cannot set a model without explicitly selecting a harness")`
-2. If `agentModelId` is non-null, look up the harness from `services.harnesses` by `agentHarnessId` and check `harness.models.some(m => m.id === agentModelId)`. If not found, return `badUserInput("Model X is not available for harness Y")`
+1. Existing harness availability check (`harnessAuthService.isAvailable`) now reads from `body.agentConfig?.harnessId` instead of `body.agentHarnessId`
+2. If `agentConfig.modelId` is non-null, look up the harness from `services.harnesses` by `agentConfig.harnessId` and check `harness.models.some(m => m.id === agentConfig.modelId)`. If not found, return `badUserInput("Model X is not available for harness Y")`
 
-Extract validation into a shared helper (e.g. `validateHarnessAndModel` in the harness module) to avoid duplicating across handlers.
+The nested `agentConfig` shape eliminates the need to validate "model without harness" -- that state is unrepresentable.
+
+Extract validation into a shared helper (e.g. `validateAgentConfig` in the harness module) to avoid duplicating across handlers.
 
 **Harness list endpoint** (workspace handlers GET harnesses): Include `models: h.models` in the response for each harness.
 
-**Pass-through**: All handlers that pass `agentHarnessId` to services/repository now also pass `agentModelId`.
+**Pass-through**: All handlers that pass harness config to services/repository now pass the full `agentConfig` (or convert it to `ScopedHarnessConfig`).
 
-### Services and DTO mapping
+### Services, domain models, and DTO mapping
 
-`**DatabaseProjectService`**:
+First, update the server-side domain model types that currently have `agentHarnessId: AgentHarnessId | null`:
 
-- `toProject(row, config: ScopedHarnessConfig | null)` -> include both `agentHarnessId: config?.harnessId ?? null` and `agentModelId: config?.modelId ?? null`
-- `createProject` / `updateProject`: call `setProjectConfig(projectId, config)` where config includes both harness and model
+- `[apps/server/src/projects/ProjectsService.ts](apps/server/src/projects/ProjectsService.ts)` -- `Project` interface: replace `agentHarnessId: AgentHarnessId | null` with `agentConfig: ScopedHarnessConfig | null`. `CreateProject` and `UpdateProject` derive from `Project` via `Omit`/`Partial`, so they pick up the change automatically.
+- `[apps/server/src/workspaces/Workspace.ts](apps/server/src/workspaces/Workspace.ts)` -- `Workspace` type and `UpdateWorkspace` type: same replacement.
 
-**Workspace service**: Same pattern -- `toWorkspace` takes config, service methods pass both values.
+Then update the services and DTO mappers:
 
-**Task handlers**: `toTaskDto(task, config: ScopedHarnessConfig | null)` -> include both fields.
+`**[apps/server/src/projects/DatabaseProjectService.ts](apps/server/src/projects/DatabaseProjectService.ts)`**:
+
+- `toProject(row, config: ScopedHarnessConfig | null)` -> map to `agentConfig: config ? { harnessId: config.harnessId, modelId: config.modelId } : null`
+- `createProject` / `updateProject`: extract `agentConfig` from the request, convert to `ScopedHarnessConfig | null`, call `setProjectConfig(projectId, config)`
+
+`**[apps/server/src/workspaces/DatabaseWorkspacesService.ts](apps/server/src/workspaces/DatabaseWorkspacesService.ts)`**: Same pattern -- `toWorkspace` takes `ScopedHarnessConfig | null`, `updateWorkspace` passes config to `setWorkspaceConfig`.
+
+**Task handlers** (`[apps/server/src/tasks/tasks-handlers.ts](apps/server/src/tasks/tasks-handlers.ts)`): `toTaskDto(task, config: ScopedHarnessConfig | null)` -> map to `agentConfig` the same way.
 
 ### `WorkflowExecutionService`
 
@@ -181,30 +232,37 @@ Pass `modelId` into `harness.prepare({ ..., modelId })`.
 
 ### Frontend `ModelSelect` component
 
-Create `[apps/frontend/app/components/ui/ModelSelect.tsx](apps/frontend/app/components/ui/ModelSelect.tsx)`, following the same pattern as `HarnessSelect`:
+Create `[apps/frontend/app/components/ui/ModelSelect.tsx](apps/frontend/app/components/ui/ModelSelect.tsx)`:
 
 - Props: `value: string`, `onValueChange`, `models: Array<{ id: string; displayName: string }>`, `disabled`, `isLoading`
-- An "inherit" / "Harness default" option (value = `INHERIT_VALUE`)
+- A "Harness default" option using a dedicated sentinel (e.g. `HARNESS_DEFAULT_VALUE = "__harness_default__"`). This is **not** `INHERIT_VALUE` -- models don't inherit from a parent scope, they simply fall back to whatever the harness's built-in default is.
 - List of models from the selected harness
-- Export `parseModelValue(value: string): string | null` (same pattern as `parseHarnessValue`)
+- Export `parseModelValue(value: string): string | null` mapping the sentinel to `null`
 
-### Frontend dialogs
+### Frontend types and dialogs
 
-All three dialogs (`WorkspaceConfigDialog`, `ProjectDialog`, `TaskDialog`) need:
+First, update the frontend type files that currently have `agentHarnessId`:
 
-1. A `modelValue` state alongside `harnessValue`, defaulting to `INHERIT_VALUE`
+- `apps/frontend/app/types/workspace.ts` -- replace `agentHarnessId: AgentHarnessId | null` with `agentConfig: AgentConfig | null` (import `AgentConfig` from `@mono/api`)
+- `apps/frontend/app/types/project.ts` -- same replacement on the `Project` type
+- `apps/frontend/app/types/task.ts` -- same replacement on `Task`, `NewTask`, and `UpdateTask`
+
+Then update all three dialogs (`WorkspaceConfigDialog`, `ProjectDialog`, `TaskDialog`):
+
+1. A `modelValue` state alongside `harnessValue`, defaulting to `HARNESS_DEFAULT_VALUE`
 2. The `ModelSelect` component shown **only when** `harnessValue !== INHERIT_VALUE` (i.e. a harness is explicitly selected)
-3. When `harnessValue` changes, reset `modelValue` to `INHERIT_VALUE`
+3. When `harnessValue` changes, reset `modelValue` to `HARNESS_DEFAULT_VALUE`
 4. Filter models from `harnessesData.harnesses.find(h => h.id === harnessValue)?.models ?? []`
-5. On submit, `agentModelId: parseModelValue(modelValue)` alongside `agentHarnessId`
+5. On submit, construct `agentConfig: harnessValue !== INHERIT_VALUE ? { harnessId: parseHarnessValue(harnessValue), modelId: parseModelValue(modelValue) } : null`
 
-The `inheritDisplayName` for the model select is "Harness default" at all scope levels (since null means "let the harness decide").
+When editing an existing entity, initialize from `entity.agentConfig`:
 
-When editing an existing entity, initialize `modelValue` from the entity's `agentModelId ?? INHERIT_VALUE`.
+- `harnessValue`: `entity.agentConfig?.harnessId ?? INHERIT_VALUE`
+- `modelValue`: `entity.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE`
 
 ## Edge Cases and Error Handling
 
-- **Model set without harness**: Server returns 400. Frontend prevents this by hiding model select when harness is "inherit".
+- **Model set without harness**: Impossible by DTO shape (`agentConfig` is an object or null). Frontend also prevents this by hiding model select when harness is "inherit".
 - **Model not valid for harness**: Server returns 400 with a descriptive message. Frontend prevents this by only showing models for the selected harness.
 - **Harness changed, model now invalid**: Frontend resets model to "Harness default" on harness change. Server validates on save.
 - **Harness becomes unavailable after model was saved**: Existing behaviour -- harness availability is checked at workflow execution time, not retroactively.

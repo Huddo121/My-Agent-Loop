@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: frontend-model-select
     content: Create `ModelSelect` component in `apps/frontend/app/components/ui/ModelSelect.tsx` with a 'Harness default' option (using a dedicated sentinel, NOT `INHERIT_VALUE`), model list, and `parseModelValue` helper.
-    status: pending
+    status: completed
   - id: frontend-dialogs
     content: "Update frontend types (`app/types/task.ts`, `workspace.ts`, `project.ts`) to replace `agentHarnessId` with `agentConfig`. Integrate `ModelSelect` into `WorkspaceConfigDialog`, `ProjectDialog`, and `TaskDialog`: add `modelValue` state, show conditionally when harness is explicit, reset on harness change, submit nested `agentConfig` object (or null for inherit). Update `inheritDisplayName` logic to read from `agentConfig`. After this todo, run typecheck for the full project -- it should pass."
     status: pending

@@ -1,6 +1,11 @@
-import { match } from "ts-pattern";
 import type { Result } from "../utils/Result";
+import type { GitHubService } from "./github/GitHubService";
 import { GitHubServiceImpl } from "./github/GitHubService";
+import type {
+  GitHubJob,
+  GitHubPullRequest,
+  GitHubWorkflowRun,
+} from "./github/GitHubTypes";
 import type { GitLabService } from "./gitlab/GitLabService";
 import { GitLabServiceImpl } from "./gitlab/GitLabServiceImpl";
 import type {
@@ -41,7 +46,11 @@ export interface GitForgeService {
   testConnection(): Promise<Result<void>>;
 }
 
-function toGenericMergeRequest(mr: GitLabMergeRequest): MergeRequest {
+// ---------------------------------------------------------------------------
+// GitLab -> generic mappers
+// ---------------------------------------------------------------------------
+
+function gitlabMrToGeneric(mr: GitLabMergeRequest): MergeRequest {
   return {
     id: mr.id,
     title: mr.title,
@@ -53,7 +62,7 @@ function toGenericMergeRequest(mr: GitLabMergeRequest): MergeRequest {
   };
 }
 
-function toGenericPipeline(p: GitLabPipeline): Pipeline {
+function gitlabPipelineToGeneric(p: GitLabPipeline): Pipeline {
   return {
     id: p.id,
     ref: p.ref,
@@ -63,7 +72,7 @@ function toGenericPipeline(p: GitLabPipeline): Pipeline {
   };
 }
 
-function toGenericJob(j: GitLabJob): PipelineJob {
+function gitlabJobToGeneric(j: GitLabJob): PipelineJob {
   return {
     id: j.id,
     name: j.name,
@@ -72,182 +81,277 @@ function toGenericJob(j: GitLabJob): PipelineJob {
   };
 }
 
-export class DefaultGitForgeService implements GitForgeService {
-  constructor(
-    private readonly credential: ForgeCredential,
-    private readonly gitLabService: GitLabService,
-    private readonly gitHubService: GitHubServiceImpl,
-  ) {}
+// ---------------------------------------------------------------------------
+// GitHub -> generic mappers
+// ---------------------------------------------------------------------------
+
+function githubPrToGeneric(pr: GitHubPullRequest): MergeRequest {
+  return {
+    id: pr.id,
+    title: pr.title,
+    description: pr.body,
+    sourceBranch: pr.source_branch,
+    targetBranch: pr.target_branch,
+    state: pr.state,
+    webUrl: pr.html_url,
+  };
+}
+
+function githubWorkflowRunToGeneric(run: GitHubWorkflowRun): Pipeline {
+  return {
+    id: run.id,
+    ref: run.head_branch,
+    status: run.status,
+    webUrl: run.html_url,
+    createdAt: run.created_at,
+  };
+}
+
+function githubJobToGeneric(j: GitHubJob): PipelineJob {
+  return {
+    id: j.id,
+    name: j.name,
+    stage: "",
+    status: j.status,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GitLab implementation
+// ---------------------------------------------------------------------------
+
+class GitLabForgeService implements GitForgeService {
+  constructor(private readonly service: GitLabService) {}
 
   async createMergeRequest(
     options: CreateMergeRequestOptions,
   ): Promise<Result<MergeRequest>> {
-    return match(this.credential.forgeType)
-      .with("gitlab", async () => {
-        const result = await this.gitLabService.createMergeRequest({
-          sourceBranch: options.sourceBranch,
-          targetBranch: options.targetBranch,
-          title: options.title,
-          description: options.description,
-        });
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: toGenericMergeRequest(result.value),
-        };
-      })
-      .with("github", async () => {
-        const result = await this.gitHubService.createPullRequest();
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: {
-            id: result.value.id,
-            title: "",
-            description: null,
-            sourceBranch: "",
-            targetBranch: "",
-            state: "",
-            webUrl: "",
-          },
-        };
-      })
-      .exhaustive();
+    const result = await this.service.createMergeRequest({
+      sourceBranch: options.sourceBranch,
+      targetBranch: options.targetBranch,
+      title: options.title,
+      description: options.description,
+    });
+    if (!result.success) return result;
+    return { success: true, value: gitlabMrToGeneric(result.value) };
   }
 
   async getMergeRequest(id: MergeRequestId): Promise<Result<MergeRequest>> {
-    return match(id)
-      .with({ platform: "gitlab" }, async (gitlabId) => {
-        const result = await this.gitLabService.getMergeRequest(gitlabId);
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: toGenericMergeRequest(result.value),
-        };
-      })
-      .with({ platform: "github" }, async () => {
-        return {
-          success: false as const,
-          error: new Error("GitHub not yet implemented"),
-        };
-      })
-      .exhaustive();
+    if (id.platform !== "gitlab") {
+      return {
+        success: false,
+        error: new Error(`Expected gitlab ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.getMergeRequest(id);
+    if (!result.success) return result;
+    return { success: true, value: gitlabMrToGeneric(result.value) };
   }
 
   async listMergeRequests(
     options?: ListMergeRequestOptions,
   ): Promise<Result<MergeRequest[]>> {
-    return match(this.credential.forgeType)
-      .with("gitlab", async () => {
-        const result = await this.gitLabService.listMergeRequests({
-          state: options?.state,
-          source_branch: options?.sourceBranch,
-          target_branch: options?.targetBranch,
-        });
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: result.value.map(toGenericMergeRequest),
-        };
-      })
-      .with("github", async () => {
-        const result = await this.gitHubService.listPullRequests();
-        if (!result.success) return result;
-        return { success: true as const, value: [] };
-      })
-      .exhaustive();
+    const result = await this.service.listMergeRequests({
+      state: options?.state,
+      source_branch: options?.sourceBranch,
+      target_branch: options?.targetBranch,
+    });
+    if (!result.success) return result;
+    return { success: true, value: result.value.map(gitlabMrToGeneric) };
   }
 
   async addMergeRequestComment(
     id: MergeRequestId,
     body: string,
   ): Promise<Result<void>> {
-    return match(id)
-      .with({ platform: "gitlab" }, (gitlabId) =>
-        this.gitLabService.addMergeRequestNote(gitlabId, body),
-      )
-      .with({ platform: "github" }, async () => {
-        return this.gitHubService.addPullRequestComment();
-      })
-      .exhaustive();
+    if (id.platform !== "gitlab") {
+      return {
+        success: false,
+        error: new Error(`Expected gitlab ID, got ${id.platform}`),
+      };
+    }
+    return this.service.addMergeRequestNote(id, body);
   }
 
   async listPipelines(ref?: string): Promise<Result<Pipeline[]>> {
-    return match(this.credential.forgeType)
-      .with("gitlab", async () => {
-        const result = await this.gitLabService.listPipelines(ref);
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: result.value.map(toGenericPipeline),
-        };
-      })
-      .with("github", async () => {
-        const result = await this.gitHubService.listWorkflowRuns();
-        if (!result.success) return result;
-        return { success: true as const, value: [] };
-      })
-      .exhaustive();
+    const result = await this.service.listPipelines(ref);
+    if (!result.success) return result;
+    return { success: true, value: result.value.map(gitlabPipelineToGeneric) };
   }
 
   async getPipeline(id: PipelineId): Promise<Result<Pipeline>> {
-    return match(id)
-      .with({ platform: "gitlab" }, async (gitlabId) => {
-        const result = await this.gitLabService.getPipeline(gitlabId);
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: toGenericPipeline(result.value),
-        };
-      })
-      .with({ platform: "github" }, async () => {
-        return {
-          success: false as const,
-          error: new Error("GitHub not yet implemented"),
-        };
-      })
-      .exhaustive();
+    if (id.platform !== "gitlab") {
+      return {
+        success: false,
+        error: new Error(`Expected gitlab ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.getPipeline(id);
+    if (!result.success) return result;
+    return { success: true, value: gitlabPipelineToGeneric(result.value) };
   }
 
   async listPipelineJobs(id: PipelineId): Promise<Result<PipelineJob[]>> {
-    return match(id)
-      .with({ platform: "gitlab" }, async (gitlabId) => {
-        const result = await this.gitLabService.listPipelineJobs(gitlabId);
-        if (!result.success) return result;
-        return {
-          success: true as const,
-          value: result.value.map(toGenericJob),
-        };
-      })
-      .with({ platform: "github" }, async () => {
-        const result = await this.gitHubService.listWorkflowRunJobs();
-        if (!result.success) return result;
-        return { success: true as const, value: [] };
-      })
-      .exhaustive();
+    if (id.platform !== "gitlab") {
+      return {
+        success: false,
+        error: new Error(`Expected gitlab ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.listPipelineJobs(id);
+    if (!result.success) return result;
+    return { success: true, value: result.value.map(gitlabJobToGeneric) };
   }
 
   async getJobLog(id: JobId): Promise<Result<string>> {
-    return match(id)
-      .with({ platform: "gitlab" }, (gitlabId) =>
-        this.gitLabService.getJobLog(gitlabId),
-      )
-      .with({ platform: "github" }, async () => {
-        return {
-          success: false as const,
-          error: new Error("GitHub not yet implemented"),
-        };
-      })
-      .exhaustive();
+    if (id.platform !== "gitlab") {
+      return {
+        success: false,
+        error: new Error(`Expected gitlab ID, got ${id.platform}`),
+      };
+    }
+    return this.service.getJobLog(id);
   }
 
-  async testConnection(): Promise<Result<void>> {
-    return match(this.credential.forgeType)
-      .with("gitlab", () => this.gitLabService.testConnection())
-      .with("github", () => this.gitHubService.testConnection())
-      .exhaustive();
+  testConnection(): Promise<Result<void>> {
+    return this.service.testConnection();
   }
 }
+
+// ---------------------------------------------------------------------------
+// GitHub implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps the generic ListMergeRequestOptions.state values to GitHub's pull
+ * request list API state parameter.
+ */
+function toGitHubPrState(
+  state?: ListMergeRequestOptions["state"],
+): "open" | "closed" | "all" | undefined {
+  switch (state) {
+    case "opened":
+      return "open";
+    case "closed":
+    case "merged":
+      return "closed";
+    case "all":
+      return "all";
+    default:
+      return undefined;
+  }
+}
+
+class GitHubForgeService implements GitForgeService {
+  constructor(private readonly service: GitHubService) {}
+
+  async createMergeRequest(
+    options: CreateMergeRequestOptions,
+  ): Promise<Result<MergeRequest>> {
+    const result = await this.service.createPullRequest({
+      sourceBranch: options.sourceBranch,
+      targetBranch: options.targetBranch,
+      title: options.title,
+      description: options.description,
+    });
+    if (!result.success) return result;
+    return { success: true, value: githubPrToGeneric(result.value) };
+  }
+
+  async getMergeRequest(id: MergeRequestId): Promise<Result<MergeRequest>> {
+    if (id.platform !== "github") {
+      return {
+        success: false,
+        error: new Error(`Expected github ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.getPullRequest(id);
+    if (!result.success) return result;
+    return { success: true, value: githubPrToGeneric(result.value) };
+  }
+
+  async listMergeRequests(
+    options?: ListMergeRequestOptions,
+  ): Promise<Result<MergeRequest[]>> {
+    const wantMergedOnly = options?.state === "merged";
+    const result = await this.service.listPullRequests({
+      state: toGitHubPrState(options?.state),
+      head: options?.sourceBranch,
+      base: options?.targetBranch,
+    });
+    if (!result.success) return result;
+
+    let prs = result.value;
+    if (wantMergedOnly) {
+      prs = prs.filter((pr) => pr.merged);
+    }
+    return { success: true, value: prs.map(githubPrToGeneric) };
+  }
+
+  async addMergeRequestComment(
+    id: MergeRequestId,
+    body: string,
+  ): Promise<Result<void>> {
+    if (id.platform !== "github") {
+      return {
+        success: false,
+        error: new Error(`Expected github ID, got ${id.platform}`),
+      };
+    }
+    return this.service.addPullRequestComment(id, body);
+  }
+
+  async listPipelines(ref?: string): Promise<Result<Pipeline[]>> {
+    const result = await this.service.listWorkflowRuns(ref);
+    if (!result.success) return result;
+    return {
+      success: true,
+      value: result.value.map(githubWorkflowRunToGeneric),
+    };
+  }
+
+  async getPipeline(id: PipelineId): Promise<Result<Pipeline>> {
+    if (id.platform !== "github") {
+      return {
+        success: false,
+        error: new Error(`Expected github ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.getWorkflowRun(id);
+    if (!result.success) return result;
+    return { success: true, value: githubWorkflowRunToGeneric(result.value) };
+  }
+
+  async listPipelineJobs(id: PipelineId): Promise<Result<PipelineJob[]>> {
+    if (id.platform !== "github") {
+      return {
+        success: false,
+        error: new Error(`Expected github ID, got ${id.platform}`),
+      };
+    }
+    const result = await this.service.listWorkflowRunJobs(id);
+    if (!result.success) return result;
+    return { success: true, value: result.value.map(githubJobToGeneric) };
+  }
+
+  async getJobLog(id: JobId): Promise<Result<string>> {
+    if (id.platform !== "github") {
+      return {
+        success: false,
+        error: new Error(`Expected github ID, got ${id.platform}`),
+      };
+    }
+    return this.service.getJobLog(id);
+  }
+
+  testConnection(): Promise<Result<void>> {
+    return this.service.testConnection();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
 /**
  * Extracts the project path from a repository URL (e.g. "group/repo" for GitLab/GitHub).
@@ -290,23 +394,20 @@ export function getProjectPathFromRepositoryUrl(repositoryUrl: string): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+
 /**
  * Constructs the appropriate GitForgeService for a project's credential.
  */
 export function createGitForgeService(
   credential: ForgeCredential,
 ): GitForgeService {
-  return match(credential.forgeType)
-    .with("gitlab", () => {
-      const gitLabService = new GitLabServiceImpl(credential);
-      return new DefaultGitForgeService(
-        credential,
-        gitLabService,
-        new GitHubServiceImpl(),
-      );
-    })
-    .with("github", () => {
-      throw new Error("GitHub not yet implemented");
-    })
-    .exhaustive();
+  switch (credential.forgeType) {
+    case "gitlab":
+      return new GitLabForgeService(new GitLabServiceImpl(credential));
+    case "github":
+      return new GitHubForgeService(new GitHubServiceImpl(credential));
+  }
 }

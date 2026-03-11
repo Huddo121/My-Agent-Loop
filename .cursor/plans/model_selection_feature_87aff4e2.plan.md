@@ -4,13 +4,13 @@ overview: Add per-harness model selection with the same scoped inheritance patte
 todos:
   - id: api-schemas
     content: "Restructure DTOs in `packages/api/` ONLY: define `agentConfigSchema` and `harnessModelSchema` in the harnesses module, replace flat `agentHarnessId` with nested `agentConfig: { harnessId, modelId } | null` on workspace/project/task DTOs and request schemas, add `models` array to `harnessListItemSchema`. Do NOT update server or frontend consumers -- later todos handle those. Typecheck WILL fail after this todo."
-    status: pending
+    status: completed
   - id: db-schema
     content: Update `apps/server/src/db/schema.ts` to add nullable `agentModelId` text column to `agentHarnessConfigurationTable`. The user will handle the DB migration separately.
-    status: pending
+    status: completed
   - id: harness-config-repo
     content: "Refactor `AgentHarnessConfigRepository` in `apps/server/src/harness/AgentHarnessConfigRepository.ts`: define `ScopedHarnessConfig` type, update all getters to return `ScopedHarnessConfig | null`, update setters to accept `ScopedHarnessConfig | null`, rename `resolveHarnessId` to `resolveHarnessConfig` returning `ScopedHarnessConfig`. Typecheck WILL fail after this todo because callers haven't been updated yet."
-    status: pending
+    status: completed
   - id: harness-interface-impls
     content: "Update `AgentHarness` interface to include `models: readonly HarnessModel[]` and add `modelId: string | null` to `HarnessPreparationContext`. Update all four harness implementations (OpenCode, Claude Code, Cursor CLI, Codex CLI) to define their model lists (see 'Starter model lists' section) and use `context.modelId` in `prepare()`. Typecheck WILL fail after this todo because `WorkflowExecutionService` hasn't been updated yet."
     status: pending

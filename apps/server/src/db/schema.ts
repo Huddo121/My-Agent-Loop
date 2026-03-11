@@ -90,6 +90,7 @@ export const agentHarnessConfigurationTable = pg.pgTable(
       .unique()
       .$type<TaskId>(),
     agentHarnessId: pg.text().notNull().$type<AgentHarnessId>(),
+    agentModelId: pg.text().$type<string>(),
   },
   (table) => ({
     exactlyOneTarget: check(

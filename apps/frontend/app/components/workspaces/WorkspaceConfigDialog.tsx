@@ -1,3 +1,4 @@
+import type { AgentConfig } from "@mono/api";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,14 +14,17 @@ import {
   INHERIT_VALUE,
   parseHarnessValue,
 } from "~/components/ui/HarnessSelect";
+import {
+  HARNESS_DEFAULT_VALUE,
+  ModelSelect,
+  parseModelValue,
+} from "~/components/ui/ModelSelect";
 import { Input } from "~/components/ui/input";
 import {
   useHarnessesQuery,
   useUpdateWorkspace,
 } from "~/lib/workspaces/useWorkspaces";
 import type { Workspace } from "~/types";
-
-const SYSTEM_DEFAULT_VALUE = "__default__" as const;
 
 export type WorkspaceConfigDialogProps = {
   open: boolean;
@@ -35,7 +39,10 @@ export function WorkspaceConfigDialog({
 }: WorkspaceConfigDialogProps) {
   const [name, setName] = useState(workspace.name);
   const [harnessValue, setHarnessValue] = useState<string>(
-    workspace.agentHarnessId ?? SYSTEM_DEFAULT_VALUE,
+    workspace.agentConfig?.harnessId ?? INHERIT_VALUE,
+  );
+  const [modelValue, setModelValue] = useState<string>(
+    workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE,
   );
 
   const { data: harnessesData, isLoading: isLoadingHarnesses } =
@@ -46,21 +53,35 @@ export function WorkspaceConfigDialog({
 
   const systemDefaultDisplayName = useMemo(() => "OpenCode", []);
 
+  const modelsForSelectedHarness = useMemo(() => {
+    if (harnessValue === INHERIT_VALUE) return [];
+    const harnessId = parseHarnessValue(harnessValue);
+    if (harnessId === null) return [];
+    const harness = harnesses.find((h) => h.id === harnessId);
+    return harness?.models ?? [];
+  }, [harnessValue, harnesses]);
+
   useEffect(() => {
     if (open) {
       setName(workspace.name);
-      setHarnessValue(workspace.agentHarnessId ?? SYSTEM_DEFAULT_VALUE);
+      setHarnessValue(workspace.agentConfig?.harnessId ?? INHERIT_VALUE);
+      setModelValue(workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE);
     }
-  }, [open, workspace.name, workspace.agentHarnessId]);
+  }, [open, workspace.name, workspace.agentConfig]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const agentHarnessId = parseHarnessValue(
-      harnessValue === SYSTEM_DEFAULT_VALUE ? INHERIT_VALUE : harnessValue,
-    );
+    const parsedHarnessId = parseHarnessValue(harnessValue);
+    const agentConfig: AgentConfig | null =
+      parsedHarnessId === null
+        ? null
+        : {
+            harnessId: parsedHarnessId,
+            modelId: parseModelValue(modelValue),
+          };
 
     updateWorkspace.mutate(
-      { name: name.trim(), agentHarnessId },
+      { name: name.trim(), agentConfig },
       {
         onSuccess: () => onOpenChange(false),
       },
@@ -111,14 +132,11 @@ export function WorkspaceConfigDialog({
                 <HarnessSelect
                   id="workspace-config-harness"
                   value={
-                    harnessValue === SYSTEM_DEFAULT_VALUE
-                      ? INHERIT_VALUE
-                      : harnessValue
+                    harnessValue
                   }
                   onValueChange={(value) => {
-                    setHarnessValue(
-                      value === INHERIT_VALUE ? SYSTEM_DEFAULT_VALUE : value,
-                    );
+                    setHarnessValue(value);
+                    setModelValue(HARNESS_DEFAULT_VALUE);
                   }}
                   harnesses={harnesses}
                   isLoading={isLoadingHarnesses}
@@ -126,6 +144,28 @@ export function WorkspaceConfigDialog({
                   inheritLabel="System default"
                 />
               </div>
+              {harnessValue !== INHERIT_VALUE && (
+                <div className="mt-4">
+                  <label
+                    htmlFor="workspace-config-model"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Default model
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                    Used when the selected harness is active for this workspace.
+                  </p>
+                  <div className="mt-1">
+                    <ModelSelect
+                      id="workspace-config-model"
+                      value={modelValue}
+                      onValueChange={setModelValue}
+                      models={modelsForSelectedHarness}
+                      isLoading={isLoadingHarnesses}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             {updateWorkspace.isError && (
               <p className="text-sm text-destructive">

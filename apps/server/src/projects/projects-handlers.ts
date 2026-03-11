@@ -14,6 +14,7 @@ import {
   defaultForgeBaseUrl,
   getProjectPathFromRepositoryUrl,
 } from "../forge";
+import { validateAgentConfig } from "../harness";
 import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
 import { ProtectedString } from "../utils/ProtectedString";
@@ -45,14 +46,12 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
-    if (
-      ctx.body.agentHarnessId !== undefined &&
-      ctx.body.agentHarnessId !== null &&
-      !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
-    ) {
-      return badUserInput(
-        `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-      );
+    const validationError = validateAgentConfig(ctx.body.agentConfig, {
+      harnessAuthService: ctx.services.harnessAuthService,
+      harnesses: ctx.services.harnesses,
+    });
+    if (validationError !== null) {
+      return badUserInput(validationError);
     }
     return withNewTransaction(ctx.services.db, async () => {
       const forgeType = ctx.body.forgeType;
@@ -67,7 +66,12 @@ export const projectsHandlers: HonoHandlersFor<
         workflowConfiguration: ctx.body.workflowConfiguration,
         forgeType,
         forgeBaseUrl,
-        agentHarnessId: ctx.body.agentHarnessId ?? null,
+        agentConfig: ctx.body.agentConfig
+          ? {
+              harnessId: ctx.body.agentConfig.harnessId,
+              modelId: ctx.body.agentConfig.modelId,
+            }
+          : null,
       });
       await ctx.services.forgeSecretRepository.upsertForgeSecret(
         project.id,
@@ -118,14 +122,12 @@ export const projectsHandlers: HonoHandlersFor<
     },
     PATCH: async (ctx) => {
       const { projectId } = ctx.hono.req.param();
-      if (
-        ctx.body.agentHarnessId !== undefined &&
-        ctx.body.agentHarnessId !== null &&
-        !ctx.services.harnessAuthService.isAvailable(ctx.body.agentHarnessId)
-      ) {
-        return badUserInput(
-          `Agent harness "${ctx.body.agentHarnessId}" is not available (API key not configured).`,
-        );
+      const validationError = validateAgentConfig(ctx.body.agentConfig, {
+        harnessAuthService: ctx.services.harnessAuthService,
+        harnesses: ctx.services.harnesses,
+      });
+      if (validationError !== null) {
+        return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
         const updatePayload: Parameters<
@@ -142,8 +144,15 @@ export const projectsHandlers: HonoHandlersFor<
           updatePayload.forgeType = ctx.body.forgeType;
         if (ctx.body.forgeBaseUrl !== undefined)
           updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
-        if (ctx.body.agentHarnessId !== undefined)
-          updatePayload.agentHarnessId = ctx.body.agentHarnessId;
+        if (ctx.body.agentConfig !== undefined) {
+          updatePayload.agentConfig =
+            ctx.body.agentConfig === null
+              ? null
+              : {
+                  harnessId: ctx.body.agentConfig.harnessId,
+                  modelId: ctx.body.agentConfig.modelId,
+                };
+        }
 
         const project = await ctx.services.projectsService.updateProject(
           projectId as ProjectId,

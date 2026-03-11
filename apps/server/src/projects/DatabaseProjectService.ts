@@ -1,12 +1,10 @@
-import type {
-  AgentHarnessId,
-  ProjectId,
-  ProjectShortCode,
-  WorkspaceId,
-} from "@mono/api";
+import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
 import { and, asc, eq } from "drizzle-orm";
 import { projectsTable } from "../db/schema";
-import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import type {
+  AgentHarnessConfigRepository,
+  ScopedHarnessConfig,
+} from "../harness/AgentHarnessConfigRepository";
 import { getTransaction } from "../utils/transaction-context";
 import type {
   CreateProject,
@@ -18,7 +16,7 @@ import type {
 
 function toProject(
   row: typeof projectsTable.$inferSelect,
-  agentHarnessId: AgentHarnessId | null,
+  config: ScopedHarnessConfig | null,
 ): Project {
   return {
     id: row.id as ProjectId,
@@ -30,7 +28,7 @@ function toProject(
     queueState: row.queueState,
     forgeType: row.forgeType,
     forgeBaseUrl: row.forgeBaseUrl,
-    agentHarnessId,
+    agentConfig: config,
   };
 }
 
@@ -49,7 +47,7 @@ export class DatabaseProjectService implements ProjectsService {
       await this.harnessConfig.getProjectConfigs(projectIds);
     return rows.map((row) => {
       const id = row.id as ProjectId;
-      return toProject(row, harnessConfigs[id]);
+      return toProject(row, harnessConfigs[id] ?? null);
     });
   }
 
@@ -64,8 +62,8 @@ export class DatabaseProjectService implements ProjectsService {
       return undefined;
     }
 
-    const agentHarnessId = await this.harnessConfig.getProjectConfig(projectId);
-    return toProject(row, agentHarnessId);
+    const config = await this.harnessConfig.getProjectConfig(projectId);
+    return toProject(row, config);
   }
 
   async createProject(project: CreateProject): Promise<Project> {
@@ -83,13 +81,10 @@ export class DatabaseProjectService implements ProjectsService {
       })
       .returning();
 
-    if (
-      project.agentHarnessId !== undefined &&
-      project.agentHarnessId !== null
-    ) {
+    if (project.agentConfig !== null) {
       await this.harnessConfig.setProjectConfig(
         newProject.id as ProjectId,
-        project.agentHarnessId,
+        project.agentConfig,
       );
     }
     const created = await this.getProject(newProject.id as ProjectId);
@@ -117,8 +112,8 @@ export class DatabaseProjectService implements ProjectsService {
     }
 
     const id = row.id as ProjectId;
-    const agentHarnessId = await this.harnessConfig.getProjectConfig(id);
-    return toProject(row, agentHarnessId);
+    const config = await this.harnessConfig.getProjectConfig(id);
+    return toProject(row, config);
   }
 
   async updateProject(
@@ -126,7 +121,7 @@ export class DatabaseProjectService implements ProjectsService {
     update: UpdateProject,
   ): Promise<Project | undefined> {
     const tx = getTransaction();
-    const { agentHarnessId, ...tableUpdate } = update;
+    const { agentConfig, ...tableUpdate } = update;
     const tableKeys = [
       "workspaceId",
       "name",
@@ -148,8 +143,8 @@ export class DatabaseProjectService implements ProjectsService {
         .set(setPayload as typeof tableUpdate)
         .where(eq(projectsTable.id, projectId));
     }
-    if (agentHarnessId !== undefined) {
-      await this.harnessConfig.setProjectConfig(projectId, agentHarnessId);
+    if (agentConfig !== undefined) {
+      await this.harnessConfig.setProjectConfig(projectId, agentConfig ?? null);
     }
     return this.getProject(projectId);
   }

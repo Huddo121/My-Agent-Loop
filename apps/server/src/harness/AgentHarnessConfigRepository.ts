@@ -5,35 +5,42 @@ import { getTransaction } from "../utils/transaction-context";
 
 const DEFAULT_HARNESS_ID: AgentHarnessId = "opencode";
 
+export type ScopedHarnessConfig = {
+  harnessId: AgentHarnessId;
+  modelId: string | null;
+};
+
 export interface AgentHarnessConfigRepository {
-  getWorkspaceConfig(workspaceId: WorkspaceId): Promise<AgentHarnessId | null>;
-  getProjectConfig(projectId: ProjectId): Promise<AgentHarnessId | null>;
+  getWorkspaceConfig(
+    workspaceId: WorkspaceId,
+  ): Promise<ScopedHarnessConfig | null>;
+  getProjectConfig(projectId: ProjectId): Promise<ScopedHarnessConfig | null>;
   /** Fetch the project-level harness config (not resolved) for multiple projects in one query. */
   getProjectConfigs(
     projectIds: ProjectId[],
-  ): Promise<Record<ProjectId, AgentHarnessId | null>>;
-  getTaskConfig(taskId: TaskId): Promise<AgentHarnessId | null>;
+  ): Promise<Record<ProjectId, ScopedHarnessConfig | null>>;
+  getTaskConfig(taskId: TaskId): Promise<ScopedHarnessConfig | null>;
   /** Fetch the task-level harness config (not resolved) for multiple tasks in one query. */
   getTaskConfigs(
     taskIds: TaskId[],
-  ): Promise<Map<TaskId, AgentHarnessId | null>>;
+  ): Promise<Map<TaskId, ScopedHarnessConfig | null>>;
   setWorkspaceConfig(
     workspaceId: WorkspaceId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void>;
   setProjectConfig(
     projectId: ProjectId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void>;
   setTaskConfig(
     taskId: TaskId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void>;
-  resolveHarnessId(
+  resolveHarnessConfig(
     taskId: TaskId,
     projectId: ProjectId,
     workspaceId: WorkspaceId,
-  ): Promise<AgentHarnessId>;
+  ): Promise<ScopedHarnessConfig>;
 }
 
 export class DatabaseAgentHarnessConfigRepository
@@ -41,134 +48,182 @@ export class DatabaseAgentHarnessConfigRepository
 {
   async getWorkspaceConfig(
     workspaceId: WorkspaceId,
-  ): Promise<AgentHarnessId | null> {
+  ): Promise<ScopedHarnessConfig | null> {
     const tx = getTransaction();
     const [row] = await tx
-      .select({ agentHarnessId: agentHarnessConfigurationTable.agentHarnessId })
+      .select({
+        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+        agentModelId: agentHarnessConfigurationTable.agentModelId,
+      })
       .from(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.workspaceId, workspaceId))
       .limit(1);
-    return row?.agentHarnessId ?? null;
+    if (!row) return null;
+    return {
+      harnessId: row.agentHarnessId,
+      modelId: row.agentModelId,
+    };
   }
 
-  async getProjectConfig(projectId: ProjectId): Promise<AgentHarnessId | null> {
+  async getProjectConfig(
+    projectId: ProjectId,
+  ): Promise<ScopedHarnessConfig | null> {
     const tx = getTransaction();
     const [row] = await tx
-      .select({ agentHarnessId: agentHarnessConfigurationTable.agentHarnessId })
+      .select({
+        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+        agentModelId: agentHarnessConfigurationTable.agentModelId,
+      })
       .from(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.projectId, projectId))
       .limit(1);
-    return row?.agentHarnessId ?? null;
+    if (!row) return null;
+    return {
+      harnessId: row.agentHarnessId,
+      modelId: row.agentModelId,
+    };
   }
 
   async getProjectConfigs(
     projectIds: ProjectId[],
-  ): Promise<Record<ProjectId, AgentHarnessId | null>> {
+  ): Promise<Record<ProjectId, ScopedHarnessConfig | null>> {
     if (projectIds.length === 0) return {};
     const tx = getTransaction();
     const rows = await tx
       .select({
         projectId: agentHarnessConfigurationTable.projectId,
         agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+        agentModelId: agentHarnessConfigurationTable.agentModelId,
       })
       .from(agentHarnessConfigurationTable)
       .where(inArray(agentHarnessConfigurationTable.projectId, projectIds));
-    const map: Record<ProjectId, AgentHarnessId | null> = {};
+    const map: Record<ProjectId, ScopedHarnessConfig | null> = {};
     for (const projectId of projectIds) {
       const row = rows.find((r) => r.projectId === projectId);
-      map[projectId] = (row?.agentHarnessId ?? null) as AgentHarnessId | null;
+      map[projectId] = row
+        ? {
+            harnessId: row.agentHarnessId,
+            modelId: row.agentModelId,
+          }
+        : null;
     }
     return map;
   }
 
-  async getTaskConfig(taskId: TaskId): Promise<AgentHarnessId | null> {
+  async getTaskConfig(taskId: TaskId): Promise<ScopedHarnessConfig | null> {
     const tx = getTransaction();
     const [row] = await tx
-      .select({ agentHarnessId: agentHarnessConfigurationTable.agentHarnessId })
+      .select({
+        agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+        agentModelId: agentHarnessConfigurationTable.agentModelId,
+      })
       .from(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.taskId, taskId))
       .limit(1);
-    return row?.agentHarnessId ?? null;
+    if (!row) return null;
+    return {
+      harnessId: row.agentHarnessId,
+      modelId: row.agentModelId,
+    };
   }
 
   async setWorkspaceConfig(
     workspaceId: WorkspaceId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void> {
     const tx = getTransaction();
     await tx
       .delete(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.workspaceId, workspaceId));
-    if (agentHarnessId !== null) {
+    if (config !== null) {
       await tx.insert(agentHarnessConfigurationTable).values({
         workspaceId,
-        agentHarnessId,
+        agentHarnessId: config.harnessId,
+        agentModelId: config.modelId,
       });
     }
   }
 
   async setProjectConfig(
     projectId: ProjectId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void> {
     const tx = getTransaction();
     await tx
       .delete(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.projectId, projectId));
-    if (agentHarnessId !== null) {
+    if (config !== null) {
       await tx.insert(agentHarnessConfigurationTable).values({
         projectId,
-        agentHarnessId,
+        agentHarnessId: config.harnessId,
+        agentModelId: config.modelId,
       });
     }
   }
 
   async setTaskConfig(
     taskId: TaskId,
-    agentHarnessId: AgentHarnessId | null,
+    config: ScopedHarnessConfig | null,
   ): Promise<void> {
     const tx = getTransaction();
     await tx
       .delete(agentHarnessConfigurationTable)
       .where(eq(agentHarnessConfigurationTable.taskId, taskId));
-    if (agentHarnessId !== null) {
+    if (config !== null) {
       await tx.insert(agentHarnessConfigurationTable).values({
         taskId,
-        agentHarnessId,
+        agentHarnessId: config.harnessId,
+        agentModelId: config.modelId,
       });
     }
   }
 
   async getTaskConfigs(
     taskIds: TaskId[],
-  ): Promise<Map<TaskId, AgentHarnessId | null>> {
+  ): Promise<Map<TaskId, ScopedHarnessConfig | null>> {
     if (taskIds.length === 0) return new Map();
     const tx = getTransaction();
     const rows = await tx
       .select({
         taskId: agentHarnessConfigurationTable.taskId,
         agentHarnessId: agentHarnessConfigurationTable.agentHarnessId,
+        agentModelId: agentHarnessConfigurationTable.agentModelId,
       })
       .from(agentHarnessConfigurationTable)
       .where(inArray(agentHarnessConfigurationTable.taskId, taskIds));
-    const map = new Map<TaskId, AgentHarnessId | null>();
+    const map = new Map<TaskId, ScopedHarnessConfig | null>();
     for (const taskId of taskIds) {
       const row = rows.find((r) => r.taskId === taskId);
-      map.set(taskId, (row?.agentHarnessId ?? null) as AgentHarnessId | null);
+      map.set(
+        taskId,
+        row
+          ? {
+              harnessId: row.agentHarnessId,
+              modelId: row.agentModelId,
+            }
+          : null,
+      );
     }
     return map;
   }
 
-  async resolveHarnessId(
+  async resolveHarnessConfig(
     taskId: TaskId,
     projectId: ProjectId,
     workspaceId: WorkspaceId,
-  ): Promise<AgentHarnessId> {
+  ): Promise<ScopedHarnessConfig> {
     const [taskConfig, projectConfig, workspaceConfig] = await Promise.all([
       this.getTaskConfig(taskId),
       this.getProjectConfig(projectId),
       this.getWorkspaceConfig(workspaceId),
     ]);
-    return taskConfig ?? projectConfig ?? workspaceConfig ?? DEFAULT_HARNESS_ID;
+    return (
+      taskConfig ??
+      projectConfig ??
+      workspaceConfig ?? {
+        harnessId: DEFAULT_HARNESS_ID,
+        modelId: null,
+      }
+    );
   }
 }

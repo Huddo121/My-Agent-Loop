@@ -3,6 +3,7 @@ import type { Auth, Config, McpRemoteConfig } from "@opencode-ai/sdk";
 import type {
   AgentHarness,
   AgentHarnessPreparation,
+  HarnessModel,
   HarnessPreparationContext,
 } from "./AgentHarness";
 
@@ -11,25 +12,26 @@ export const MAL_TASK_ID_HEADER = "X-MAL-Task-ID";
 
 const baseConfig: Config = {
   $schema: "https://opencode.ai/config.json",
-  provider: {
-    ollama: {
-      options: {
-        baseURL: "http://host.docker.internal:11434/v1",
-      },
-      models: {
-        "devstral-small-2": {
-          name: "Devstral Small 2",
-          tool_call: true,
-          reasoning: true,
-        },
-        "glm-4.7-flash": {
-          name: "GLM 4.7 Flash",
-          tool_call: true,
-          reasoning: true,
-        },
-      },
-    },
-  },
+  // TODO:One day I should come back to this, using local models might allow for some fun "free" loops
+  // provider: {
+  //   ollama: {
+  //     options: {
+  //       baseURL: "http://host.docker.internal:11434/v1",
+  //     },
+  //     models: {
+  //       "devstral-small-2": {
+  //         name: "Devstral Small 2",
+  //         tool_call: true,
+  //         reasoning: true,
+  //       },
+  //       "glm-4.7-flash": {
+  //         name: "GLM 4.7 Flash",
+  //         tool_call: true,
+  //         reasoning: true,
+  //       },
+  //     },
+  //   },
+  // },
   permission: {
     "*": "allow",
   } as Config["permission"],
@@ -43,12 +45,17 @@ const baseConfig: Config = {
 export class OpenCodeHarness implements AgentHarness {
   readonly id = "opencode" as const;
   readonly displayName = "OpenCode";
+  readonly models: readonly HarnessModel[] = [
+    { id: "opencode/big-pickle", displayName: "Big Pickle (Free)" },
+    { id: "opencode/minimax-m2.5-free", displayName: "MiniMax M2.5 (Free)" },
+  ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
     const config = this.buildConfig(
       context.projectId,
       context.taskId,
       context.mcpServerUrl,
+      context.modelId,
     );
     const authConfig = this.buildAuthConfig(context.credentials);
 
@@ -73,6 +80,7 @@ export class OpenCodeHarness implements AgentHarness {
     projectId: ProjectId,
     taskId: TaskId,
     mcpServerUrl: string,
+    modelId: string | null,
   ): Config {
     const mcpServerConfig: McpRemoteConfig = {
       enabled: true,
@@ -88,7 +96,7 @@ export class OpenCodeHarness implements AgentHarness {
       mcp: {
         "my-agent-loop-tools": mcpServerConfig,
       },
-      model: this.selectModel(),
+      model: modelId ?? this.defaultModelId(),
     };
   }
 
@@ -103,7 +111,7 @@ export class OpenCodeHarness implements AgentHarness {
     };
   }
 
-  private selectModel(): string {
+  private defaultModelId(): string {
     return "opencode/minimax-m2.5-free";
   }
 }

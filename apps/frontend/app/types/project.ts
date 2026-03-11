@@ -1,5 +1,5 @@
 import type {
-  AgentHarnessId,
+  AgentConfig,
   ProjectId,
   ProjectShortCode,
   QueueStateDto,
@@ -20,7 +20,7 @@ export type Project = {
   forgeType: ForgeTypeDto;
   forgeBaseUrl: string;
   hasForgeToken: boolean;
-  agentHarnessId: AgentHarnessId | null;
+  agentConfig: AgentConfig | null;
 };
 
 export type NewProject = {

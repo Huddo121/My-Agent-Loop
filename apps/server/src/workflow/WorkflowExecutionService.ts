@@ -101,11 +101,12 @@ export class WorkflowExecutionService {
     );
     fs.writeFileSync(taskFilePath, formatTaskFile(task));
 
-    const harnessId = await this.harnessConfig.resolveHarnessId(
-      task.id,
-      project.id,
-      project.workspaceId,
-    );
+    const { harnessId, modelId } =
+      await this.harnessConfig.resolveHarnessConfig(
+        task.id,
+        project.id,
+        project.workspaceId,
+      );
     if (!this.harnessAuthService.isAvailable(harnessId)) {
       return {
         success: false,
@@ -128,6 +129,7 @@ export class WorkflowExecutionService {
       taskId: task.id,
       mcpServerUrl: MCP_SERVER_URL,
       credentials: credential,
+      modelId,
     });
 
     const repository = checkoutResult.value;

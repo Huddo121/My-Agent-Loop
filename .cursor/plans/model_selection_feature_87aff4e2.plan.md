@@ -28,7 +28,7 @@ todos:
     status: completed
   - id: frontend-dialogs
     content: "Update frontend types (`app/types/task.ts`, `workspace.ts`, `project.ts`) to replace `agentHarnessId` with `agentConfig`. Integrate `ModelSelect` into `WorkspaceConfigDialog`, `ProjectDialog`, and `TaskDialog`: add `modelValue` state, show conditionally when harness is explicit, reset on harness change, submit nested `agentConfig` object (or null for inherit). Update `inheritDisplayName` logic to read from `agentConfig`. After this todo, run typecheck for the full project -- it should pass."
-    status: pending
+    status: completed
 isProject: false
 ---
 

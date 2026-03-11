@@ -1,3 +1,4 @@
+import type { AgentConfig } from "@mono/api";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,6 +14,11 @@ import {
   INHERIT_VALUE,
   parseHarnessValue,
 } from "~/components/ui/HarnessSelect";
+import {
+  HARNESS_DEFAULT_VALUE,
+  ModelSelect,
+  parseModelValue,
+} from "~/components/ui/ModelSelect";
 import { Input } from "~/components/ui/input";
 import { Kbd, KbdGroup } from "~/components/ui/kbd";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
@@ -36,6 +42,7 @@ export function TaskDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [harnessValue, setHarnessValue] = useState<string>(INHERIT_VALUE);
+  const [modelValue, setModelValue] = useState<string>(HARNESS_DEFAULT_VALUE);
 
   const workspace = useCurrentWorkspace();
   const { data: harnessesData, isLoading: isLoadingHarnesses } =
@@ -44,23 +51,35 @@ export function TaskDialog({
 
   const inheritDisplayName = useMemo(() => {
     const projectHarnessId =
-      project.agentHarnessId ?? workspace.agentHarnessId ?? "opencode";
+      project.agentConfig?.harnessId ??
+      workspace.agentConfig?.harnessId ??
+      "opencode";
     return (
       harnesses.find((h) => h.id === projectHarnessId)?.displayName ??
       projectHarnessId
     );
-  }, [project.agentHarnessId, workspace.agentHarnessId, harnesses]);
+  }, [project.agentConfig, workspace.agentConfig, harnesses]);
+
+  const modelsForSelectedHarness = useMemo(() => {
+    if (harnessValue === INHERIT_VALUE) return [];
+    const harnessId = parseHarnessValue(harnessValue);
+    if (harnessId === null) return [];
+    const harness = harnesses.find((h) => h.id === harnessId);
+    return harness?.models ?? [];
+  }, [harnessValue, harnesses]);
 
   useEffect(() => {
     if (open) {
       if (task) {
         setTitle(task.title);
         setDescription(task.description);
-        setHarnessValue(task.agentHarnessId ?? INHERIT_VALUE);
+        setHarnessValue(task.agentConfig?.harnessId ?? INHERIT_VALUE);
+        setModelValue(task.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE);
       } else {
         setTitle("");
         setDescription("");
         setHarnessValue(INHERIT_VALUE);
+        setModelValue(HARNESS_DEFAULT_VALUE);
       }
     }
   }, [open, task]);
@@ -68,11 +87,18 @@ export function TaskDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      const agentHarnessId = parseHarnessValue(harnessValue);
+      const parsedHarnessId = parseHarnessValue(harnessValue);
+      const agentConfig: AgentConfig | null =
+        parsedHarnessId === null
+          ? null
+          : {
+              harnessId: parsedHarnessId,
+              modelId: parseModelValue(modelValue),
+            };
       onSubmit({
         title: title.trim(),
         description: description.trim(),
-        agentHarnessId,
+        agentConfig,
       });
       onOpenChange(false);
     }
@@ -82,11 +108,18 @@ export function TaskDialog({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === "Enter" && open && title.trim()) {
         e.preventDefault();
-        const agentHarnessId = parseHarnessValue(harnessValue);
+        const parsedHarnessId = parseHarnessValue(harnessValue);
+        const agentConfig: AgentConfig | null =
+          parsedHarnessId === null
+            ? null
+            : {
+                harnessId: parsedHarnessId,
+                modelId: parseModelValue(modelValue),
+              };
         onSubmit({
           title: title.trim(),
           description: description.trim(),
-          agentHarnessId,
+          agentConfig,
         });
         onOpenChange(false);
       }
@@ -94,7 +127,7 @@ export function TaskDialog({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, title, description, harnessValue, onSubmit, onOpenChange]);
+  }, [open, title, description, harnessValue, modelValue, onSubmit, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,12 +177,35 @@ export function TaskDialog({
               <HarnessSelect
                 id="task-harness"
                 value={harnessValue}
-                onValueChange={setHarnessValue}
+                onValueChange={(value) => {
+                  setHarnessValue(value);
+                  setModelValue(HARNESS_DEFAULT_VALUE);
+                }}
                 harnesses={harnesses}
                 isLoading={isLoadingHarnesses}
                 inheritDisplayName={inheritDisplayName}
                 inheritLabel="Inherit from project"
               />
+              {harnessValue !== INHERIT_VALUE && (
+                <div className="mt-2">
+                  <label
+                    htmlFor="task-model"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Model
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                    Used when this task selects a specific harness.
+                  </p>
+                  <ModelSelect
+                    id="task-model"
+                    value={modelValue}
+                    onValueChange={setModelValue}
+                    models={modelsForSelectedHarness}
+                    isLoading={isLoadingHarnesses}
+                  />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -23,17 +23,18 @@ import {
 } from "~/components/ui/HarnessSelect";
 import { Input } from "~/components/ui/input";
 import {
+  HARNESS_DEFAULT_VALUE,
+  ModelSelect,
+  parseModelValue,
+} from "~/components/ui/ModelSelect";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  HARNESS_DEFAULT_VALUE,
-  ModelSelect,
-  parseModelValue,
-} from "~/components/ui/ModelSelect";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
@@ -270,230 +271,241 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div>
-              <label
-                htmlFor="project-name"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Project Name
-              </label>
-              <Input
-                id="project-name"
-                placeholder="Project name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="repository-url"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Repository URL
-              </label>
-              <Input
-                id="repository-url"
-                placeholder="git@github.com/something/amazing.git"
-                value={repositoryUrl}
-                onChange={(e) => setRepositoryUrl(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <hr />
-            <h2 className="text-lg font-medium mb-1">Git Forge</h2>
-            <div>
-              <label
-                htmlFor="forge-type"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Forge type
-              </label>
-              <Select
-                value={forgeType}
-                onValueChange={(value: ForgeTypeDto) => {
-                  setForgeType(value);
-                  setForgeBaseUrl(defaultForgeBaseUrl(value));
-                }}
-              >
-                <SelectTrigger id="forge-type" className="mt-1 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gitlab">GitLab</SelectItem>
-                  <SelectItem value="github">GitHub</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label
-                htmlFor="forge-base-url"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Base URL
-              </label>
-              <Input
-                id="forge-base-url"
-                placeholder="https://gitlab.com"
-                value={forgeBaseUrl}
-                onChange={(e) => setForgeBaseUrl(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="forge-token"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Token
-              </label>
-              <Input
-                id="forge-token"
-                type="password"
-                placeholder={
-                  mode === "update" && initialHasForgeToken
-                    ? "Token configured"
-                    : "Personal access token"
-                }
-                value={forgeToken}
-                onChange={(e) => setForgeToken(e.target.value)}
-                className="mt-1"
-              />
-              {canTestConnection && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={testForgeConnection.isPending}
-                  >
-                    {testForgeConnection.isPending
-                      ? "Testing…"
-                      : "Test Connection"}
-                  </Button>
-                  {testResult !== null &&
-                    (testResult.success ? (
-                      <span className="text-sm text-green-600">Success</span>
-                    ) : (
-                      <span className="text-sm text-destructive">
-                        {testResult.error}
-                      </span>
-                    ))}
-                </div>
-              )}
-            </div>
-            <hr />
-            <div>
-              <label
-                htmlFor="short-code"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Short Code
-              </label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Letters only (A-Z). Will be converted to uppercase.
-              </p>
-              <Input
-                id="short-code"
-                placeholder="ABC"
-                value={shortCode}
-                onChange={(e) => setShortCode(e.target.value.toUpperCase())}
-                maxLength={10}
-                className="mt-1 font-mono"
-              />
-            </div>
-            <hr />
-            <h2 className="text-lg font-medium mb-1">Workflow Configuration</h2>
-            <div>
-              <label
-                htmlFor="on-task-completed"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Task Completed
-              </label>
-              <p className="text-xs text-muted-foreground mt-1">
-                What action to take when an agent completes a task.
-              </p>
-              <Select
-                value={workflowConfiguration.onTaskCompleted}
-                onValueChange={(
-                  value:
-                    | "push-branch"
-                    | "merge-immediately"
-                    | "push-branch-and-create-mr",
-                ) =>
-                  setWorkflowConfiguration({
-                    ...workflowConfiguration,
-                    onTaskCompleted: value,
-                  })
-                }
-              >
-                <SelectTrigger id="on-task-completed" className="mt-1 w-full">
-                  <SelectValue placeholder="Select action" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="push-branch">
-                    <p>Push task branch for review</p>
-                  </SelectItem>
-                  <SelectItem value="push-branch-and-create-mr">
-                    <p>Push branch and create merge request</p>
-                  </SelectItem>
-                  <SelectItem value="merge-immediately">
-                    <p>Merge task branch immediately</p>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <hr />
-            <h2 className="text-lg font-medium mb-1">Agent Harness</h2>
-            <div>
-              <label
-                htmlFor="project-harness"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Agent harness
-              </label>
-              <p className="text-xs text-muted-foreground mt-0.5 mb-1">
-                Overrides the workspace default for tasks in this project.
-              </p>
-              <div className="mt-1">
-                <HarnessSelect
-                  id="project-harness"
-                  value={harnessValue}
-                  onValueChange={setHarnessValue}
-                  harnesses={harnesses}
-                  isLoading={isLoadingHarnesses}
-                  inheritDisplayName={inheritDisplayName}
-                  inheritLabel="Inherit from workspace"
+          <Tabs defaultValue="project" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="project">Project</TabsTrigger>
+              <TabsTrigger value="git">Git</TabsTrigger>
+              <TabsTrigger value="harness">Harness</TabsTrigger>
+            </TabsList>
+            <TabsContent value="project" className="space-y-4 py-4">
+              <div>
+                <label
+                  htmlFor="project-name"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Project Name
+                </label>
+                <Input
+                  id="project-name"
+                  placeholder="Project name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                  className="mt-1"
                 />
               </div>
-              {harnessValue !== INHERIT_VALUE && (
-                <div className="mt-4">
-                  <label
-                    htmlFor="project-model"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Model
-                  </label>
-                  <p className="text-xs text-muted-foreground mt-0.5 mb-1">
-                    Used when this project&apos;s harness is selected for tasks.
-                  </p>
-                  <div className="mt-1">
-                    <ModelSelect
-                      id="project-model"
-                      value={modelValue}
-                      onValueChange={setModelValue}
-                      models={modelsForSelectedHarness}
-                      isLoading={isLoadingHarnesses}
-                    />
+              <div>
+                <label
+                  htmlFor="repository-url"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Repository URL
+                </label>
+                <Input
+                  id="repository-url"
+                  placeholder="git@github.com/something/amazing.git"
+                  value={repositoryUrl}
+                  onChange={(e) => setRepositoryUrl(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="short-code"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Short Code
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Letters only (A-Z). Will be converted to uppercase.
+                </p>
+                <Input
+                  id="short-code"
+                  placeholder="ABC"
+                  value={shortCode}
+                  onChange={(e) => setShortCode(e.target.value.toUpperCase())}
+                  maxLength={10}
+                  className="mt-1 font-mono"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="git" className="space-y-4 py-4">
+              <h2 className="text-lg font-medium mb-1">Git Forge</h2>
+              <div>
+                <label
+                  htmlFor="forge-type"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Forge type
+                </label>
+                <Select
+                  value={forgeType}
+                  onValueChange={(value: ForgeTypeDto) => {
+                    setForgeType(value);
+                    setForgeBaseUrl(defaultForgeBaseUrl(value));
+                  }}
+                >
+                  <SelectTrigger id="forge-type" className="mt-1 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gitlab">GitLab</SelectItem>
+                    <SelectItem value="github">GitHub</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label
+                  htmlFor="forge-base-url"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Base URL
+                </label>
+                <Input
+                  id="forge-base-url"
+                  placeholder="https://gitlab.com"
+                  value={forgeBaseUrl}
+                  onChange={(e) => setForgeBaseUrl(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="forge-token"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Token
+                </label>
+                <Input
+                  id="forge-token"
+                  type="password"
+                  placeholder={
+                    mode === "update" && initialHasForgeToken
+                      ? "Token configured"
+                      : "Personal access token"
+                  }
+                  value={forgeToken}
+                  onChange={(e) => setForgeToken(e.target.value)}
+                  className="mt-1"
+                />
+                {canTestConnection && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestConnection}
+                      disabled={testForgeConnection.isPending}
+                    >
+                      {testForgeConnection.isPending
+                        ? "Testing…"
+                        : "Test Connection"}
+                    </Button>
+                    {testResult !== null &&
+                      (testResult.success ? (
+                        <span className="text-sm text-green-600">Success</span>
+                      ) : (
+                        <span className="text-sm text-destructive">
+                          {testResult.error}
+                        </span>
+                      ))}
                   </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="harness" className="space-y-4 py-4">
+              <h2 className="text-lg font-medium mb-1">Agent Harness</h2>
+              <div>
+                <label
+                  htmlFor="project-harness"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Agent harness
+                </label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                  Overrides the workspace default for tasks in this project.
+                </p>
+                <div className="mt-1">
+                  <HarnessSelect
+                    id="project-harness"
+                    value={harnessValue}
+                    onValueChange={setHarnessValue}
+                    harnesses={harnesses}
+                    isLoading={isLoadingHarnesses}
+                    inheritDisplayName={inheritDisplayName}
+                    inheritLabel="Inherit from workspace"
+                  />
                 </div>
-              )}
-            </div>
-          </div>
+                {harnessValue !== INHERIT_VALUE && (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="project-model"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Model
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                      Used when this project&apos;s harness is selected for
+                      tasks.
+                    </p>
+                    <div className="mt-1">
+                      <ModelSelect
+                        id="project-model"
+                        value={modelValue}
+                        onValueChange={setModelValue}
+                        models={modelsForSelectedHarness}
+                        isLoading={isLoadingHarnesses}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <hr />
+              <h2 className="text-lg font-medium mb-1">
+                Workflow Configuration
+              </h2>
+              <div>
+                <label
+                  htmlFor="on-task-completed"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Task Completed
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  What action to take when an agent completes a task.
+                </p>
+                <Select
+                  value={workflowConfiguration.onTaskCompleted}
+                  onValueChange={(
+                    value:
+                      | "push-branch"
+                      | "merge-immediately"
+                      | "push-branch-and-create-mr",
+                  ) =>
+                    setWorkflowConfiguration({
+                      ...workflowConfiguration,
+                      onTaskCompleted: value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="on-task-completed" className="mt-1 w-full">
+                    <SelectValue placeholder="Select action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="push-branch">
+                      <p>Push task branch for review</p>
+                    </SelectItem>
+                    <SelectItem value="push-branch-and-create-mr">
+                      <p>Push branch and create merge request</p>
+                    </SelectItem>
+                    <SelectItem value="merge-immediately">
+                      <p>Merge task branch immediately</p>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter className="mt-4">
             {dismissable && (
               <Button

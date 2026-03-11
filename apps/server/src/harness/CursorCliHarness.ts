@@ -5,7 +5,7 @@ import type {
 } from "./AgentHarness";
 import { MAL_PROJECT_ID_HEADER, MAL_TASK_ID_HEADER } from "./OpenCodeHarness";
 
-const MCP_JSON_PATH = "/code/.cursor/mcp.json";
+const MCP_JSON_PATH = "/root/.cursor/mcp.json";
 const MCP_SERVER_NAME = "my-agent-loop-tools";
 
 const TASK_PROMPT =

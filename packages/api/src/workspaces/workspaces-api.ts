@@ -2,7 +2,11 @@ import { Endpoint } from "cerato";
 import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
 import { badUserInputSchema, notFoundSchema } from "../common-schemas";
-import { agentHarnessIdSchema } from "../harnesses/harnesses-model";
+import {
+  agentConfigSchema,
+  agentHarnessIdSchema,
+  harnessModelSchema,
+} from "../harnesses/harnesses-model";
 import { projectsApi } from "../projects/projects-api";
 import { workspaceIdSchema } from "./workspaces-model";
 
@@ -10,7 +14,7 @@ export const workspaceDtoSchema = z.object({
   id: workspaceIdSchema,
   name: z.string(),
   createdAt: isoDatetimeToDate,
-  agentHarnessId: agentHarnessIdSchema.nullable(),
+  agentConfig: agentConfigSchema.nullable(),
 });
 export type WorkspaceDto = z.infer<typeof workspaceDtoSchema>;
 
@@ -23,7 +27,7 @@ export type CreateWorkspaceRequest = z.infer<
 
 export const updateWorkspaceRequestSchema = z.object({
   name: z.string().optional(),
-  agentHarnessId: agentHarnessIdSchema.nullable().optional(),
+  agentConfig: agentConfigSchema.nullable().optional(),
 });
 export type UpdateWorkspaceRequest = z.infer<
   typeof updateWorkspaceRequestSchema
@@ -33,6 +37,7 @@ export const harnessListItemSchema = z.object({
   id: agentHarnessIdSchema,
   displayName: z.string(),
   isAvailable: z.boolean(),
+  models: z.array(harnessModelSchema),
 });
 export type HarnessListItem = z.infer<typeof harnessListItemSchema>;
 

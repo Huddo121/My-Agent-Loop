@@ -20,9 +20,19 @@ export class CursorCliHarness implements AgentHarness {
   readonly id = "cursor-cli" as const;
   readonly displayName = "Cursor CLI";
   readonly models: readonly HarnessModel[] = [
-    { id: "claude-4.6-sonnet", displayName: "Claude 4.6 Sonnet" },
-    { id: "gemini-3-pro", displayName: "Gemini 3 Pro" },
+    { id: "auto", displayName: "Auto" },
     { id: "composer-1.5", displayName: "Composer 1.5" },
+    { id: "gemini-3-flash", displayName: "Gemini 3 Flash" },
+    { id: "gemini-3-pro", displayName: "Gemini 3 Pro" },
+    { id: "gemini-3.1-pro", displayName: "Gemini 3.1 Pro" },
+    { id: "gpt-5.1-high", displayName: "GPT-5.1 High" },
+    { id: "gpt-5.4-high", displayName: "GPT-5.4 High" },
+    { id: "gpt-5.4-medium", displayName: "GPT-5.4" },
+    { id: "kimi-k2.5", displayName: "Kimi K2.5" },
+    { id: "opus-4.6-thinking", displayName: "Claude 4.6 Opus (Thinking)" },
+    { id: "opus-4.6", displayName: "Claude 4.6 Opus" },
+    { id: "sonnet-4.6-thinking", displayName: "Claude 4.6 Sonnet (Thinking)" },
+    { id: "sonnet-4.6", displayName: "Claude 4.6 Sonnet" },
   ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {

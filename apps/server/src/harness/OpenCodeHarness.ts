@@ -12,25 +12,26 @@ export const MAL_TASK_ID_HEADER = "X-MAL-Task-ID";
 
 const baseConfig: Config = {
   $schema: "https://opencode.ai/config.json",
-  provider: {
-    ollama: {
-      options: {
-        baseURL: "http://host.docker.internal:11434/v1",
-      },
-      models: {
-        "devstral-small-2": {
-          name: "Devstral Small 2",
-          tool_call: true,
-          reasoning: true,
-        },
-        "glm-4.7-flash": {
-          name: "GLM 4.7 Flash",
-          tool_call: true,
-          reasoning: true,
-        },
-      },
-    },
-  },
+  // TODO:One day I should come back to this, using local models might allow for some fun "free" loops
+  // provider: {
+  //   ollama: {
+  //     options: {
+  //       baseURL: "http://host.docker.internal:11434/v1",
+  //     },
+  //     models: {
+  //       "devstral-small-2": {
+  //         name: "Devstral Small 2",
+  //         tool_call: true,
+  //         reasoning: true,
+  //       },
+  //       "glm-4.7-flash": {
+  //         name: "GLM 4.7 Flash",
+  //         tool_call: true,
+  //         reasoning: true,
+  //       },
+  //     },
+  //   },
+  // },
   permission: {
     "*": "allow",
   } as Config["permission"],
@@ -45,12 +46,8 @@ export class OpenCodeHarness implements AgentHarness {
   readonly id = "opencode" as const;
   readonly displayName = "OpenCode";
   readonly models: readonly HarnessModel[] = [
-    { id: "anthropic/claude-sonnet-4.6", displayName: "Claude Sonnet 4.6" },
-    { id: "anthropic/claude-haiku-4.5", displayName: "Claude Haiku 4.5" },
-    {
-      id: "google/gemini-3.1-pro-preview",
-      displayName: "Gemini 3.1 Pro",
-    },
+    { id: "opencode/big-pickle", displayName: "Big Pickle (Free)" },
+    { id: "opencode/minimax-m2.5-free", displayName: "MiniMax M2.5 (Free)" },
   ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {

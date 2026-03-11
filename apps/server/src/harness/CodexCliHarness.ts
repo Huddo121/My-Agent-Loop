@@ -30,7 +30,6 @@ export class CodexCliHarness implements AgentHarness {
   readonly models: readonly HarnessModel[] = [
     { id: "gpt-5.4", displayName: "GPT-5.4" },
     { id: "gpt-5.3-codex-spark", displayName: "Codex Spark" },
-    { id: "o3", displayName: "o3" },
   ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {

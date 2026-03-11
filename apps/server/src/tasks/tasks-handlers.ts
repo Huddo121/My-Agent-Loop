@@ -1,6 +1,5 @@
-import type { TaskDto } from "@mono/api";
+import type { AgentConfig, TaskDto } from "@mono/api";
 import {
-  type AgentHarnessId,
   badUserInput,
   type MyAgentLoopApi,
   notFound,
@@ -12,18 +11,22 @@ import type { HonoHandlersFor } from "cerato";
 import type { Services } from "../services";
 import type { Task } from "../task-queue/TaskQueue";
 import { withNewTransaction } from "../utils/transaction-context";
+import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 
 type WorkspaceProjectsTasksApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
 
-function toTaskDto(task: Task, agentHarnessId: AgentHarnessId | null): TaskDto {
+function toTaskDto(task: Task, config: ScopedHarnessConfig | null): TaskDto {
+  const agentConfig: AgentConfig | null = config
+    ? { harnessId: config.harnessId, modelId: config.modelId }
+    : null;
   return {
     id: task.id,
     title: task.title,
     description: task.description,
     completedOn: task.completedOn,
     position: task.position ?? null,
-    agentHarnessId,
+    agentConfig,
   };
 }
 

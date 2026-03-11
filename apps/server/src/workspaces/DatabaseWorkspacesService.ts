@@ -1,20 +1,23 @@
-import type { AgentHarnessId, WorkspaceId } from "@mono/api";
+import type { WorkspaceId } from "@mono/api";
 import { asc, eq } from "drizzle-orm";
 import { workspacesTable } from "../db/schema";
-import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import type {
+  AgentHarnessConfigRepository,
+  ScopedHarnessConfig,
+} from "../harness/AgentHarnessConfigRepository";
 import { getTransaction } from "../utils/transaction-context";
 import type { CreateWorkspace, UpdateWorkspace, Workspace } from "./Workspace";
 import type { WorkspacesService } from "./WorkspacesService";
 
 function toWorkspace(
   row: typeof workspacesTable.$inferSelect,
-  agentHarnessId: AgentHarnessId | null,
+  config: ScopedHarnessConfig | null,
 ): Workspace {
   return {
     id: row.id as WorkspaceId,
     name: row.name,
     createdAt: row.createdAt,
-    agentHarnessId,
+    agentConfig: config,
   };
 }
 
@@ -71,8 +74,8 @@ export class DatabaseWorkspacesService implements WorkspacesService {
         .set({ name: update.name })
         .where(eq(workspacesTable.id, id));
     }
-    if (update.agentHarnessId !== undefined) {
-      await this.harnessConfig.setWorkspaceConfig(id, update.agentHarnessId);
+    if (update.agentConfig !== undefined) {
+      await this.harnessConfig.setWorkspaceConfig(id, update.agentConfig ?? null);
     }
 
     return this.getWorkspace(id);

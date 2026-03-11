@@ -1,7 +1,6 @@
 export type { GitForgeService } from "./GitForgeService";
 export {
   createGitForgeService,
-  DefaultGitForgeService,
   getProjectPathFromRepositoryUrl,
 } from "./GitForgeService";
 export type {

@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: workflow-execution
     content: Update `WorkflowExecutionService.prepare()` to call `resolveHarnessConfig` instead of `resolveHarnessId`, destructure `{ harnessId, modelId }`, and pass `modelId` into `harness.prepare()`. After this todo, run typecheck for the server -- it should pass.
-    status: pending
+    status: completed
   - id: frontend-model-select
     content: Create `ModelSelect` component in `apps/frontend/app/components/ui/ModelSelect.tsx` with a 'Harness default' option (using a dedicated sentinel, NOT `INHERIT_VALUE`), model list, and `parseModelValue` helper.
     status: pending

@@ -2,7 +2,7 @@ import { Endpoint } from "cerato";
 import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
 import { badUserInputSchema, notFoundSchema } from "../common-schemas";
-import { agentHarnessIdSchema } from "../harnesses/harnesses-model";
+import { agentConfigSchema } from "../harnesses/harnesses-model";
 import { taskIdSchema } from "./tasks-model";
 
 export const taskDtoSchema = z.object({
@@ -11,7 +11,7 @@ export const taskDtoSchema = z.object({
   description: z.string(),
   completedOn: isoDatetimeToDate.nullish(),
   position: z.number().nullish(),
-  agentHarnessId: agentHarnessIdSchema.nullable(),
+  agentConfig: agentConfigSchema.nullable(),
 });
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 
@@ -21,7 +21,7 @@ export const createTaskRequestSchema = taskDtoSchema
     description: true,
   })
   .extend({
-    agentHarnessId: agentHarnessIdSchema.nullable().optional(),
+    agentConfig: agentConfigSchema.nullable().optional(),
   });
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
@@ -31,7 +31,7 @@ export const updateTaskRequestSchema = taskDtoSchema
     description: true,
   })
   .extend({
-    agentHarnessId: agentHarnessIdSchema.nullable().optional(),
+    agentConfig: agentConfigSchema.nullable().optional(),
   });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 

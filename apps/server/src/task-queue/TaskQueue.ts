@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from "@mono/api";
+import type { ProjectId, Subtask, TaskId } from "@mono/api";
 
 export interface Task {
   id: TaskId;
@@ -6,10 +6,15 @@ export interface Task {
   description: string;
   completedOn?: Date;
   position?: number | null;
+  subtasks: Subtask[];
 }
 
-export type NewTask = Pick<Task, "title" | "description">;
-export type UpdateTask = Pick<Task, "title" | "description">;
+export type NewTask = Pick<Task, "title" | "description"> & {
+  subtasks?: Subtask[];
+};
+export type UpdateTask = Pick<Task, "title" | "description"> & {
+  subtasks?: Subtask[];
+};
 
 export type GetAllTasksOptions = {
   includeCompleted?: boolean;

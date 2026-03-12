@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from "@mono/api";
+import type { ProjectId, Subtask, TaskId } from "@mono/api";
 import { and, asc, count, eq, isNotNull, isNull, max, min } from "drizzle-orm";
 import { tasksTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
@@ -21,6 +21,7 @@ const fromTaskEntity = (task: typeof tasksTable.$inferSelect): Task => {
     description: task.description,
     completedOn: task.completedOn ?? undefined,
     position: task.position ?? undefined,
+    subtasks: (task.subtasks as Subtask[]) ?? [],
   };
 };
 
@@ -70,7 +71,12 @@ export class DatabaseTaskQueue implements TaskQueue {
 
     const [newTask] = await tx
       .insert(tasksTable)
-      .values({ ...task, projectId, position: newPosition })
+      .values({
+        ...task,
+        projectId,
+        position: newPosition,
+        subtasks: task.subtasks ?? [],
+      })
       .returning();
     console.info("Added to task to database backed queue", {
       taskId: newTask.id,

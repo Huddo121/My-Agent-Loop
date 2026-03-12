@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: server-task-model-and-queue
     content: "Update the server-side task model and DatabaseTaskQueue. Read both files first. (1) In `TaskQueue.ts`: add `subtasks: Subtask[]` to `Task`. `NewTask` and `UpdateTask` extend with `subtasks?: Subtask[]`. (2) In `DatabaseTaskQueue.ts`: update `fromTaskEntity` to map `subtasks: (task.subtasks as Subtask[]) ?? []`. For addTask and updateTask, pass subtasks through to Drizzle — last-write-wins, no version check. See plan section 2."
-    status: pending
+    status: completed
   - id: server-http-handlers
     content: "Update the HTTP task handlers. Read `apps/server/src/tasks/tasks-handlers.ts` first. (1) Update `toTaskDto()` to include `subtasks: task.subtasks`. (2) In the POST handler, pass `subtasks: ctx.body.subtasks ?? []`. (3) In the PUT handler, pass `subtasks: ctx.body.subtasks` through to `updateTask`. See plan section 3."
     status: pending

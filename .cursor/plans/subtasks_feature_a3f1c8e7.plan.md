@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: mcp-subtask-tools
     content: "Add MCP tools for agents to manage subtasks. Read `apps/server/src/tasks/tasks-mcp-handlers.ts` first. (1) 'Create subtask': input `taskId`, `title`, optional `description`. Load task, append new subtask with generated ID, save via `taskQueue.updateTask()` with new subtasks array. Return created subtask as JSON. (2) 'Update subtask': input `taskId`, `subtaskId`, optional `title`, `description`, `state`. Load task, find subtask by ID, apply changes, save. Return error JSON if task or subtask not found. (3) Add both to `tasksMcpTools`. Get tasks response includes `subtasks`. See plan section 4."
-    status: pending
+    status: completed
   - id: task-file-generation
     content: Update `formatTaskFile` in `apps/server/src/workflow/WorkflowExecutionService.ts` to include subtasks. Read the file first. If the task has subtasks, append a '## Subtasks' section with a series of YAML objects (matching Cursor's plan format). Each subtask object has explicit `id`, `title`, `description` (optional), and `status` (pending, in-progress, completed, cancelled) — no cryptic single-character markers. Use a YAML library to serialize; add `yaml` via pnpm if not present. See plan section 5 for the exact format and example output.
     status: pending

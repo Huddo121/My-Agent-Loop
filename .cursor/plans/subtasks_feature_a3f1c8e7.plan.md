@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: db-schema
     content: "Add the `subtasks` JSONB column to the tasks table in `apps/server/src/db/schema.ts`. Read the file first. The column stores an array of subtasks: `Subtask[]`. Add `subtasks: pg.jsonb().notNull().default(sql`'[]'::jsonb`).$type<Subtask[]>()`, importing `Subtask` from `@mono/api`. Place it after the `description` column. Do NOT generate a database migration file -- humans will do that."
-    status: pending
+    status: completed
   - id: server-task-model-and-queue
     content: "Update the server-side task model and DatabaseTaskQueue. Read both files first. (1) In `TaskQueue.ts`: add `subtasks: Subtask[]` to `Task`. `NewTask` and `UpdateTask` extend with `subtasks?: Subtask[]`. (2) In `DatabaseTaskQueue.ts`: update `fromTaskEntity` to map `subtasks: (task.subtasks as Subtask[]) ?? []`. For addTask and updateTask, pass subtasks through to Drizzle — last-write-wins, no version check. See plan section 2."
     status: pending

@@ -1,4 +1,10 @@
-import type { AgentHarnessId, ProjectId, TaskId, WorkspaceId } from "@mono/api";
+import type {
+  AgentHarnessId,
+  ProjectId,
+  Subtask,
+  TaskId,
+  WorkspaceId,
+} from "@mono/api";
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
 import { check } from "drizzle-orm/pg-core";
@@ -63,6 +69,7 @@ export const tasksTable = pg.pgTable("tasks", {
     .notNull()
     .$type<ProjectId>(),
   description: pg.text().notNull(),
+  subtasks: pg.jsonb().notNull().default(sql`'[]'::jsonb`).$type<Subtask[]>(),
   createdAt: pg.timestamp().notNull().defaultNow(),
   completedOn: pg.timestamp(),
   /** Where does this task appear in the queue? Only relevant for non-completed tasks. */

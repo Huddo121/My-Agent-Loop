@@ -152,7 +152,7 @@ export function TaskDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <DialogHeader className="flex-shrink-0 px-6 pt-6">
+          <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle>{task ? "Edit Task" : "Add Task"}</DialogTitle>
             <DialogDescription>
               {task
@@ -233,7 +233,7 @@ export function TaskDialog({
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter className="flex-shrink-0 gap-2 border-t px-6 py-4">
+          <DialogFooter className="shrink-0 gap-2 border-t px-6 py-4">
             <Button
               type="button"
               variant="outline"

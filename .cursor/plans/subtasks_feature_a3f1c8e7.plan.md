@@ -28,7 +28,7 @@ todos:
     status: completed
   - id: frontend-task-card
     content: Add a subtask progress indicator to TaskCard. Read `apps/frontend/app/components/tasks/TaskCard.tsx` first. **Use the Shadcn skill and the Frontend Design skill when building this UI.** If the task has subtasks (non-empty array), render a compact progress indicator below the task title. Show completed count vs total (e.g. '2/5 subtasks') and optionally a small progress bar. Keep it minimal -- the card is 240px wide. Only show this when subtasks exist; tasks without subtasks look exactly as they do today. See plan section 7.
-    status: pending
+    status: completed
 isProject: false
 ---
 

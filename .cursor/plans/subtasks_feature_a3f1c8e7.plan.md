@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: server-http-handlers
     content: "Update the HTTP task handlers. Read `apps/server/src/tasks/tasks-handlers.ts` first. (1) Update `toTaskDto()` to include `subtasks: task.subtasks`. (2) In the POST handler, pass `subtasks: ctx.body.subtasks ?? []`. (3) In the PUT handler, pass `subtasks: ctx.body.subtasks` through to `updateTask`. See plan section 3."
-    status: pending
+    status: completed
   - id: mcp-subtask-tools
     content: "Add MCP tools for agents to manage subtasks. Read `apps/server/src/tasks/tasks-mcp-handlers.ts` first. (1) 'Create subtask': input `taskId`, `title`, optional `description`. Load task, append new subtask with generated ID, save via `taskQueue.updateTask()` with new subtasks array. Return created subtask as JSON. (2) 'Update subtask': input `taskId`, `subtaskId`, optional `title`, `description`, `state`. Load task, find subtask by ID, apply changes, save. Return error JSON if task or subtask not found. (3) Add both to `tasksMcpTools`. Get tasks response includes `subtasks`. See plan section 4."
     status: pending

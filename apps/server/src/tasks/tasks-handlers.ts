@@ -28,6 +28,7 @@ function toTaskDto(task: Task, config: ScopedHarnessConfig | null): TaskDto {
     completedOn: task.completedOn,
     position: task.position ?? null,
     agentConfig,
+    subtasks: task.subtasks,
   };
 }
 
@@ -64,7 +65,11 @@ export const tasksHandlers: HonoHandlersFor<
     return withNewTransaction(ctx.services.db, async () => {
       const task = await ctx.services.taskQueue.addTask(
         projectId as ProjectId,
-        { title: ctx.body.title, description: ctx.body.description },
+        {
+          title: ctx.body.title,
+          description: ctx.body.description,
+          subtasks: ctx.body.subtasks ?? [],
+        },
       );
       if (ctx.body.agentConfig !== null && ctx.body.agentConfig !== undefined) {
         const config: ScopedHarnessConfig = {
@@ -111,6 +116,9 @@ export const tasksHandlers: HonoHandlersFor<
         const task = await ctx.services.taskQueue.updateTask(taskId as TaskId, {
           title: ctx.body.title,
           description: ctx.body.description,
+          ...(ctx.body.subtasks !== undefined && {
+            subtasks: ctx.body.subtasks,
+          }),
         });
         if (!task) {
           return notFound();

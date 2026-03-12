@@ -212,7 +212,7 @@ const updateSubtaskSchema = z.object({
 export const updateSubtaskMcpHandler = {
   name: "Update subtask",
   description:
-    "Replace a subtask wholesale. Find the subtask in the task by ID and replace it with the provided subtask object. Returns an error if the task or subtask is not found.",
+    "Update a subtask with the provided object. Find the subtask in the task by ID and replace it with the provided subtask object. Returns an error if the task or subtask is not found.",
   parameters: updateSubtaskSchema,
   execute: async (params) => {
     const services = getMcpServices();

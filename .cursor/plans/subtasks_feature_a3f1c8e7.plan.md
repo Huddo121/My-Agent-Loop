@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: task-file-generation
     content: Update `formatTaskFile` in `apps/server/src/workflow/WorkflowExecutionService.ts` to include subtasks. Read the file first. If the task has subtasks, append a '## Subtasks' section with a series of YAML objects (matching Cursor's plan format). Each subtask object has explicit `id`, `title`, `description` (optional), and `status` (pending, in-progress, completed, cancelled) — no cryptic single-character markers. Use a YAML library to serialize; add `yaml` via pnpm if not present. See plan section 5 for the exact format and example output.
-    status: pending
+    status: completed
   - id: frontend-types-and-hooks
     content: "Update frontend types and React Query hooks. (1) In `apps/frontend/app/types/task.ts`: add `SubtaskState`, `SubtaskId`, `Subtask`; add `subtasks: Subtask[]` to `Task`; add `subtasks?: Subtask[]` to `NewTask` and `UpdateTask`. (2) In `useTasks.ts`: hooks pass through full objects, so subtasks will flow automatically once types are updated. No special handling needed."
     status: pending

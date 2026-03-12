@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: frontend-types-and-hooks
     content: "Update frontend types and React Query hooks. (1) In `apps/frontend/app/types/task.ts`: add `SubtaskState`, `SubtaskId`, `Subtask`; add `subtasks: Subtask[]` to `Task`; add `subtasks?: Subtask[]` to `NewTask` and `UpdateTask`. (2) In `useTasks.ts`: hooks pass through full objects, so subtasks will flow automatically once types are updated. No special handling needed."
-    status: pending
+    status: completed
   - id: frontend-task-dialog
     content: "Add subtask management UI to the TaskDialog. Read `apps/frontend/app/components/tasks/TaskDialog.tsx` first. **Use the Shadcn skill and the Frontend Design skill when building this UI.** Add a 'Subtasks' section below the description textarea with: (1) List of subtasks (title input, optional description, state badge, remove button). (2) 'Add subtask' button. (3) Drag-and-drop reordering via dnd-kit — the project already uses dnd-kit for task reordering (TaskQueue, SortableTaskCard); follow that pattern for subtasks inside the dialog (DndContext, SortableContext, verticalListSortingStrategy, each subtask as a sortable item with a drag handle). (4) When editing, populate subtasks from `task.subtasks`. (5) On submit, include `subtasks` in the payload. Keep the dialog scrollable. See plan section 6."
     status: pending

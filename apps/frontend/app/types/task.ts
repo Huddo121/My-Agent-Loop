@@ -1,11 +1,15 @@
-import type {
-  AgentConfig,
-  Subtask,
-  SubtaskId,
-  SubtaskState,
-  TaskId,
+import {
+  type AgentConfig,
+  createSubtaskId,
+  SUBTASK_STATE_LABELS,
+  SUBTASK_STATES,
+  type Subtask,
+  type SubtaskId,
+  type SubtaskState,
+  type TaskId,
 } from "@mono/api";
 
+export { createSubtaskId, SUBTASK_STATES, SUBTASK_STATE_LABELS };
 export type { Subtask, SubtaskId, SubtaskState };
 
 export type Task = {

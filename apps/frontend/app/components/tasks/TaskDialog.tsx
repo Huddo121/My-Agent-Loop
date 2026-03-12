@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@mono/api";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -89,61 +89,55 @@ export function TaskDialog({
     }
   }, [open, task]);
 
+  const buildTaskPayload = useCallback((): NewTask | null => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return null;
+    }
+
+    const parsedHarnessId = parseHarnessValue(harnessValue);
+    const agentConfig: AgentConfig | null =
+      parsedHarnessId === null
+        ? null
+        : {
+            harnessId: parsedHarnessId,
+            modelId: parseModelValue(modelValue),
+          };
+
+    return {
+      title: trimmedTitle,
+      description: description.trim(),
+      agentConfig,
+      subtasks,
+    };
+  }, [title, harnessValue, modelValue, description, subtasks]);
+
+  const submitTask = useCallback(() => {
+    const taskPayload = buildTaskPayload();
+    if (taskPayload === null) {
+      return;
+    }
+
+    onSubmit(taskPayload);
+    onOpenChange(false);
+  }, [buildTaskPayload, onSubmit, onOpenChange]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim()) {
-      const parsedHarnessId = parseHarnessValue(harnessValue);
-      const agentConfig: AgentConfig | null =
-        parsedHarnessId === null
-          ? null
-          : {
-              harnessId: parsedHarnessId,
-              modelId: parseModelValue(modelValue),
-            };
-      onSubmit({
-        title: title.trim(),
-        description: description.trim(),
-        agentConfig,
-        subtasks,
-      });
-      onOpenChange(false);
-    }
+    submitTask();
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === "Enter" && open && title.trim()) {
         e.preventDefault();
-        const parsedHarnessId = parseHarnessValue(harnessValue);
-        const agentConfig: AgentConfig | null =
-          parsedHarnessId === null
-            ? null
-            : {
-                harnessId: parsedHarnessId,
-                modelId: parseModelValue(modelValue),
-              };
-        onSubmit({
-          title: title.trim(),
-          description: description.trim(),
-          agentConfig,
-          subtasks,
-        });
-        onOpenChange(false);
+        submitTask();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    open,
-    title,
-    description,
-    subtasks,
-    harnessValue,
-    modelValue,
-    onSubmit,
-    onOpenChange,
-  ]);
+  }, [open, title, submitTask]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

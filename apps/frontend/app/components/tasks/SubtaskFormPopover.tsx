@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
@@ -13,21 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import type { Subtask, SubtaskId, SubtaskState } from "~/types";
-
-const SUBTASK_STATES: SubtaskState[] = [
-  "pending",
-  "in-progress",
-  "completed",
-  "cancelled",
-];
-
-const SUBTASK_STATE_LABELS: Record<SubtaskState, string> = {
-  pending: "Pending",
-  "in-progress": "In progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
+import {
+  SUBTASK_STATE_LABELS,
+  SUBTASK_STATES,
+  type Subtask,
+  type SubtaskId,
+  type SubtaskState,
+} from "~/types";
 
 export type SubtaskFormPopoverProps = {
   subtask: Subtask | null;
@@ -43,21 +35,30 @@ export function SubtaskFormPopover({
   children,
 }: SubtaskFormPopoverProps) {
   const isEditing = subtask !== null;
+  const titleId = useId();
+  const descriptionId = useId();
+  const stateId = useId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(subtask?.title ?? "");
   const [description, setDescription] = useState(subtask?.description ?? "");
   const [state, setState] = useState<SubtaskState>(subtask?.state ?? "pending");
 
+  const resetForm = useCallback(() => {
+    setTitle(subtask?.title ?? "");
+    setDescription(subtask?.description ?? "");
+    setState(subtask?.state ?? "pending");
+  }, [subtask]);
+
   useEffect(() => {
     if (open) {
-      setTitle(subtask?.title ?? "");
-      setDescription(subtask?.description ?? "");
-      setState(subtask?.state ?? "pending");
+      resetForm();
     }
-  }, [open, subtask?.title, subtask?.description, subtask?.state]);
+  }, [open, resetForm]);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) {
+    if (next) {
+      resetForm();
+    } else if (!isEditing) {
       setTitle("");
       setDescription("");
       setState("pending");
@@ -107,14 +108,11 @@ export function SubtaskFormPopover({
       <PopoverContent className="w-80" align="start" side="bottom">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="popover-subtask-title"
-              className="text-sm font-medium"
-            >
+            <label htmlFor={titleId} className="text-sm font-medium">
               Title
             </label>
             <Input
-              id="popover-subtask-title"
+              id={titleId}
               placeholder="Subtask title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -122,14 +120,11 @@ export function SubtaskFormPopover({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="popover-subtask-description"
-              className="text-sm font-medium"
-            >
+            <label htmlFor={descriptionId} className="text-sm font-medium">
               Description (optional)
             </label>
             <textarea
-              id="popover-subtask-description"
+              id={descriptionId}
               placeholder="Add details..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -138,21 +133,14 @@ export function SubtaskFormPopover({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="popover-subtask-state"
-              className="text-sm font-medium"
-            >
+            <label htmlFor={stateId} className="text-sm font-medium">
               State
             </label>
             <Select
               value={state}
               onValueChange={(v) => setState(v as SubtaskState)}
             >
-              <SelectTrigger
-                id="popover-subtask-state"
-                size="sm"
-                className="h-8"
-              >
+              <SelectTrigger id={stateId} size="sm" className="h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

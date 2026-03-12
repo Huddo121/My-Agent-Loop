@@ -29,18 +29,14 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
-import type { Subtask, SubtaskId, SubtaskState } from "~/types";
+import {
+  createSubtaskId,
+  SUBTASK_STATE_LABELS,
+  type Subtask,
+  type SubtaskId,
+  type SubtaskState,
+} from "~/types";
 import { SubtaskFormPopover } from "./SubtaskFormPopover";
-
-const generateSubtaskId = (): SubtaskId =>
-  crypto.randomUUID().slice(0, 8) as SubtaskId;
-
-const SUBTASK_STATE_LABELS: Record<SubtaskState, string> = {
-  pending: "Pending",
-  "in-progress": "In progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 const SUBTASK_STATE_VARIANTS: Record<
   SubtaskState,
@@ -223,7 +219,7 @@ export function SubtaskSection({
         <SubtaskFormPopover
           subtask={null}
           onSave={(s) => handleSaveSubtask(s)}
-          generateId={generateSubtaskId}
+          generateId={createSubtaskId}
         >
           <Button type="button" variant="outline" size="sm">
             <PlusIcon data-icon="inline-start" />
@@ -248,7 +244,7 @@ export function SubtaskSection({
                   subtask={subtask}
                   onSave={(s) => handleSaveSubtask(s, subtask.id)}
                   onRemove={handleRemoveSubtask}
-                  generateId={generateSubtaskId}
+                  generateId={createSubtaskId}
                 />
               ))}
             </div>

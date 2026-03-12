@@ -1,8 +1,7 @@
-import crypto from "node:crypto";
 import {
+  createSubtaskId,
   projectIdSchema,
   type Subtask,
-  type SubtaskId,
   subtaskSchema,
   type TaskId,
 } from "@mono/api";
@@ -184,7 +183,7 @@ export const createSubtaskMcpHandler = {
       }
 
       const newSubtask: Subtask = {
-        id: crypto.randomUUID().slice(0, 8) as SubtaskId,
+        id: createSubtaskId(),
         title: params.title,
         description: params.description,
         state: "pending",

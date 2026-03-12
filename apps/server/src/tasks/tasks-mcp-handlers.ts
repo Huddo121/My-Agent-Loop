@@ -1,4 +1,10 @@
-import { projectIdSchema, type TaskId } from "@mono/api";
+import {
+  createSubtaskId,
+  projectIdSchema,
+  type Subtask,
+  subtaskSchema,
+  type TaskId,
+} from "@mono/api";
 import z from "zod";
 import type { Task } from "../task-queue";
 import { getMcpServices } from "../utils/mcp-service-context";
@@ -50,6 +56,7 @@ export const getTasksMcpHandler = {
         description: task.description,
         title: task.title,
         completedOn: task.completedOn?.toISOString(),
+        subtasks: task.subtasks,
       }));
 
       console.info("Handled Get Tasks MCP", {
@@ -150,8 +157,101 @@ export const addTaskMcpHandler = {
   },
 } as const satisfies McpTool<typeof addTaskSchema>;
 
+const createSubtaskSchema = z.object({
+  taskId: z.string().describe("The ID of the task to add a subtask to"),
+  title: z.string().describe("The title of the subtask"),
+  description: z
+    .string()
+    .optional()
+    .describe("Optional description of the subtask"),
+});
+
+export const createSubtaskMcpHandler = {
+  name: "Create subtask",
+  description:
+    "Add a new subtask to a task. The subtask is appended to the end of the task's subtask list with state 'pending'.",
+  parameters: createSubtaskSchema,
+  execute: async (params) => {
+    const services = getMcpServices();
+    return withNewTransaction(services.db, async () => {
+      const task = await services.taskQueue.getTask(params.taskId as TaskId);
+      if (!task) {
+        return JSON.stringify({
+          result: "error",
+          reason: `Task with id ${params.taskId} not found`,
+        });
+      }
+
+      const newSubtask: Subtask = {
+        id: createSubtaskId(),
+        title: params.title,
+        description: params.description,
+        state: "pending",
+      };
+
+      const updatedSubtasks = [...task.subtasks, newSubtask];
+      await services.taskQueue.updateTask(task.id, {
+        title: task.title,
+        description: task.description,
+        subtasks: updatedSubtasks,
+      });
+
+      return JSON.stringify(newSubtask);
+    });
+  },
+} as const satisfies McpTool<typeof createSubtaskSchema>;
+
+const updateSubtaskSchema = z.object({
+  taskId: z.string().describe("The ID of the task containing the subtask"),
+  subtask: subtaskSchema.describe(
+    "The complete subtask object to replace with",
+  ),
+});
+
+export const updateSubtaskMcpHandler = {
+  name: "Update subtask",
+  description:
+    "Update a subtask with the provided object. Find the subtask in the task by ID and replace it with the provided subtask object. Returns an error if the task or subtask is not found.",
+  parameters: updateSubtaskSchema,
+  execute: async (params) => {
+    const services = getMcpServices();
+    return withNewTransaction(services.db, async () => {
+      const task = await services.taskQueue.getTask(params.taskId as TaskId);
+      if (!task) {
+        return JSON.stringify({
+          result: "error",
+          reason: `Task with id ${params.taskId} not found`,
+        });
+      }
+
+      const subtaskIndex = task.subtasks.findIndex(
+        (s) => s.id === params.subtask.id,
+      );
+      if (subtaskIndex === -1) {
+        return JSON.stringify({
+          result: "error",
+          reason: `Subtask with id ${params.subtask.id} not found in task ${params.taskId}`,
+        });
+      }
+
+      const updatedSubtasks = [...task.subtasks];
+      updatedSubtasks[subtaskIndex] = params.subtask;
+
+      await services.taskQueue.updateTask(task.id, {
+        title: task.title,
+        description: task.description,
+        subtasks: updatedSubtasks,
+      });
+
+      return JSON.stringify(params.subtask);
+    });
+  },
+} as const satisfies McpTool<typeof updateSubtaskSchema>;
+
 export const tasksMcpTools = [
   getTasksMcpHandler,
   markTaskCompletedHandler,
   addTaskMcpHandler,
+  createSubtaskMcpHandler,
+  updateSubtaskMcpHandler,
 ] as McpTools;

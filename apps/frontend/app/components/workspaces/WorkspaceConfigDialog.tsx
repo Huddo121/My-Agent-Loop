@@ -14,12 +14,12 @@ import {
   INHERIT_VALUE,
   parseHarnessValue,
 } from "~/components/ui/HarnessSelect";
+import { Input } from "~/components/ui/input";
 import {
   HARNESS_DEFAULT_VALUE,
   ModelSelect,
   parseModelValue,
 } from "~/components/ui/ModelSelect";
-import { Input } from "~/components/ui/input";
 import {
   useHarnessesQuery,
   useUpdateWorkspace,
@@ -131,9 +131,7 @@ export function WorkspaceConfigDialog({
               <div className="mt-1">
                 <HarnessSelect
                   id="workspace-config-harness"
-                  value={
-                    harnessValue
-                  }
+                  value={harnessValue}
                   onValueChange={(value) => {
                     setHarnessValue(value);
                     setModelValue(HARNESS_DEFAULT_VALUE);

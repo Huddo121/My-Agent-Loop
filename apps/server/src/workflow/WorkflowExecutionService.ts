@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { stringify } from "yaml";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { ForgeSecretRepository } from "../forge-secrets";
@@ -19,10 +20,20 @@ import type { Workflow } from "./Workflow";
 const MCP_SERVER_URL = "http://host.docker.internal:3050/mcp";
 
 const formatTaskFile = (task: Task): string => {
-  return `# ${task.title}
+  let content = `# ${task.title}\n\n${task.description}\n`;
 
-${task.description}
-`;
+  if (task.subtasks.length > 0) {
+    content += "\n## Subtasks\n\n";
+    const subtasksYaml = task.subtasks.map((s) => ({
+      id: s.id,
+      title: s.title,
+      ...(s.description ? { description: s.description } : {}),
+      status: s.state,
+    }));
+    content += stringify(subtasksYaml);
+  }
+
+  return content;
 };
 
 /**

@@ -4,7 +4,7 @@ overview: Add subtasks as an ordered list stored on the Task row (JSONB). Subtas
 todos:
   - id: api-subtask-types
     content: "Add subtask types and schemas to `packages/api/src/tasks/tasks-model.ts` and update `packages/api/src/tasks/tasks-api.ts`. Read both files first. (1) In `tasks-model.ts`, add: `subtaskIdSchema`, `SubtaskId`, `subtaskStateSchema`, `SubtaskState`, `subtaskSchema`, `Subtask`. (2) In `tasks-api.ts`, add `subtasks: z.array(subtaskSchema)` to `taskDtoSchema`. Add `subtasks: z.array(subtaskSchema).optional()` to both `createTaskRequestSchema` and `updateTaskRequestSchema`. See plan section 1."
-    status: pending
+    status: completed
   - id: db-schema
     content: "Add the `subtasks` JSONB column to the tasks table in `apps/server/src/db/schema.ts`. Read the file first. The column stores an array of subtasks: `Subtask[]`. Add `subtasks: pg.jsonb().notNull().default(sql`'[]'::jsonb`).$type<Subtask[]>()`, importing `Subtask` from `@mono/api`. Place it after the `description` column. Do NOT generate a database migration file -- humans will do that."
     status: pending

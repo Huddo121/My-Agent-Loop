@@ -14,13 +14,13 @@ import {
   INHERIT_VALUE,
   parseHarnessValue,
 } from "~/components/ui/HarnessSelect";
+import { Input } from "~/components/ui/input";
+import { Kbd, KbdGroup } from "~/components/ui/kbd";
 import {
   HARNESS_DEFAULT_VALUE,
   ModelSelect,
   parseModelValue,
 } from "~/components/ui/ModelSelect";
-import { Input } from "~/components/ui/input";
-import { Kbd, KbdGroup } from "~/components/ui/kbd";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { NewTask, Project, Task } from "~/types";
 
@@ -127,7 +127,15 @@ export function TaskDialog({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, title, description, harnessValue, modelValue, onSubmit, onOpenChange]);
+  }, [
+    open,
+    title,
+    description,
+    harnessValue,
+    modelValue,
+    onSubmit,
+    onOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

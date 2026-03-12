@@ -3,7 +3,7 @@ import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
 import { badUserInputSchema, notFoundSchema } from "../common-schemas";
 import { agentConfigSchema } from "../harnesses/harnesses-model";
-import { taskIdSchema } from "./tasks-model";
+import { subtaskSchema, taskIdSchema } from "./tasks-model";
 
 export const taskDtoSchema = z.object({
   id: taskIdSchema,
@@ -12,6 +12,7 @@ export const taskDtoSchema = z.object({
   completedOn: isoDatetimeToDate.nullish(),
   position: z.number().nullish(),
   agentConfig: agentConfigSchema.nullable(),
+  subtasks: z.array(subtaskSchema),
 });
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 
@@ -22,6 +23,7 @@ export const createTaskRequestSchema = taskDtoSchema
   })
   .extend({
     agentConfig: agentConfigSchema.nullable().optional(),
+    subtasks: z.array(subtaskSchema).optional(),
   });
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
@@ -32,6 +34,7 @@ export const updateTaskRequestSchema = taskDtoSchema
   })
   .extend({
     agentConfig: agentConfigSchema.nullable().optional(),
+    subtasks: z.array(subtaskSchema).optional(),
   });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 

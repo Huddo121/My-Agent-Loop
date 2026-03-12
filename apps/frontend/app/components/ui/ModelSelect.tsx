@@ -55,4 +55,3 @@ export function ModelSelect({
 export function parseModelValue(value: string): string | null {
   return value === HARNESS_DEFAULT_VALUE ? null : value;
 }
-

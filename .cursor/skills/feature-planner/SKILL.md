@@ -1,6 +1,10 @@
 ---
 name: feature-planner
-description: Guides agents through autonomous codebase exploration, deep questioning, and upfront decision-making to produce self-contained Cursor Plans for feature work. Use when the user asks to plan, design, or scope a feature or change before implementation, especially when a less capable agent will execute the plan.
+description: >
+  Guides agents through autonomous codebase exploration, deep questioning, and upfront decision-making to
+  produce self-contained Cursor Plans for feature work.
+
+  TRIGGER WHEN: The user asks to plan, design, or scope a feature or change before implementation, especially when a less capable agent will execute the plan.
 ---
 
 # Feature Planner

@@ -6,6 +6,7 @@ import type {
 } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { Project } from "~/types";
 
@@ -31,6 +32,9 @@ export function useProjectsQuery() {
       if (response.status === 200) {
         return response.responseBody;
       }
+      if (response.status === 401) {
+        return handleUnauthenticated();
+      }
       throw new Error("Failed to fetch projects");
     },
   });
@@ -55,6 +59,9 @@ export function useCreateProject() {
       );
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 400) {
         throw new Error(response.responseBody.message);
@@ -93,6 +100,9 @@ export function useUpdateProject() {
       });
       if (response.status === 200) {
         return response.responseBody as Project;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 400) {
         throw new Error(response.responseBody.message);
@@ -139,6 +149,9 @@ export function useStartRun() {
       });
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 404) {
         throw new Error("Project not found or no tasks available");
@@ -188,6 +201,9 @@ export function useStopQueue() {
       });
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 404) {
         throw new Error("Project not found");
@@ -240,6 +256,9 @@ export function useTestForgeConnectionWithCredentials() {
       });
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 400) {
         return {

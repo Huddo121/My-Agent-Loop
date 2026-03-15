@@ -2,7 +2,7 @@ import { Network } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { useCreateWorkspace } from "~/lib/workspaces";
+import { useBootstrapWorkspace } from "~/lib/auth";
 
 export interface WorkspaceSetupProps {
   onSuccess?: () => void;
@@ -38,7 +38,7 @@ const NODES = [
 
 export function WorkspaceSetup({ onSuccess }: WorkspaceSetupProps) {
   const [name, setName] = useState("");
-  const createWorkspace = useCreateWorkspace();
+  const createWorkspace = useBootstrapWorkspace();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,8 +169,8 @@ export function WorkspaceSetup({ onSuccess }: WorkspaceSetupProps) {
               workspace
             </h2>
             <p className="mt-2.5 text-muted-foreground leading-relaxed">
-              Give your workspace a name to get started. You can add projects
-              and tasks after this.
+              Start with a workspace for your projects, tasks, and agent
+              settings.
             </p>
           </div>
 

@@ -3,9 +3,11 @@ import {
   type MyAgentLoopApi,
   notFound,
   ok,
+  unauthenticated,
   type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
+import { requireAuthSession } from "../auth/session";
 import { validateAgentConfig } from "../harness";
 import { projectsHandlers } from "../projects/projects-handlers";
 import type { Services } from "../services";
@@ -17,24 +19,34 @@ export const workspacesHandlers: HonoHandlersFor<
   Services
 > = {
   GET: async (ctx) => {
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (authSession === null) {
+      return unauthenticated();
+    }
     return withNewTransaction(ctx.services.db, async () => {
       const workspaces =
-        await ctx.services.workspacesService.getAllWorkspaces();
+        await ctx.services.workspacesService.getAllWorkspacesForUser(
+          authSession.user.id,
+        );
       return ok(workspaces);
-    });
-  },
-  POST: async (ctx) => {
-    return withNewTransaction(ctx.services.db, async () => {
-      const workspace = await ctx.services.workspacesService.createWorkspace({
-        name: ctx.body.name,
-      });
-      return ok(workspace);
     });
   },
   ":workspaceId": {
     GET: async (ctx) => {
       const { workspaceId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (authSession === null) {
+        return unauthenticated();
+      }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const workspace = await ctx.services.workspacesService.getWorkspace(
           workspaceId as WorkspaceId,
         );
@@ -46,6 +58,10 @@ export const workspacesHandlers: HonoHandlersFor<
     },
     PATCH: async (ctx) => {
       const { workspaceId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (authSession === null) {
+        return unauthenticated();
+      }
       const body = ctx.body;
       const validationError = validateAgentConfig(body.agentConfig, {
         harnessAuthService: ctx.services.harnessAuthService,
@@ -55,6 +71,14 @@ export const workspacesHandlers: HonoHandlersFor<
         return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const agentConfig =
           body.agentConfig === undefined
             ? undefined
@@ -80,7 +104,19 @@ export const workspacesHandlers: HonoHandlersFor<
     harnesses: {
       GET: async (ctx) => {
         const { workspaceId } = ctx.hono.req.param();
+        const authSession = await requireAuthSession(ctx.hono.req.raw);
+        if (authSession === null) {
+          return unauthenticated();
+        }
         return withNewTransaction(ctx.services.db, async () => {
+          const canAccess =
+            await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+              authSession.user.id,
+              workspaceId as WorkspaceId,
+            );
+          if (!canAccess) {
+            return notFound();
+          }
           const workspace = await ctx.services.workspacesService.getWorkspace(
             workspaceId as WorkspaceId,
           );

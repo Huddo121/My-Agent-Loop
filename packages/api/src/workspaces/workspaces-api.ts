@@ -1,7 +1,11 @@
 import { Endpoint } from "cerato";
 import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
-import { badUserInputSchema, notFoundSchema } from "../common-schemas";
+import {
+  badUserInputSchema,
+  notFoundSchema,
+  unauthenticatedSchema,
+} from "../common-schemas";
 import {
   agentConfigSchema,
   agentHarnessIdSchema,
@@ -17,13 +21,6 @@ export const workspaceDtoSchema = z.object({
   agentConfig: agentConfigSchema.nullable(),
 });
 export type WorkspaceDto = z.infer<typeof workspaceDtoSchema>;
-
-export const createWorkspaceRequestSchema = z.object({
-  name: z.string(),
-});
-export type CreateWorkspaceRequest = z.infer<
-  typeof createWorkspaceRequestSchema
->;
 
 export const updateWorkspaceRequestSchema = z.object({
   name: z.string().optional(),
@@ -47,24 +44,26 @@ export const harnessesResponseSchema = z.object({
 export type HarnessesResponse = z.infer<typeof harnessesResponseSchema>;
 
 export const workspacesApi = Endpoint.multi({
-  GET: Endpoint.get().output(200, z.array(workspaceDtoSchema)),
-  POST: Endpoint.post()
-    .input(createWorkspaceRequestSchema)
-    .output(200, workspaceDtoSchema),
+  GET: Endpoint.get()
+    .output(200, z.array(workspaceDtoSchema))
+    .output(401, unauthenticatedSchema),
   children: {
     ":workspaceId": Endpoint.multi({
       GET: Endpoint.get()
         .output(200, workspaceDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(404, notFoundSchema),
       PATCH: Endpoint.patch()
         .input(updateWorkspaceRequestSchema)
         .output(200, workspaceDtoSchema)
         .output(400, badUserInputSchema)
+        .output(401, unauthenticatedSchema)
         .output(404, notFoundSchema),
       children: {
         harnesses: Endpoint.multi({
           GET: Endpoint.get()
             .output(200, harnessesResponseSchema)
+            .output(401, unauthenticatedSchema)
             .output(404, notFoundSchema),
         }),
         projects: projectsApi,

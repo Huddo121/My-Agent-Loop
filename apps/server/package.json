@@ -26,10 +26,12 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.5.5",
     "@hono/node-server": "1.19.9",
     "@mono/api": "workspace:*",
     "@opencode-ai/sdk": "1.1.36",
     "@types/pg": "8.16.0",
+    "better-auth": "1.5.5",
     "bullmq": "5.67.1",
     "cerato": "0.0.4",
     "dockerode": "4.0.9",

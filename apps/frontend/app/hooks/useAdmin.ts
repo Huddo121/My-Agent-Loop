@@ -1,6 +1,7 @@
 import type { QueueStatsResponse } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { handleUnauthenticated } from "~/lib/auth/api-errors";
 
 const ADMIN_QUERY_KEY = ["admin", "queue-stats"] as const;
 
@@ -14,6 +15,9 @@ export function useQueueStats() {
       const response = await apiClient.admin.GET();
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to fetch queue statistics");
     },
@@ -33,6 +37,9 @@ export function useClearQueue() {
       });
       if (response.status === 200) {
         return response.responseBody.success;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to clear queue");
     },

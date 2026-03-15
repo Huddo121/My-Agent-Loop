@@ -1,5 +1,6 @@
 import { Endpoint } from "cerato";
 import z from "zod";
+import { unauthenticatedSchema } from "../common-schemas";
 
 export const jobCountsSchema = z.object({
   waiting: z.number(),
@@ -22,10 +23,13 @@ export const queueStatsResponseSchema = z.object({
 export type QueueStatsResponse = z.infer<typeof queueStatsResponseSchema>;
 
 export const adminApi = Endpoint.multi({
-  GET: Endpoint.get().output(200, queueStatsResponseSchema),
+  GET: Endpoint.get()
+    .output(200, queueStatsResponseSchema)
+    .output(401, unauthenticatedSchema),
   children: {
     "clear-queue": Endpoint.post()
       .input(z.object({ queueName: z.string() }))
-      .output(200, z.object({ success: z.boolean() })),
+      .output(200, z.object({ success: z.boolean() }))
+      .output(401, unauthenticatedSchema),
   },
 });

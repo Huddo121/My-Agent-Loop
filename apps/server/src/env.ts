@@ -33,6 +33,9 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
+  APP_BASE_URL: z.string().default("http://localhost:5173"),
+  BETTER_AUTH_SECRET: z.string().nonempty(),
+
   OPENROUTER_API_KEY: harnessKey("OpenRouterApiKey"),
   ANTHROPIC_API_KEY: harnessKey("AnthropicApiKey"),
   CURSOR_API_KEY: harnessKey("CursorApiKey"),

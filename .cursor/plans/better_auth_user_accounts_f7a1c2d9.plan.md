@@ -4,49 +4,49 @@ overview: Add BetterAuth-based magic-link sign-in, membership-ready workspace au
 todos:
   - id: auth-decision-doc
     content: Add a decision record in `docs/decisions/` describing the BetterAuth integration, the split between identity/session data and app-owned workspace membership data, the console-logging email stub, and why invite behavior is deferred even though invite-ready tables are added. Update `docs/00-index.md` to link the new decision doc.
-    status: pending
+    status: completed
   - id: auth-schema
     content: Extend `apps/server/src/db/schema.ts` with the BetterAuth tables needed for users, sessions, accounts, and verification tokens, plus app-owned `workspace_memberships` and invite-ready `workspace_invitations` tables. Keep memberships role-free for now, but shape the schema so invitations can be implemented later without redesigning ownership. Do not generate migration files; leave that to a human.
-    status: pending
+    status: completed
   - id: auth-env-email
     content: Extend `apps/server/src/env.ts` and add an `apps/server/src/auth/` domain for BetterAuth configuration, including auth secrets/base URL and a stub email sender that logs the magic-link URL to console for the operator instead of sending real mail.
-    status: pending
+    status: completed
   - id: auth-server-mount
     content: Mount BetterAuth under `/api/auth/*` in `apps/server/src/index.ts` alongside the existing Cerato API. Keep BetterAuth as the source of truth for user identity and sessions, with the existing Hono server remaining the single backend entrypoint.
-    status: pending
+    status: completed
   - id: auth-context
     content: Add request-level auth helpers in `apps/server/src/auth/` to resolve the current session/user from BetterAuth and expose helpers such as `requireAuthenticatedUser`, `requireWorkspaceMembership`, and project/task membership lookups that hide whether a resource exists outside the caller's memberships.
-    status: pending
+    status: completed
   - id: auth-api
     content: Add a small typed app auth surface in `packages/api` and matching server handlers for `GET /api/session` and `POST /api/session/bootstrap-workspace`. `GET /api/session` should return the signed-in user, membership-backed workspaces, and whether bootstrap is required. `POST /api/session/bootstrap-workspace` should create the user's first workspace plus membership in one transaction and reject repeat bootstrap attempts.
-    status: pending
+    status: completed
   - id: workspace-service-auth
     content: Update workspace services and handlers so all workspace listing, fetching, and creation flows are user-aware instead of global. `GET /api/workspaces` must return only workspaces the current user belongs to, and workspace bootstrap should become the only v1 path for creating a user's initial workspace.
-    status: pending
+    status: completed
   - id: project-task-auth
     content: Update project and task handlers/services so every read and mutation is authorized through workspace membership. Add membership-aware lookup helpers for workspace, project, and task IDs, and return `401` when anonymous and `404` when the resource is outside the caller's memberships.
-    status: pending
+    status: completed
   - id: admin-disable
     content: Disable the current global admin dashboard and admin API for the auth-enabled release. Remove or hide the frontend route and block the backend endpoints until a real instance-admin model exists.
-    status: pending
+    status: completed
   - id: frontend-auth-client
     content: Add frontend auth utilities for BetterAuth in `apps/frontend/app/lib/`, including the magic-link request flow and signed-in session bootstrapping. Keep BetterAuth client usage focused on auth actions, and continue using Cerato for typed app API calls.
-    status: pending
+    status: completed
   - id: frontend-auth-gate
     content: Replace the anonymous root boot flow in `apps/frontend/app/root.tsx` with a dedicated auth gate. Unauthenticated visitors should see a magic-link sign-in screen. Authenticated users should call the new session endpoint and then either enter the app or see the one-time workspace bootstrap form if they have no memberships.
-    status: pending
+    status: completed
   - id: frontend-bootstrap
     content: Adapt the current workspace setup UI into a post-sign-in workspace bootstrap step that asks the new user to name their first workspace. On success, create the workspace via the bootstrap endpoint and proceed into the normal app shell.
-    status: pending
+    status: completed
   - id: single-workspace-v1
     content: Preserve the current single-workspace UX by continuing to select the first available workspace in the frontend context providers, but make that an explicit temporary behavior backed by membership-filtered workspace data rather than globally visible workspaces.
-    status: pending
+    status: completed
   - id: auth-errors-hooks
     content: Update frontend hooks and data-loading flows to treat `401` as an auth/session state transition instead of a generic request failure. Make sure signed-out or expired-session states fall back to the auth gate cleanly.
-    status: pending
+    status: completed
   - id: tests
-    content: Add server and frontend tests covering magic-link auth bootstrapping, session resolution, first-workspace bootstrap, membership-based authorization for workspace/project/task APIs, blocked admin access, and root gating behavior for anonymous, bootstrap-required, and fully bootstrapped users.
-    status: pending
+    content: Add server and frontend tests covering magic-link auth bootstrapping, session resolution, first-workspace bootstrap, membership-based authorization for workspace/project/task APIs, the frontend admin route staying hidden, and root gating behavior for anonymous, bootstrap-required, and fully bootstrapped users.
+    status: completed
 isProject: false
 ---
 

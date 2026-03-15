@@ -30,13 +30,13 @@ todos:
     content: "Update `apps/server/src/services.ts` to wire the new services. Read the current file first -- it has all the DI wiring. Changes: (1) Import and instantiate VmSandboxService with the platform-appropriate adapter (process.platform === 'darwin' for VfkitAdapter, 'linux' for CloudHypervisorAdapter). (2) Instantiate DatabaseSandboxTypeConfigRepository. (3) Update WorkflowExecutionService constructor call to pass both sandbox services + config repo (matching the workflow-refactor changes). (4) Add sandboxTypeConfigRepository and vmSandboxService to the Services interface. (5) Ensure BackgroundWorkflowProcessor.shutdown() stops both sandbox services."
     status: pending
   - id: sandbox-type-api
-    content: Add HTTP API endpoints for sandbox type configuration. Read existing handler files to find where workspace and project routes are defined (look in apps/server/src/workspaces/ and apps/server/src/projects/ for handler files). Add GET/PUT endpoints for /api/workspaces/:id/sandbox-type and /api/projects/:id/sandbox-type. These call SandboxTypeConfigRepository. Also add MCP tools -- read apps/server/src/projects/projects-mcp-handlers.ts for the MCP tool pattern (uses satisfies McpTool, getMcpServices(), withRequiredProjectId). Register new tools in apps/server/src/mcp.ts. The API package (packages/api) will need the SandboxType type exported -- read packages/api/AGENTS.md for cerato patterns.
+    content: Add HTTP API endpoints for sandbox type configuration. Read existing handler files to find where workspace and project routes are defined (look in apps/server/src/workspaces/ and apps/server/src/projects/ for handler files). Add GET/PUT endpoints for /api/workspaces/:id/sandbox-type and /api/projects/:id/sandbox-type. Require an authenticated Better Auth session, return `401` when no session is present, return `404` when the caller is not a member of the workspace, and return `404` when the caller cannot access the target project. These call SandboxTypeConfigRepository. Also add MCP tools -- read apps/server/src/projects/projects-mcp-handlers.ts for the MCP tool pattern (uses satisfies McpTool, getMcpServices(), withRequiredProjectId). Register new tools in apps/server/src/mcp.ts. The API package (packages/api) will need the SandboxType type exported -- read packages/api/AGENTS.md for cerato patterns.
     status: pending
   - id: frontend-api
     content: Add sandbox type API integration to the frontend. (1) Add the SandboxType type and API endpoint types to packages/api (read packages/api/AGENTS.md for cerato codec patterns -- first param = wire type, second = app type). (2) Create a useSandboxType hook in apps/frontend/app/lib/sandbox/useSandboxType.ts. Read apps/frontend/app/lib/projects/useProjects.ts as the pattern -- it shows how to use React Query with cerato API calls, including queries and mutations with cache invalidation.
     status: pending
   - id: frontend-ui
-    content: Add sandbox type UI components and integrate into existing pages. (1) Create SandboxTypeSelect component in apps/frontend/app/components/ui/SandboxTypeSelect.tsx -- read apps/frontend/app/components/ui/HarnessSelect.tsx as the pattern (it's a dropdown select for a similar config). Options are 'Docker' and 'VM'. (2) Add SandboxTypeSelect to workspace settings -- find the workspace settings page and add the selector. (3) Add SandboxTypeSelect to apps/frontend/app/components/projects/ProjectDialog.tsx -- read the file to see how HarnessSelect is integrated there and follow the same pattern. Read apps/frontend/AGENTS.md for frontend conventions.
+    content: Add sandbox type UI components and integrate into existing pages. (1) Create SandboxTypeSelect component in apps/frontend/app/components/ui/SandboxTypeSelect.tsx -- read apps/frontend/app/components/ui/HarnessSelect.tsx as the pattern (it's a dropdown select for a similar config). Options are 'Docker' and 'VM'. (2) Add SandboxTypeSelect to workspace settings, behind the authenticated app shell and current-workspace context. (3) Add SandboxTypeSelect to apps/frontend/app/components/projects/ProjectDialog.tsx -- read the file to see how HarnessSelect is integrated there and follow the same pattern. Read apps/frontend/AGENTS.md for frontend conventions.
     status: pending
   - id: docs
     content: "Create `docs/decisions/vm-sandboxing.md` documenting: why VMs (isolation, future Docker-in-VM), why Cloud Hypervisor + vfkit (virtio-fs, REST API), architecture overview (VmPlatformAdapter abstraction), setup instructions for Linux (install binaries, run networking script, build rootfs) and macOS (install vfkit via Homebrew, build rootfs). Update `docs/00-index.md` to link to the new file. Read existing decisions docs (e.g., docs/decisions/forge-authentication.md) for the style."
@@ -341,6 +341,12 @@ Note: The enum uses `"vm"` rather than `"cloud-hypervisor"` since the VMM backen
 - `GET /api/projects/:id/sandbox-type`
 - `PUT /api/projects/:id/sandbox-type`
 
+These endpoints must follow the new auth model:
+
+- return `401` when there is no authenticated Better Auth session
+- return `404` when the caller is not a member of the target workspace
+- return `404` when the caller cannot access the target project
+
 **MCP tools** -- add sandbox type management to MCP handlers following existing patterns.
 
 ### 7. WorkflowExecutionService Refactoring
@@ -421,6 +427,8 @@ Follow existing patterns in `apps/frontend/`:
 - **Project dialog** -- add sandbox type selector to [ProjectDialog.tsx](apps/frontend/app/components/projects/ProjectDialog.tsx)
 - **API hooks** -- add `useSandboxType` hook following the pattern in [useProjects.ts](apps/frontend/app/lib/projects/useProjects.ts)
 
+The sandbox-type selectors should only render inside the authenticated app shell after the current workspace has been resolved from the caller's memberships.
+
 ## Future Paths (informational, not in scope for v1)
 
 ### Log Streaming
@@ -462,4 +470,3 @@ Since VMs have their own kernel, Docker can run natively inside the VM. The root
 - QEMU or Firecracker as alternative VMM backends
 - Automated host networking setup (manual setup with documented script for v1)
 - In-VM log streaming daemon (v1 uses serial console or file-based approach)
-

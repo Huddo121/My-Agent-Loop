@@ -9,7 +9,7 @@ todos:
     content: Create a server-side `LiveEventsService` that manages in-memory SSE subscribers. It should register and unregister connections, store each connection's workspace id and parsed subscriptions, publish only matching events, and support heartbeats or keepalives for long-lived idle streams.
     status: pending
   - id: sse-endpoint
-    content: Add a raw Hono SSE endpoint at `/api/workspaces/:workspaceId/live-events` outside the Cerato API tree. Accept repeated `subscription` query params, validate them using the shared `packages/api` schemas, reject invalid subscriptions with `400`, and clean up the subscription on abort or disconnect.
+    content: Add a raw Hono SSE endpoint at `/api/workspaces/:workspaceId/live-events` outside the Cerato API tree. Require an authenticated Better Auth session, return `401` when no session is present, and return `404` when the caller is not a member of the workspace. Accept repeated `subscription` query params, validate them using the shared `packages/api` schemas, reject invalid subscriptions with `400`, and clean up the subscription on abort or disconnect.
     status: pending
   - id: service-wiring
     content: Wire `LiveEventsService` into `apps/server/src/services.ts` and expose it through the server service container so HTTP handlers, MCP handlers, and workflow services can publish live events without reaching into lower-level connection state directly.
@@ -21,16 +21,16 @@ todos:
     content: Publish `project.updated` events whenever project queue state or project metadata changes in ways the UI should reflect live. Cover run start, stop, queue-state transitions in `WorkflowManager`, and project update flows that already return a full project DTO.
     status: pending
   - id: frontend-provider
-    content: Add a frontend live-events integration that opens one `EventSource` per workspace tab and mounts inside `CurrentWorkspaceProvider`. Derive subscriptions from the current UI state so the app always listens for workspace project updates and, when a project is selected, board updates for that project.
+    content: Add a frontend live-events integration that opens one `EventSource` per workspace tab and mounts inside `CurrentWorkspaceProvider`. Reuse the authenticated app shell and current-workspace selection that now come from `/api/session` and workspace bootstrap, so the provider only mounts once auth and workspace membership have been resolved. Derive subscriptions from the current UI state so the app always listens for workspace project updates and, when a project is selected, board updates for that project.
     status: pending
   - id: cache-updates
     content: Add React Query cache helpers for live events and use them in the live-events provider. `project.updated` should patch the projects cache, and `task.updated` should insert, replace, reorder, or remove board tasks based on the task payload and completion state without forcing a full refetch.
     status: pending
   - id: reconnect-behavior
-    content: Make the frontend recreate the SSE connection when the subscription set changes and invalidate relevant queries once on reconnect or initial open so the UI can recover from missed events without implementing replay or `Last-Event-ID`.
+    content: Make the frontend recreate the SSE connection when the subscription set changes and invalidate relevant queries once on reconnect or initial open so the UI can recover from missed events without implementing replay or `Last-Event-ID`. If the stream starts returning auth failures after logout or session expiry, stop reconnecting and let the normal signed-out app flow take over.
     status: pending
   - id: tests
-    content: Add tests for shared schema parsing, backend subscription filtering and cleanup, event publication from task and project mutation paths, and frontend cache update helpers plus reconnect/subscription-change behavior.
+    content: Add tests for shared schema parsing, backend subscription filtering and cleanup, auth and membership enforcement on the SSE endpoint, event publication from task and project mutation paths, and frontend cache update helpers plus reconnect/subscription-change behavior.
     status: pending
   - id: docs
     content: Add a decision record in `docs/decisions/` documenting the `LiveEvents` subsystem, the use of SSE, the in-memory process-local subscription registry, and the typed event payload approach. Update `docs/00-index.md` to link the new decision doc.
@@ -80,6 +80,8 @@ Do not introduce separate move, completion, or queue-state event variants in v1.
 
 Maintain one SSE connection per workspace per browser tab, mounted at the app level instead of per component. This avoids wasteful duplicate connections and keeps the live event integration centralized.
 
+The live-events provider should only mount after the authenticated app shell has resolved `/api/session` and selected the current workspace from the caller's memberships. It should not participate in the unauthenticated or workspace-bootstrap states.
+
 ### Reliability defaults
 
 Do not implement replay or persisted event history in v1. If the stream reconnects, the frontend should invalidate the relevant queries once so the UI catches up from canonical server state.
@@ -116,11 +118,13 @@ The service should expose register, unregister, and publish methods. Publish sho
 
 Add a raw Hono GET route at `/api/workspaces/:workspaceId/live-events`. The handler should:
 
-1. read all `subscription` query params
-2. parse and validate them against the shared schema
-3. register the connection with `LiveEventsService`
-4. stream SSE messages plus keepalives
-5. unregister on abort/disconnect
+1. require an authenticated Better Auth session and return `401` if it is missing
+2. verify the caller is a member of `:workspaceId` and return `404` if not
+3. read all `subscription` query params
+4. parse and validate them against the shared schema
+5. register the connection with `LiveEventsService`
+6. stream SSE messages plus keepalives
+7. unregister on abort/disconnect
 
 If subscription parsing fails, return a `400` response immediately.
 
@@ -187,6 +191,8 @@ Add shared contract tests for:
 Add backend tests for:
 
 - workspace and subscription filtering
+- `401` for unauthenticated SSE requests
+- `404` for non-member workspace SSE requests
 - rejection of invalid subscription strings
 - cleanup when clients disconnect
 - event publication from task and project mutation paths
@@ -197,6 +203,7 @@ Add frontend tests for:
 - task cache updates from `task.updated`
 - removal of completed tasks from the active queue cache
 - reconnect invalidation behavior
+- stop-retrying behavior after auth loss/logout
 - subscription-set changes when the selected project changes
 
 ## Out of Scope

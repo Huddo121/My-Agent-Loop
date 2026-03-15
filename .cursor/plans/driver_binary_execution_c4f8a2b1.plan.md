@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: driver-runtime
     content: Implement the driver runtime in `apps/driver/src/`. Split it into small modules for CLI parsing, host API client, task-file loading/saving, harness process execution, git commit/reset helpers, retry handling, and progress detection. The runtime should support both single-task runs and subtask runs through the same loop, with subtask-aware behavior enabled when the task file contains subtasks.
-    status: pending
+    status: completed
   - id: driver-api
     content: Add a dedicated internal driver API to `apps/server/src/` for driver-to-host communication. It should be separate from MCP and support reading the current canonical task state and persisting a task snapshot after each iteration. Authenticate requests with a random per-run token sent in a request header. Reject missing or invalid tokens.
     status: pending

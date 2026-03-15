@@ -9,11 +9,13 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
+import { AuthGate } from "./components/auth";
 import {
   FloatingSidebarTrigger,
   SidebarProvider,
 } from "./components/ui/sidebar";
 import { WorkspaceSetup } from "./components/workspaces";
+import { authClient, useAppSessionQuery } from "./lib/auth";
 import {
   CurrentWorkspaceProvider,
   useWorkspaceContext,
@@ -63,17 +65,49 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
-  const { currentWorkspace, needsSetup, isLoadingWorkspaces } =
-    useWorkspaceContext();
-  if (isLoadingWorkspaces) {
+  const authSession = authClient.useSession();
+
+  const appSessionQuery = useAppSessionQuery(authSession.data !== null);
+
+  if (authSession.isPending) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading…</div>
       </div>
     );
   }
-  if (needsSetup) {
+
+  if (authSession.data === null) {
+    return <AuthGate />;
+  }
+
+  if (appSessionQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+
+  if (appSessionQuery.data?.needsWorkspaceBootstrap) {
     return <WorkspaceSetup />;
+  }
+
+  return (
+    <WorkspaceProvider>
+      <AuthenticatedAppContent />
+    </WorkspaceProvider>
+  );
+}
+
+function AuthenticatedAppContent() {
+  const { currentWorkspace, isLoadingWorkspaces } = useWorkspaceContext();
+  if (isLoadingWorkspaces) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-muted-foreground">Loading…</div>
+      </div>
+    );
   }
   if (!currentWorkspace) return null;
   return (
@@ -87,9 +121,7 @@ function AppContent() {
 export default function App() {
   return (
     <Providers>
-      <WorkspaceProvider>
-        <AppContent />
-      </WorkspaceProvider>
+      <AppContent />
     </Providers>
   );
 }

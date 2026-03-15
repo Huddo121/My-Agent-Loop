@@ -9,4 +9,5 @@ My Agent Loop is a project that aims to make it easier to allow agents to more a
 - [Coding Practices](./02-coding-practices.md): Specific advice on how to write, structure, and verify code in this codebase
 - [Concepts](./03-concepts.md): More detailed information about the high level concepts in use in this project
 - [Decisions](./decisions): Architecture and design decisions
+  - [BetterAuth and Workspace Memberships](./decisions/better-auth-workspace-memberships.md)
 - [Ideas](./ideas): This is a folder of notes for things that I'm thinking about but not yet working on, or may never work on

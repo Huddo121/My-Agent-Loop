@@ -1,6 +1,7 @@
 import type { WorkspaceId } from "@mono/api";
 import { asc, eq } from "drizzle-orm";
-import { workspacesTable } from "../db/schema";
+import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
+import { workspaceMembershipsTable, workspacesTable } from "../db/schema";
 import type {
   AgentHarnessConfigRepository,
   ScopedHarnessConfig,
@@ -22,20 +23,28 @@ function toWorkspace(
 }
 
 export class DatabaseWorkspacesService implements WorkspacesService {
-  constructor(private readonly harnessConfig: AgentHarnessConfigRepository) {}
+  constructor(
+    private readonly harnessConfig: AgentHarnessConfigRepository,
+    private readonly memberships: WorkspaceMembershipsService,
+  ) {}
 
-  async getAllWorkspaces(): Promise<Workspace[]> {
+  async getAllWorkspacesForUser(userId: string): Promise<Workspace[]> {
     const tx = getTransaction();
     const rows = await tx
       .select()
       .from(workspacesTable)
+      .innerJoin(
+        workspaceMembershipsTable,
+        eq(workspaceMembershipsTable.workspaceId, workspacesTable.id),
+      )
+      .where(eq(workspaceMembershipsTable.userId, userId))
       .orderBy(asc(workspacesTable.id));
     const result: Workspace[] = [];
-    for (const row of rows) {
+    for (const { workspaces } of rows) {
       const config = await this.harnessConfig.getWorkspaceConfig(
-        row.id as WorkspaceId,
+        workspaces.id as WorkspaceId,
       );
-      result.push(toWorkspace(row, config));
+      result.push(toWorkspace(workspaces, config));
     }
     return result;
   }
@@ -51,12 +60,16 @@ export class DatabaseWorkspacesService implements WorkspacesService {
     return toWorkspace(row, config);
   }
 
-  async createWorkspace(workspace: CreateWorkspace): Promise<Workspace> {
+  async createWorkspaceForUser(
+    userId: string,
+    workspace: CreateWorkspace,
+  ): Promise<Workspace> {
     const tx = getTransaction();
     const [row] = await tx
       .insert(workspacesTable)
       .values({ name: workspace.name })
       .returning();
+    await this.memberships.addMembership(userId, row.id as WorkspaceId);
     return toWorkspace(row, null);
   }
 

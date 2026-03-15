@@ -1,6 +1,7 @@
 import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { NewTask, Task, UpdateTask } from "~/types";
 
@@ -23,6 +24,9 @@ export function useTasks(projectId: ProjectId | null) {
       });
       if (response.status === 200) {
         return response.responseBody as Task[];
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to fetch tasks");
     },
@@ -48,6 +52,9 @@ export function useCreateTask(projectId: ProjectId | null) {
       });
       if (response.status === 200) {
         return response.responseBody as Task;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to create task");
     },
@@ -78,6 +85,9 @@ export function useCompleteTask(projectId: ProjectId | null) {
       });
       if (response.status === 200) {
         return response.responseBody as Task;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to complete task");
     },
@@ -117,6 +127,9 @@ export function useUpdateTask(projectId: ProjectId | null) {
       });
       if (response.status === 200) {
         return response.responseBody as Task;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to update task");
     },
@@ -163,6 +176,9 @@ export function useMoveTask(projectId: ProjectId | null) {
             ? new Date(response.responseBody.completedOn)
             : null,
         };
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       throw new Error("Failed to move task");
     },

@@ -1,4 +1,8 @@
 import Dockerode from "dockerode";
+import {
+  DatabaseWorkspaceMembershipsService,
+  type WorkspaceMembershipsService,
+} from "./auth/WorkspaceMembershipsService";
 import { type Database, db } from "./db";
 import { env } from "./env";
 import type { RelativeFilePath } from "./file-system/FilePath";
@@ -56,6 +60,7 @@ export interface Services {
   backgroundWorkflowProcessor: BackgroundWorkflowProcessor;
   projectsService: ProjectsService;
   workspacesService: WorkspacesService;
+  workspaceMembershipsService: WorkspaceMembershipsService;
   runsService: RunsService;
   encryptionService: EncryptionService;
   forgeSecretRepository: ForgeSecretRepository;
@@ -79,6 +84,7 @@ const sandboxService = new DockerSandboxService(
 
 const taskQueue = new DatabaseTaskQueue();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
+const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
 const harnessAuthService = new EnvHarnessAuthService({
   OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
@@ -87,6 +93,7 @@ const harnessAuthService = new EnvHarnessAuthService({
 });
 const workspacesService = new DatabaseWorkspacesService(
   agentHarnessConfigRepository,
+  workspaceMembershipsService,
 );
 const projectsService = new DatabaseProjectService(
   agentHarnessConfigRepository,
@@ -150,6 +157,7 @@ export const services: Services = {
   workflowExecutionService,
   projectsService,
   workspacesService,
+  workspaceMembershipsService,
   runsService,
   encryptionService,
   forgeSecretRepository,

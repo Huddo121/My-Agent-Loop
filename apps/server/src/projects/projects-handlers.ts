@@ -9,6 +9,7 @@ import {
 } from "@mono/api";
 import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
+import { requireAuthSession } from "../auth/session";
 import {
   createGitForgeService,
   defaultForgeBaseUrl,
@@ -30,7 +31,19 @@ export const projectsHandlers: HonoHandlersFor<
 > = {
   GET: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (Array.isArray(authSession)) {
+      return authSession;
+    }
     return withNewTransaction(ctx.services.db, async () => {
+      const canAccess =
+        await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+          authSession.user.id,
+          workspaceId as WorkspaceId,
+        );
+      if (!canAccess) {
+        return notFound();
+      }
       const projects = await ctx.services.projectsService.getAllProjects(
         workspaceId as WorkspaceId,
       );
@@ -46,6 +59,10 @@ export const projectsHandlers: HonoHandlersFor<
   },
   POST: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (Array.isArray(authSession)) {
+      return authSession;
+    }
     const validationError = validateAgentConfig(ctx.body.agentConfig, {
       harnessAuthService: ctx.services.harnessAuthService,
       harnesses: ctx.services.harnesses,
@@ -54,6 +71,14 @@ export const projectsHandlers: HonoHandlersFor<
       return badUserInput(validationError);
     }
     return withNewTransaction(ctx.services.db, async () => {
+      const canAccess =
+        await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+          authSession.user.id,
+          workspaceId as WorkspaceId,
+        );
+      if (!canAccess) {
+        return notFound();
+      }
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
         ctx.body.forgeBaseUrl ?? defaultForgeBaseUrl(forgeType);
@@ -102,8 +127,21 @@ export const projectsHandlers: HonoHandlersFor<
   },
   ":projectId": {
     GET: async (ctx) => {
-      const { projectId } = ctx.hono.req.param();
+      const { workspaceId, projectId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessProject(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const project = await ctx.services.projectsService.getProject(
           projectId as ProjectId,
         );
@@ -121,7 +159,11 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     PATCH: async (ctx) => {
-      const { projectId } = ctx.hono.req.param();
+      const { workspaceId, projectId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
       const validationError = validateAgentConfig(ctx.body.agentConfig, {
         harnessAuthService: ctx.services.harnessAuthService,
         harnesses: ctx.services.harnesses,
@@ -130,6 +172,15 @@ export const projectsHandlers: HonoHandlersFor<
         return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessProject(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const updatePayload: Parameters<
           typeof ctx.services.projectsService.updateProject
         >[1] = {};
@@ -175,8 +226,21 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     DELETE: async (ctx) => {
-      const { projectId } = ctx.hono.req.param();
+      const { workspaceId, projectId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessProject(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const project = await ctx.services.projectsService.deleteProject(
           projectId as ProjectId,
         );
@@ -193,8 +257,21 @@ export const projectsHandlers: HonoHandlersFor<
     },
     tasks: tasksHandlers,
     "test-forge-connection": async (ctx) => {
-      const { projectId } = ctx.hono.req.param();
+      const { workspaceId, projectId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessProject(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const project = await ctx.services.projectsService.getProject(
           projectId as ProjectId,
         );
@@ -224,10 +301,23 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     run: async (ctx) => {
-      const { projectId } = ctx.hono.req.param();
+      const { workspaceId, projectId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
 
       const mode = ctx.body.mode;
       return await withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessProject(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+          );
+        if (!canAccess) {
+          return notFound("The project could not be found");
+        }
         const project = await ctx.services.projectsService.getProject(
           projectId as ProjectId,
         );

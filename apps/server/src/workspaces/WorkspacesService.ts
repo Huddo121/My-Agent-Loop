@@ -2,9 +2,12 @@ import type { WorkspaceId } from "@mono/api";
 import type { CreateWorkspace, UpdateWorkspace, Workspace } from "./Workspace";
 
 export interface WorkspacesService {
-  getAllWorkspaces(): Promise<Workspace[]>;
+  getAllWorkspacesForUser(userId: string): Promise<Workspace[]>;
   getWorkspace(id: WorkspaceId): Promise<Workspace | undefined>;
-  createWorkspace(workspace: CreateWorkspace): Promise<Workspace>;
+  createWorkspaceForUser(
+    userId: string,
+    workspace: CreateWorkspace,
+  ): Promise<Workspace>;
   updateWorkspace(
     id: WorkspaceId,
     update: UpdateWorkspace,

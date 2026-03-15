@@ -21,11 +21,130 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
 
 export const forgeTypeEnum = pg.pgEnum("forge_type", ["gitlab", "github"]);
 
+export const userTable = pg.pgTable("user", {
+  id: pg.text().primaryKey(),
+  name: pg.text().notNull(),
+  email: pg.text().notNull().unique(),
+  emailVerified: pg.boolean().notNull().default(false),
+  image: pg.text(),
+  createdAt: pg.timestamp().notNull(),
+  updatedAt: pg.timestamp().notNull(),
+});
+
+export const sessionTable = pg.pgTable(
+  "session",
+  {
+    id: pg.text().primaryKey(),
+    expiresAt: pg.timestamp().notNull(),
+    token: pg.text().notNull().unique(),
+    createdAt: pg.timestamp().notNull(),
+    updatedAt: pg.timestamp().notNull(),
+    ipAddress: pg.text(),
+    userAgent: pg.text(),
+    userId: pg
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (table) => ({
+    userIdIdx: pg.index().on(table.userId),
+  }),
+);
+
+export const accountTable = pg.pgTable(
+  "account",
+  {
+    id: pg.text().primaryKey(),
+    accountId: pg.text().notNull(),
+    providerId: pg.text().notNull(),
+    userId: pg
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+    accessToken: pg.text(),
+    refreshToken: pg.text(),
+    idToken: pg.text(),
+    accessTokenExpiresAt: pg.timestamp(),
+    refreshTokenExpiresAt: pg.timestamp(),
+    scope: pg.text(),
+    password: pg.text(),
+    createdAt: pg.timestamp().notNull(),
+    updatedAt: pg.timestamp().notNull(),
+  },
+  (table) => ({
+    userIdIdx: pg.index().on(table.userId),
+    providerAccountUnique: pg.unique().on(table.providerId, table.accountId),
+  }),
+);
+
+export const verificationTable = pg.pgTable(
+  "verification",
+  {
+    id: pg.text().primaryKey(),
+    identifier: pg.text().notNull(),
+    value: pg.text().notNull(),
+    expiresAt: pg.timestamp().notNull(),
+    createdAt: pg.timestamp().notNull(),
+    updatedAt: pg.timestamp().notNull(),
+  },
+  (table) => ({
+    identifierIdx: pg.index().on(table.identifier),
+  }),
+);
+
 export const workspacesTable = pg.pgTable("workspaces", {
   id: pg.uuid().primaryKey().defaultRandom().$type<WorkspaceId>(),
   name: pg.text().notNull(),
   createdAt: pg.timestamp().notNull().defaultNow(),
 });
+
+export const workspaceMembershipsTable = pg.pgTable(
+  "workspace_memberships",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+    workspaceId: pg
+      .uuid()
+      .references(() => workspacesTable.id, { onDelete: "cascade" })
+      .notNull()
+      .$type<WorkspaceId>(),
+    userId: pg
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: pg.timestamp().notNull().defaultNow(),
+  },
+  (table) => ({
+    workspaceUserUnique: pg.unique().on(table.workspaceId, table.userId),
+  }),
+);
+
+export const workspaceInvitationsTable = pg.pgTable(
+  "workspace_invitations",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+    workspaceId: pg
+      .uuid()
+      .references(() => workspacesTable.id, { onDelete: "cascade" })
+      .notNull()
+      .$type<WorkspaceId>(),
+    inviterUserId: pg
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+    inviteeEmail: pg.text().notNull(),
+    token: pg.text().notNull().unique(),
+    status: pg.text().notNull().default("pending"),
+    expiresAt: pg.timestamp().notNull(),
+    createdAt: pg.timestamp().notNull().defaultNow(),
+    acceptedAt: pg.timestamp(),
+    revokedAt: pg.timestamp(),
+  },
+  (table) => ({
+    workspaceInviteeUnique: pg
+      .unique()
+      .on(table.workspaceId, table.inviteeEmail),
+  }),
+);
 
 export const projectsTable = pg.pgTable(
   "projects",

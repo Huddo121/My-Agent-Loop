@@ -1,7 +1,11 @@
 import { Endpoint } from "cerato";
 import z from "zod";
 import { isoDatetimeToDate } from "../common-codecs";
-import { badUserInputSchema, notFoundSchema } from "../common-schemas";
+import {
+  badUserInputSchema,
+  notFoundSchema,
+  unauthenticatedSchema,
+} from "../common-schemas";
 import { agentConfigSchema } from "../harnesses/harnesses-model";
 import { subtaskSchema, taskIdSchema } from "./tasks-model";
 
@@ -52,28 +56,37 @@ export const moveTaskRequestSchema = z.union([
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 
 export const tasksApi = Endpoint.multi({
-  GET: Endpoint.get().output(200, z.array(taskDtoSchema)),
+  GET: Endpoint.get()
+    .output(200, z.array(taskDtoSchema))
+    .output(401, unauthenticatedSchema)
+    .output(404, notFoundSchema),
   POST: Endpoint.post()
     .input(createTaskRequestSchema)
     .output(200, taskDtoSchema)
+    .output(401, unauthenticatedSchema)
+    .output(404, notFoundSchema)
     .output(400, badUserInputSchema),
   children: {
     ":taskId": Endpoint.multi({
       GET: Endpoint.get()
         .output(200, taskDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(404, notFoundSchema),
       PUT: Endpoint.put()
         .input(updateTaskRequestSchema)
         .output(200, taskDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(400, badUserInputSchema)
         .output(404, notFoundSchema),
       children: {
         complete: Endpoint.post()
           .output(200, taskDtoSchema)
+          .output(401, unauthenticatedSchema)
           .output(404, notFoundSchema),
         move: Endpoint.post()
           .input(moveTaskRequestSchema)
           .output(200, taskDtoSchema)
+          .output(401, unauthenticatedSchema)
           .output(404, notFoundSchema),
       },
     }),

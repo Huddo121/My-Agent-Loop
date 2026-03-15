@@ -1,6 +1,10 @@
 import { Endpoint } from "cerato";
 import z from "zod";
-import { badUserInputSchema, notFoundSchema } from "../common-schemas";
+import {
+  badUserInputSchema,
+  notFoundSchema,
+  unauthenticatedSchema,
+} from "../common-schemas";
 import { agentConfigSchema } from "../harnesses/harnesses-model";
 import { runIdSchema } from "../runs/runs-model";
 import { tasksApi } from "../tasks/tasks-api";
@@ -129,42 +133,54 @@ export type TestForgeConnectionRequest = z.infer<
 >;
 
 export const projectsApi = Endpoint.multi({
-  GET: Endpoint.get().output(200, z.array(projectDtoSchema)),
+  GET: Endpoint.get()
+    .output(200, z.array(projectDtoSchema))
+    .output(401, unauthenticatedSchema)
+    .output(404, notFoundSchema),
   POST: Endpoint.post()
     .input(createProjectRequestSchema)
     .output(200, projectDtoSchema)
+    .output(401, unauthenticatedSchema)
+    .output(404, notFoundSchema)
     .output(400, badUserInputSchema),
   children: {
     "test-forge-connection": Endpoint.post()
       .input(testForgeConnectionRequestSchema)
       .output(200, testForgeConnectionSuccessSchema)
+      .output(401, unauthenticatedSchema)
       .output(400, badUserInputSchema),
     ":projectId": Endpoint.multi({
       GET: Endpoint.get()
         .output(200, projectDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(404, notFoundSchema),
       PATCH: Endpoint.patch()
         .input(updateProjectRequestSchema)
         .output(200, projectDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(400, badUserInputSchema)
         .output(404, notFoundSchema),
       DELETE: Endpoint.delete()
         .output(200, projectDtoSchema)
+        .output(401, unauthenticatedSchema)
         .output(404, notFoundSchema),
       children: {
         tasks: tasksApi,
         run: Endpoint.post()
           .input(startRunRequestSchema)
           .output(200, runStartedResponseSchema)
+          .output(401, unauthenticatedSchema)
           .output(400, runFailureResponseSchema)
           .output(404, notFoundSchema),
         stop: Endpoint.post()
           .input(stopQueueRequestSchema)
           .output(200, stopQueueResponseSchema)
+          .output(401, unauthenticatedSchema)
           .output(400, stopQueueFailureResponseSchema)
           .output(404, notFoundSchema),
         "test-forge-connection": Endpoint.post()
           .output(200, testForgeConnectionSuccessSchema)
+          .output(401, unauthenticatedSchema)
           .output(400, badUserInputSchema)
           .output(404, notFoundSchema),
       },

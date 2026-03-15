@@ -1,10 +1,7 @@
-import type {
-  CreateWorkspaceRequest,
-  UpdateWorkspaceRequest,
-  WorkspaceId,
-} from "@mono/api";
+import type { UpdateWorkspaceRequest, WorkspaceId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
+import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import type { Workspace } from "~/types";
 
 const WORKSPACES_QUERY_KEY = ["workspaces"] as const;
@@ -24,32 +21,10 @@ export function useWorkspacesQuery() {
       if (response.status === 200) {
         return response.responseBody;
       }
-      throw new Error("Failed to fetch workspaces");
-    },
-  });
-}
-
-/**
- * Hook to create a new workspace.
- */
-export function useCreateWorkspace() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (request: CreateWorkspaceRequest): Promise<Workspace> => {
-      const response = await apiClient.workspaces.POST({
-        body: request,
-      });
-      if (response.status === 200) {
-        return response.responseBody;
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
-      throw new Error("Failed to create workspace");
-    },
-    onSuccess: (newWorkspace) => {
-      queryClient.setQueryData<Workspace[]>(WORKSPACES_QUERY_KEY, (old) => {
-        if (!old) return [newWorkspace];
-        return [...old, newWorkspace];
-      });
+      throw new Error("Failed to fetch workspaces");
     },
   });
 }
@@ -66,6 +41,9 @@ export function useWorkspaceQuery(workspaceId: WorkspaceId) {
       });
       if (response.status === 200) {
         return response.responseBody;
+      }
+      if (response.status === 401) {
+        return handleUnauthenticated();
       }
       if (response.status === 404) return null;
       throw new Error("Failed to fetch workspace");
@@ -87,6 +65,9 @@ export function useHarnessesQuery(workspaceId: WorkspaceId) {
         },
       );
       if (response.status === 200) return response.responseBody;
+      if (response.status === 401) {
+        return handleUnauthenticated();
+      }
       if (response.status === 404) {
         throw new Error("Workspace not found");
       }
@@ -109,6 +90,9 @@ export function useUpdateWorkspace(workspaceId: WorkspaceId) {
         body: request,
       });
       if (response.status === 200) return response.responseBody;
+      if (response.status === 401) {
+        return handleUnauthenticated();
+      }
       if (response.status === 400) {
         throw new Error(response.responseBody.message);
       }

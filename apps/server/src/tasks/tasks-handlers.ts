@@ -6,8 +6,10 @@ import {
   ok,
   type ProjectId,
   type TaskId,
+  type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
+import { requireAuthSession } from "../auth/session";
 import { validateAgentConfig } from "../harness";
 import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 import type { Services } from "../services";
@@ -38,8 +40,21 @@ export const tasksHandlers: HonoHandlersFor<
   Services
 > = {
   GET: async (ctx) => {
-    const { projectId } = ctx.hono.req.param();
+    const { workspaceId, projectId } = ctx.hono.req.param();
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (Array.isArray(authSession)) {
+      return authSession;
+    }
     return withNewTransaction(ctx.services.db, async () => {
+      const canAccess =
+        await ctx.services.workspaceMembershipsService.canAccessProject(
+          authSession.user.id,
+          workspaceId as WorkspaceId,
+          projectId as ProjectId,
+        );
+      if (!canAccess) {
+        return notFound();
+      }
       const tasks = await ctx.services.taskQueue.getAllTasks(
         projectId as ProjectId,
       );
@@ -54,7 +69,11 @@ export const tasksHandlers: HonoHandlersFor<
   },
 
   POST: async (ctx) => {
-    const { projectId } = ctx.hono.req.param();
+    const { workspaceId, projectId } = ctx.hono.req.param();
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (Array.isArray(authSession)) {
+      return authSession;
+    }
     const validationError = validateAgentConfig(ctx.body.agentConfig, {
       harnessAuthService: ctx.services.harnessAuthService,
       harnesses: ctx.services.harnesses,
@@ -63,6 +82,15 @@ export const tasksHandlers: HonoHandlersFor<
       return badUserInput(validationError);
     }
     return withNewTransaction(ctx.services.db, async () => {
+      const canAccess =
+        await ctx.services.workspaceMembershipsService.canAccessProject(
+          authSession.user.id,
+          workspaceId as WorkspaceId,
+          projectId as ProjectId,
+        );
+      if (!canAccess) {
+        return notFound();
+      }
       const task = await ctx.services.taskQueue.addTask(
         projectId as ProjectId,
         {
@@ -88,9 +116,23 @@ export const tasksHandlers: HonoHandlersFor<
 
   ":taskId": {
     GET: async (ctx) => {
-      const { taskId } = ctx.hono.req.param();
+      const { workspaceId, projectId, taskId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
 
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessTask(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+            taskId as TaskId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const task = await ctx.services.taskQueue.getTask(taskId as TaskId);
         if (!task) {
           return notFound();
@@ -104,7 +146,11 @@ export const tasksHandlers: HonoHandlersFor<
     },
 
     PUT: async (ctx) => {
-      const { taskId } = ctx.hono.req.param();
+      const { workspaceId, projectId, taskId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
       const validationError = validateAgentConfig(ctx.body.agentConfig, {
         harnessAuthService: ctx.services.harnessAuthService,
         harnesses: ctx.services.harnesses,
@@ -113,6 +159,16 @@ export const tasksHandlers: HonoHandlersFor<
         return badUserInput(validationError);
       }
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessTask(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+            taskId as TaskId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const task = await ctx.services.taskQueue.updateTask(taskId as TaskId, {
           title: ctx.body.title,
           description: ctx.body.description,
@@ -148,9 +204,23 @@ export const tasksHandlers: HonoHandlersFor<
     },
 
     complete: async (ctx) => {
-      const { taskId } = ctx.hono.req.param();
+      const { workspaceId, projectId, taskId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
 
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessTask(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+            taskId as TaskId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const completedTask = await ctx.services.taskQueue.completeTask(
           taskId as TaskId,
         );
@@ -166,9 +236,23 @@ export const tasksHandlers: HonoHandlersFor<
     },
 
     move: async (ctx) => {
-      const { taskId } = ctx.hono.req.param();
+      const { workspaceId, projectId, taskId } = ctx.hono.req.param();
+      const authSession = await requireAuthSession(ctx.hono.req.raw);
+      if (Array.isArray(authSession)) {
+        return authSession;
+      }
 
       return withNewTransaction(ctx.services.db, async () => {
+        const canAccess =
+          await ctx.services.workspaceMembershipsService.canAccessTask(
+            authSession.user.id,
+            workspaceId as WorkspaceId,
+            projectId as ProjectId,
+            taskId as TaskId,
+          );
+        if (!canAccess) {
+          return notFound();
+        }
         const movedTask = await ctx.services.taskQueue.moveTask(
           taskId as TaskId,
           ctx.body,

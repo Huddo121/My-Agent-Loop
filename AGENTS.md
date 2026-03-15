@@ -8,6 +8,7 @@ Review the `docs` directory to understand some of the specifics of this project.
 - Prefer handling null/optional values at the edges (call sites); avoid unnecessary null checks inside shared hooks and components (see "Nullability at the edges" in `docs/02-coding-practices.md`)
 - Don't generate or modify configuration if a tool can do it for you
   - E.g. don't modify package.json to add a dependency, use a `pnpm` command to do it
+  - Don't scaffold out a shadcn component from memory, use the CLI command to do it
 - If you modify the documentation, be sure to update the `00-index.md` if necessary
 - Run the `typecheck` and `check` scripts in `package.json` before finishing your task, and endeavour to resolve all found issues.
 - When completing a task, aim to complete the task and don't try to do too much beyond what was asked of you unless it is strictly required to complete your objective

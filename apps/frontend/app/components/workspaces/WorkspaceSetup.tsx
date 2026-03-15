@@ -169,7 +169,8 @@ export function WorkspaceSetup({ onSuccess }: WorkspaceSetupProps) {
               workspace
             </h2>
             <p className="mt-2.5 text-muted-foreground leading-relaxed">
-              Name your first workspace now that your account is signed in.
+              Start with a workspace for your projects, tasks, and agent
+              settings.
             </p>
           </div>
 

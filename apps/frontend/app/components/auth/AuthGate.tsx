@@ -2,7 +2,7 @@ import { Network } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { useMagicLinkSignIn } from "~/lib/auth";
+import { getRelativeCallbackUrl, useMagicLinkSignIn } from "~/lib/auth";
 
 export function AuthGate() {
   const [email, setEmail] = useState("");
@@ -18,7 +18,7 @@ export function AuthGate() {
     signIn.mutate(
       {
         email: normalizedEmail,
-        callbackURL: window.location.origin,
+        callbackURL: getRelativeCallbackUrl(),
       },
       {
         onSuccess: () => {

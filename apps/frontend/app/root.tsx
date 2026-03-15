@@ -66,10 +66,13 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
 function AppContent() {
   const authSession = authClient.useSession();
-
+  const isLoadingAuthSession = authSession.isPending;
   const appSessionQuery = useAppSessionQuery(authSession.data !== null);
+  const isLoadingAppSession =
+    authSession.data !== null &&
+    (appSessionQuery.isLoading || appSessionQuery.isPending);
 
-  if (authSession.isPending) {
+  if (isLoadingAuthSession || isLoadingAppSession) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading…</div>
@@ -79,14 +82,6 @@ function AppContent() {
 
   if (authSession.data === null) {
     return <AuthGate />;
-  }
-
-  if (appSessionQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-muted-foreground">Loading…</div>
-      </div>
-    );
   }
 
   if (appSessionQuery.data?.needsWorkspaceBootstrap) {

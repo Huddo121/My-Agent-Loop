@@ -1,6 +1,6 @@
-import { unauthenticated } from "@mono/api";
 import type { AuthSessionData } from "./AuthSession";
 import { auth } from "./auth";
+import type { UserId } from "./UserId";
 
 export async function getAuthSession(
   request: Request,
@@ -8,15 +8,24 @@ export async function getAuthSession(
   const session = await auth.api.getSession({
     headers: request.headers,
   });
-  return session as AuthSessionData | null;
+  if (session === null) {
+    return null;
+  }
+
+  return {
+    session: {
+      ...session.session,
+      userId: session.session.userId as UserId,
+    },
+    user: {
+      ...session.user,
+      id: session.user.id as UserId,
+    },
+  };
 }
 
 export async function requireAuthSession(
   request: Request,
-): Promise<AuthSessionData | [401, ReturnType<typeof unauthenticated>[1]]> {
-  const session = await getAuthSession(request);
-  if (session === null) {
-    return unauthenticated();
-  }
-  return session;
+): Promise<AuthSessionData | null> {
+  return getAuthSession(request);
 }

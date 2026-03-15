@@ -1,5 +1,6 @@
 import type { WorkspaceId } from "@mono/api";
 import { asc, eq } from "drizzle-orm";
+import type { UserId } from "../auth/UserId";
 import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import { workspaceMembershipsTable, workspacesTable } from "../db/schema";
 import type {
@@ -28,7 +29,7 @@ export class DatabaseWorkspacesService implements WorkspacesService {
     private readonly memberships: WorkspaceMembershipsService,
   ) {}
 
-  async getAllWorkspacesForUser(userId: string): Promise<Workspace[]> {
+  async getAllWorkspacesForUser(userId: UserId): Promise<Workspace[]> {
     const tx = getTransaction();
     const rows = await tx
       .select()
@@ -41,9 +42,7 @@ export class DatabaseWorkspacesService implements WorkspacesService {
       .orderBy(asc(workspacesTable.id));
     const result: Workspace[] = [];
     for (const { workspaces } of rows) {
-      const config = await this.harnessConfig.getWorkspaceConfig(
-        workspaces.id as WorkspaceId,
-      );
+      const config = await this.harnessConfig.getWorkspaceConfig(workspaces.id);
       result.push(toWorkspace(workspaces, config));
     }
     return result;
@@ -61,7 +60,7 @@ export class DatabaseWorkspacesService implements WorkspacesService {
   }
 
   async createWorkspaceForUser(
-    userId: string,
+    userId: UserId,
     workspace: CreateWorkspace,
   ): Promise<Workspace> {
     const tx = getTransaction();
@@ -69,7 +68,7 @@ export class DatabaseWorkspacesService implements WorkspacesService {
       .insert(workspacesTable)
       .values({ name: workspace.name })
       .returning();
-    await this.memberships.addMembership(userId, row.id as WorkspaceId);
+    await this.memberships.addMembership(userId, row.id);
     return toWorkspace(row, null);
   }
 

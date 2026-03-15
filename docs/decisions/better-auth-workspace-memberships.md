@@ -13,7 +13,7 @@ We need authenticated user accounts now, but the first release does not need inv
 - **Identity and sessions**: BetterAuth is the source of truth for users, sessions, linked accounts, and verification records.
 - **Auth method**: Magic-link sign-in only. Email/password, reset flows, and social login are out of scope for this release.
 - **Email delivery**: Use a stub sender that logs the magic-link URL to the server console. This keeps the flow testable without committing the repo to a mail provider yet.
-- **Workspace authorization**: Workspace membership remains an app-owned concept. We store memberships and invite-ready rows in our own tables instead of using BetterAuth organization features.
+- **Workspace authorization**: Workspace membership remains an app-owned concept. We store memberships in our own tables instead of using BetterAuth organization features.
 - **Bootstrap flow**: A signed-in user with no memberships is required to create their first workspace before entering the app shell. Creating that workspace also creates the initial membership.
 - **Access control**: Workspace, project, and task APIs require an authenticated session plus workspace membership. Anonymous requests return `401`. Requests for resources outside the caller's memberships return `404`.
 - **Frontend behavior**: The data model allows multiple memberships, but the v1 UI remains single-workspace by selecting the first available workspace.
@@ -22,7 +22,8 @@ We need authenticated user accounts now, but the first release does not need inv
 ## Consequences
 
 - New server environment requirements include `BETTER_AUTH_SECRET` and `APP_BASE_URL`.
-- Database schema work now includes BetterAuth tables (`user`, `session`, `account`, `verification`) plus app tables for `workspace_memberships` and `workspace_invitations`.
+- Local development should set `BETTER_AUTH_SECRET` and `APP_BASE_URL` in `apps/server/.env.local`.
+- Database schema work now includes BetterAuth tables (`user`, `session`, `account`, `verification`) plus the app-owned `workspace_memberships` table.
 - BetterAuth endpoints are mounted under `/api/auth/*`, while app-specific auth state is exposed through typed Cerato endpoints under `/api/session`.
 - The anonymous workspace creation path is removed from the main app boot. Authentication and workspace bootstrap are now separate steps.
-- Invitation behavior is intentionally deferred, but the schema is ready for later invite send and accept flows.
+- Invitation behavior is intentionally deferred until there is a concrete workflow to implement.

@@ -5,6 +5,7 @@ import {
   ok,
   type ProjectId,
   runIdSchema,
+  unauthenticated,
   type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
@@ -32,8 +33,8 @@ export const projectsHandlers: HonoHandlersFor<
   GET: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
     const authSession = await requireAuthSession(ctx.hono.req.raw);
-    if (Array.isArray(authSession)) {
-      return authSession;
+    if (authSession === null) {
+      return unauthenticated();
     }
     return withNewTransaction(ctx.services.db, async () => {
       const canAccess =
@@ -60,8 +61,8 @@ export const projectsHandlers: HonoHandlersFor<
   POST: async (ctx) => {
     const { workspaceId } = ctx.hono.req.param();
     const authSession = await requireAuthSession(ctx.hono.req.raw);
-    if (Array.isArray(authSession)) {
-      return authSession;
+    if (authSession === null) {
+      return unauthenticated();
     }
     const validationError = validateAgentConfig(ctx.body.agentConfig, {
       harnessAuthService: ctx.services.harnessAuthService,
@@ -129,8 +130,8 @@ export const projectsHandlers: HonoHandlersFor<
     GET: async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
@@ -161,8 +162,8 @@ export const projectsHandlers: HonoHandlersFor<
     PATCH: async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       const validationError = validateAgentConfig(ctx.body.agentConfig, {
         harnessAuthService: ctx.services.harnessAuthService,
@@ -228,8 +229,8 @@ export const projectsHandlers: HonoHandlersFor<
     DELETE: async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
@@ -259,8 +260,8 @@ export const projectsHandlers: HonoHandlersFor<
     "test-forge-connection": async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
@@ -303,8 +304,8 @@ export const projectsHandlers: HonoHandlersFor<
     run: async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
 
       const mode = ctx.body.mode;

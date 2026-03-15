@@ -4,7 +4,7 @@ import { apiClient } from "~/lib/api-client";
 import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import type { Workspace } from "~/types";
 
-const WORKSPACES_QUERY_KEY = ["workspaces"] as const;
+export const WORKSPACES_QUERY_KEY = ["workspaces"] as const;
 const WORKSPACE_QUERY_KEY = (workspaceId: WorkspaceId) =>
   [...WORKSPACES_QUERY_KEY, workspaceId] as const;
 const WORKSPACE_HARNESES_QUERY_KEY = (workspaceId: WorkspaceId) =>

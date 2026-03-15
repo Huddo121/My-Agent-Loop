@@ -1,5 +1,7 @@
+import type { UserId } from "./UserId";
+
 export interface AuthSessionUser {
-  id: string;
+  id: UserId;
   email: string;
   emailVerified: boolean;
   name: string;
@@ -12,7 +14,7 @@ export interface AuthSessionData {
   session: {
     id: string;
     token: string;
-    userId: string;
+    userId: UserId;
     expiresAt: Date;
     createdAt: Date;
     updatedAt: Date;

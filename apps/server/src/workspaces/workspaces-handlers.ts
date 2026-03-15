@@ -3,6 +3,7 @@ import {
   type MyAgentLoopApi,
   notFound,
   ok,
+  unauthenticated,
   type WorkspaceId,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
@@ -19,8 +20,8 @@ export const workspacesHandlers: HonoHandlersFor<
 > = {
   GET: async (ctx) => {
     const authSession = await requireAuthSession(ctx.hono.req.raw);
-    if (Array.isArray(authSession)) {
-      return authSession;
+    if (authSession === null) {
+      return unauthenticated();
     }
     return withNewTransaction(ctx.services.db, async () => {
       const workspaces =
@@ -34,8 +35,8 @@ export const workspacesHandlers: HonoHandlersFor<
     GET: async (ctx) => {
       const { workspaceId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
@@ -58,8 +59,8 @@ export const workspacesHandlers: HonoHandlersFor<
     PATCH: async (ctx) => {
       const { workspaceId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);
-      if (Array.isArray(authSession)) {
-        return authSession;
+      if (authSession === null) {
+        return unauthenticated();
       }
       const body = ctx.body;
       const validationError = validateAgentConfig(body.agentConfig, {
@@ -104,8 +105,8 @@ export const workspacesHandlers: HonoHandlersFor<
       GET: async (ctx) => {
         const { workspaceId } = ctx.hono.req.param();
         const authSession = await requireAuthSession(ctx.hono.req.raw);
-        if (Array.isArray(authSession)) {
-          return authSession;
+        if (authSession === null) {
+          return unauthenticated();
         }
         return withNewTransaction(ctx.services.db, async () => {
           const canAccess =

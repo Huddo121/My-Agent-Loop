@@ -8,6 +8,7 @@ import type {
 import { sql } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
 import { check } from "drizzle-orm/pg-core";
+import type { UserId } from "../auth/UserId";
 import type { RunId } from "../runs/RunId";
 import type { WorkflowConfiguration } from "../workflow/Workflow";
 
@@ -22,7 +23,7 @@ export const queueStateEnum = pg.pgEnum("queue_state", [
 export const forgeTypeEnum = pg.pgEnum("forge_type", ["gitlab", "github"]);
 
 export const userTable = pg.pgTable("user", {
-  id: pg.text().primaryKey(),
+  id: pg.text().primaryKey().$type<UserId>(),
   name: pg.text().notNull(),
   email: pg.text().notNull().unique(),
   emailVerified: pg.boolean().notNull().default(false),
@@ -44,7 +45,8 @@ export const sessionTable = pg.pgTable(
     userId: pg
       .text()
       .references(() => userTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .notNull()
+      .$type<UserId>(),
   },
   (table) => ({
     userIdIdx: pg.index().on(table.userId),
@@ -60,7 +62,8 @@ export const accountTable = pg.pgTable(
     userId: pg
       .text()
       .references(() => userTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .notNull()
+      .$type<UserId>(),
     accessToken: pg.text(),
     refreshToken: pg.text(),
     idToken: pg.text(),
@@ -110,39 +113,12 @@ export const workspaceMembershipsTable = pg.pgTable(
     userId: pg
       .text()
       .references(() => userTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .notNull()
+      .$type<UserId>(),
     createdAt: pg.timestamp().notNull().defaultNow(),
   },
   (table) => ({
     workspaceUserUnique: pg.unique().on(table.workspaceId, table.userId),
-  }),
-);
-
-export const workspaceInvitationsTable = pg.pgTable(
-  "workspace_invitations",
-  {
-    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
-    workspaceId: pg
-      .uuid()
-      .references(() => workspacesTable.id, { onDelete: "cascade" })
-      .notNull()
-      .$type<WorkspaceId>(),
-    inviterUserId: pg
-      .text()
-      .references(() => userTable.id, { onDelete: "cascade" })
-      .notNull(),
-    inviteeEmail: pg.text().notNull(),
-    token: pg.text().notNull().unique(),
-    status: pg.text().notNull().default("pending"),
-    expiresAt: pg.timestamp().notNull(),
-    createdAt: pg.timestamp().notNull().defaultNow(),
-    acceptedAt: pg.timestamp(),
-    revokedAt: pg.timestamp(),
-  },
-  (table) => ({
-    workspaceInviteeUnique: pg
-      .unique()
-      .on(table.workspaceId, table.inviteeEmail),
   }),
 );
 
@@ -153,7 +129,8 @@ export const projectsTable = pg.pgTable(
     workspaceId: pg
       .uuid()
       .references(() => workspacesTable.id)
-      .notNull(),
+      .notNull()
+      .$type<WorkspaceId>(),
     name: pg.text().notNull(),
     shortCode: pg.text().notNull(),
     repositoryUrl: pg.text().notNull(),
@@ -175,6 +152,7 @@ export const projectForgeSecretsTable = pg.pgTable("project_forge_secrets", {
     .uuid()
     .references(() => projectsTable.id)
     .notNull()
+    .$type<ProjectId>()
     .unique(),
   encryptedToken: pg.text().notNull(),
 });
@@ -244,7 +222,8 @@ export const runsTable = pg.pgTable(
     taskId: pg
       .uuid()
       .references(() => tasksTable.id)
-      .notNull(),
+      .notNull()
+      .$type<TaskId>(),
     startedAt: pg.timestamp().notNull().defaultNow(),
     state: runStateEnum().notNull().default("pending"),
     completedAt: pg.timestamp(),

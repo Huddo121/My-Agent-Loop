@@ -2,6 +2,7 @@ import {
   badUserInput,
   type MyAgentLoopApi,
   ok,
+  unauthenticated,
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
 import { requireAuthSession } from "../auth/session";
@@ -15,8 +16,8 @@ export const sessionHandlers: HonoHandlersFor<
 > = {
   GET: async (ctx) => {
     const authSession = await requireAuthSession(ctx.hono.req.raw);
-    if (Array.isArray(authSession)) {
-      return authSession;
+    if (authSession === null) {
+      return unauthenticated();
     }
     return withNewTransaction(ctx.services.db, async () => {
       const workspaces =
@@ -32,8 +33,8 @@ export const sessionHandlers: HonoHandlersFor<
   },
   "bootstrap-workspace": async (ctx) => {
     const authSession = await requireAuthSession(ctx.hono.req.raw);
-    if (Array.isArray(authSession)) {
-      return authSession;
+    if (authSession === null) {
+      return unauthenticated();
     }
     return withNewTransaction(ctx.services.db, async () => {
       const alreadyBootstrapped =

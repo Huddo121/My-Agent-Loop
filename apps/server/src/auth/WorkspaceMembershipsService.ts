@@ -6,18 +6,19 @@ import {
   workspaceMembershipsTable,
 } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
+import type { UserId } from "./UserId";
 
 export interface WorkspaceMembershipsService {
-  userHasAnyWorkspace(userId: string): Promise<boolean>;
-  addMembership(userId: string, workspaceId: WorkspaceId): Promise<void>;
-  isWorkspaceMember(userId: string, workspaceId: WorkspaceId): Promise<boolean>;
+  userHasAnyWorkspace(userId: UserId): Promise<boolean>;
+  addMembership(userId: UserId, workspaceId: WorkspaceId): Promise<void>;
+  isWorkspaceMember(userId: UserId, workspaceId: WorkspaceId): Promise<boolean>;
   canAccessProject(
-    userId: string,
+    userId: UserId,
     workspaceId: WorkspaceId,
     projectId: ProjectId,
   ): Promise<boolean>;
   canAccessTask(
-    userId: string,
+    userId: UserId,
     workspaceId: WorkspaceId,
     projectId: ProjectId,
     taskId: TaskId,
@@ -27,7 +28,7 @@ export interface WorkspaceMembershipsService {
 export class DatabaseWorkspaceMembershipsService
   implements WorkspaceMembershipsService
 {
-  async userHasAnyWorkspace(userId: string): Promise<boolean> {
+  async userHasAnyWorkspace(userId: UserId): Promise<boolean> {
     const tx = getTransaction();
     const membership = await tx.query.workspaceMembershipsTable.findFirst({
       where: eq(workspaceMembershipsTable.userId, userId),
@@ -35,7 +36,7 @@ export class DatabaseWorkspaceMembershipsService
     return membership !== undefined;
   }
 
-  async addMembership(userId: string, workspaceId: WorkspaceId): Promise<void> {
+  async addMembership(userId: UserId, workspaceId: WorkspaceId): Promise<void> {
     const tx = getTransaction();
     await tx.insert(workspaceMembershipsTable).values({
       userId,
@@ -44,7 +45,7 @@ export class DatabaseWorkspaceMembershipsService
   }
 
   async isWorkspaceMember(
-    userId: string,
+    userId: UserId,
     workspaceId: WorkspaceId,
   ): Promise<boolean> {
     const tx = getTransaction();
@@ -58,7 +59,7 @@ export class DatabaseWorkspaceMembershipsService
   }
 
   async canAccessProject(
-    userId: string,
+    userId: UserId,
     workspaceId: WorkspaceId,
     projectId: ProjectId,
   ): Promise<boolean> {
@@ -84,7 +85,7 @@ export class DatabaseWorkspaceMembershipsService
   }
 
   async canAccessTask(
-    userId: string,
+    userId: UserId,
     workspaceId: WorkspaceId,
     projectId: ProjectId,
     taskId: TaskId,

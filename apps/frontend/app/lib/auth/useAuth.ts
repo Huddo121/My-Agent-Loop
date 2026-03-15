@@ -2,11 +2,11 @@ import type { AppSessionResponse, BootstrapWorkspaceRequest } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Workspace } from "~/types";
 import { apiClient } from "../api-client";
+import { WORKSPACES_QUERY_KEY } from "../workspaces/useWorkspaces";
 import { handleUnauthenticated } from "./api-errors";
 import { authClient } from "./auth-client";
 
 export const APP_SESSION_QUERY_KEY = ["session"] as const;
-const WORKSPACES_QUERY_KEY = ["workspaces"] as const;
 
 export function useMagicLinkSignIn() {
   return useMutation({

@@ -33,12 +33,36 @@ Set the TODO's `status` to `in-progress` in the plan file's frontmatter.
 
 ### 2. Spawn subagent
 
-Invoke the todo-completer subagent with:
+**You must spawn the "Plan TODO executor" subagent** (defined at `.cursor/agents/todo-completer.md`). Use whatever invocation mechanism your harness provides, but ensure you target this specific subagent – do not use a generic agent type.
+
+Include in the task:
 - **Plan file path** (so it can read the whole plan for context)
-- **Which TODO** to work on, giving it the id and the TODO content
+- **Which TODO** to work on (give it the `id` and the TODO `content`)
 - **Optional extra context**: If the subagent needs specifics from work a previous subagent completed that are not in the plan, pass them.
 
-Do not assume how the subagent is triggered (mcp_task, agent reference, etc.) – use whatever mechanism your harness provides.
+#### Cursor mcp_task tool
+
+When using Cursor's Task tool (`mcp_task`):
+
+| Parameter | Required | Value |
+|-----------|----------|-------|
+| `subagent_type` | Yes | `"Plan TODO executor"` – matches the `name` in the todo-completer frontmatter |
+| `description` | Yes | Short 3–5 word description of the task (e.g. "Complete driver-app todo") |
+| `prompt` | Yes | Full instructions: plan file path, TODO id, TODO content, and any extra context |
+
+Optional: `model` (e.g. `"fast"`), `readonly`, `run_in_background`, `resume` (agent ID), `attachments` (file paths).
+
+Example prompt structure:
+
+```
+Execute the following TODO from the plan.
+
+Plan file: .cursor/plans/driver_binary_execution_c4f8a2b1.plan.md
+TODO id: driver-app
+TODO content: Create a new workspace app at apps/driver. Add its package.json...
+
+[Optional: Context from previous subagent work that isn't in the plan]
+```
 
 ### 3. Handle subagent result
 

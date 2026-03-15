@@ -1,0 +1,18 @@
+{
+  "name": "@mono/driver",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mono/api": "workspace:*",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "25.0.9",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -4,7 +4,7 @@ overview: Add a dedicated Node-based driver app that is packaged as a single Lin
 todos:
   - id: driver-app
     content: Create a new workspace app at `apps/driver`. Add its `package.json`, `tsconfig.json`, and source entrypoint. Keep it self-contained and avoid importing server internals directly unless a type or helper is intentionally moved to a shared package. The app should be a CLI program that accepts run metadata, harness command, task file path, host API base URL, and driver token as arguments.
-    status: pending
+    status: completed
   - id: driver-runtime
     content: Implement the driver runtime in `apps/driver/src/`. Split it into small modules for CLI parsing, host API client, task-file loading/saving, harness process execution, git commit/reset helpers, retry handling, and progress detection. The runtime should support both single-task runs and subtask runs through the same loop, with subtask-aware behavior enabled when the task file contains subtasks.
     status: pending

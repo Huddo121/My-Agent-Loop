@@ -3,6 +3,9 @@
   "files": [],
   "references": [
     {
+      "path": "apps/driver"
+    },
+    {
       "path": "apps/frontend"
     },
     {

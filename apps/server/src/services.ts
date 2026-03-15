@@ -4,6 +4,10 @@ import {
   type WorkspaceMembershipsService,
 } from "./auth/WorkspaceMembershipsService";
 import { type Database, db } from "./db";
+import {
+  type DriverRunTokenStore,
+  InMemoryDriverRunTokenStore,
+} from "./driver-api/DriverRunTokenStore";
 import { env } from "./env";
 import type { RelativeFilePath } from "./file-system/FilePath";
 import { LocalFileSystemService } from "./file-system/FileSystemService";
@@ -52,6 +56,7 @@ import type { WorkspacesService } from "./workspaces/WorkspacesService";
 export interface Services {
   db: Database;
   taskQueue: TaskQueue;
+  driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
@@ -83,6 +88,7 @@ const sandboxService = new DockerSandboxService(
 );
 
 const taskQueue = new DatabaseTaskQueue();
+const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
 const harnessAuthService = new EnvHarnessAuthService({
@@ -151,6 +157,7 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
 export const services: Services = {
   db,
   taskQueue,
+  driverRunTokenStore,
   sandboxService,
   gitService,
   workflowManager,

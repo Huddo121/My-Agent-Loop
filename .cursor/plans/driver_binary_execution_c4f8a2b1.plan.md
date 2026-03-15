@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: driver-api
     content: Add a dedicated internal driver API to `apps/server/src/` for driver-to-host communication. It should be separate from MCP and support reading the current canonical task state and persisting a task snapshot after each iteration. Authenticate requests with a random per-run token sent in a request header. Reject missing or invalid tokens.
-    status: pending
+    status: completed
   - id: driver-token
     content: Extend run preparation in `apps/server/src/workflow/WorkflowExecutionService.ts` and any supporting services so each run gets a random driver token. Pass that token to the sandboxed driver as a CLI argument and persist it only for the lifetime needed to validate driver API calls. Keep the token scoped to a single run.
     status: pending

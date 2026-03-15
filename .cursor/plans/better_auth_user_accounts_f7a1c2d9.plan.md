@@ -45,8 +45,8 @@ todos:
     content: Update frontend hooks and data-loading flows to treat `401` as an auth/session state transition instead of a generic request failure. Make sure signed-out or expired-session states fall back to the auth gate cleanly.
     status: completed
   - id: tests
-    content: Add server and frontend tests covering magic-link auth bootstrapping, session resolution, first-workspace bootstrap, membership-based authorization for workspace/project/task APIs, blocked admin access, and root gating behavior for anonymous, bootstrap-required, and fully bootstrapped users.
-    status: pending
+    content: Add server and frontend tests covering magic-link auth bootstrapping, session resolution, first-workspace bootstrap, membership-based authorization for workspace/project/task APIs, the frontend admin route staying hidden, and root gating behavior for anonymous, bootstrap-required, and fully bootstrapped users.
+    status: completed
 isProject: false
 ---
 

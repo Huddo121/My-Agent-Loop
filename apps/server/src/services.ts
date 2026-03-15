@@ -140,6 +140,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   agentHarnessConfigRepository,
   harnessAuthService,
   forgeSecretRepository,
+  driverRunTokenStore,
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(

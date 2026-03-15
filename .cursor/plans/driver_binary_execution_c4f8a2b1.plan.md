@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: driver-token
     content: Extend run preparation in `apps/server/src/workflow/WorkflowExecutionService.ts` and any supporting services so each run gets a random driver token. Pass that token to the sandboxed driver as a CLI argument and persist it only for the lifetime needed to validate driver API calls. Keep the token scoped to a single run.
-    status: pending
+    status: completed
   - id: sandbox-startup
     content: Refactor sandbox startup so the driver is always the long-lived process inside the sandbox. Update `apps/server/src/sandbox/lifecycle.sh` and the workflow preparation code so lifecycle bootstraps environment/setup and then executes the driver binary, while the driver itself spawns the selected harness command for each iteration.
     status: pending

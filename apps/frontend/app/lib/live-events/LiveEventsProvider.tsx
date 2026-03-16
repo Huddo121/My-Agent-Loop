@@ -1,7 +1,10 @@
-import { liveEventDtoSchema } from "@mono/api";
+import { liveEventDtoSchema, type ProjectId } from "@mono/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useParams } from "react-router";
+import { tasksQueryKey } from "~/hooks/useTasks";
+import { apiClient } from "~/lib/api-client";
+import { projectsQueryKey } from "~/lib/projects/useProjects";
 import { useCurrentWorkspace } from "~/lib/workspaces";
 import { applyProjectUpdated, applyTaskUpdated } from "./cache-helpers";
 
@@ -13,6 +16,11 @@ import { applyProjectUpdated, applyTaskUpdated } from "./cache-helpers";
  *
  * On each parsed event, updates React Query caches via cache helpers so the
  * board and projects stay in sync without full refetches.
+ *
+ * On stream open or reconnect, invalidates workspace-projects and
+ * project-board queries once so the UI catches up from canonical server state.
+ * If the stream fails with auth (401), stops reconnecting so the normal
+ * signed-out flow can take over.
  */
 export function LiveEventsProvider({
   children,
@@ -35,6 +43,21 @@ export function LiveEventsProvider({
 
     const es = new EventSource(url);
 
+    function invalidateOnOpen() {
+      queryClient.invalidateQueries({
+        queryKey: projectsQueryKey(workspace.id),
+      });
+      if (routeProjectId) {
+        queryClient.invalidateQueries({
+          queryKey: tasksQueryKey(routeProjectId as ProjectId),
+        });
+      }
+    }
+
+    es.onopen = () => {
+      invalidateOnOpen();
+    };
+
     es.onmessage = (ev) => {
       try {
         const parsed = JSON.parse(ev.data);
@@ -55,9 +78,19 @@ export function LiveEventsProvider({
       }
     };
 
-    es.onerror = () => {
-      // EventSource will auto-reconnect by default. Reconnect behavior
-      // (invalidation on reconnect, stop on auth failure) is the reconnect-behavior TODO.
+    es.onerror = async () => {
+      // EventSource does not expose HTTP status. When the server returns 401,
+      // the connection fails and we cannot distinguish it from other failures.
+      // Check session explicitly: if unauthenticated, stop reconnecting so
+      // the normal signed-out app flow can take over.
+      try {
+        const response = await apiClient.session.GET();
+        if (response.status === 401) {
+          es.close();
+        }
+      } catch {
+        // Network error during session check; let EventSource retry
+      }
     };
 
     return () => {

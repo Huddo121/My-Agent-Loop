@@ -1,4 +1,4 @@
-import type { ProjectDto, TaskDto, WorkspaceId } from "@mono/api";
+import type { ProjectDto, ProjectId, TaskDto, WorkspaceId } from "@mono/api";
 import type { QueryClient } from "@tanstack/react-query";
 import { tasksQueryKey } from "~/hooks/useTasks";
 import { projectsQueryKey } from "~/lib/projects/useProjects";
@@ -44,7 +44,7 @@ export function applyTaskUpdated(
   projectId: string,
   task: TaskDto,
 ): void {
-  const key = tasksQueryKey(projectId);
+  const key = tasksQueryKey(projectId as ProjectId);
   const completedOn = task.completedOn;
 
   queryClient.setQueryData<Task[]>(key, (old) => {

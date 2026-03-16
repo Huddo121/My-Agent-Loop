@@ -1,6 +1,7 @@
 import { badUserInput, notFound, unauthenticated } from "@mono/api";
 import type { Hono } from "hono";
 import z from "zod";
+import type { Logger } from "../logger/Logger";
 import type { RunId } from "../runs/RunId";
 import type { Services } from "../services";
 
@@ -32,7 +33,7 @@ const lifecycleEventSchema = z.discriminatedUnion("kind", [
 
 type DriverApiServices = Pick<
   Services,
-  "db" | "driverRunTokenStore" | "runsService"
+  "db" | "driverRunTokenStore" | "runsService" | "logger"
 >;
 
 /**
@@ -85,17 +86,28 @@ export function registerDriverApiRoutes(
       return ctx.json(response[1], response[0]);
     }
 
-    // Store the log event
+    // Shape the log into a simple server-side format and write to server logs
+    const logEntry = {
+      timestamp: new Date(),
+      stream: body.stream,
+      message: body.message,
+    };
+
+    // Log immediately to server output for visibility
+    const logMessage = `[driver:${runId}] ${logEntry.stream}: ${logEntry.message}`;
+    if (body.stream === "stderr") {
+      services.logger.error(logMessage);
+    } else {
+      services.logger.info(logMessage);
+    }
+
+    // Also store in-memory for potential later retrieval
     let logs = driverLogs.get(runId);
     if (logs === undefined) {
       logs = [];
       driverLogs.set(runId, logs);
     }
-    logs.push({
-      timestamp: new Date(),
-      stream: body.stream,
-      message: body.message,
-    });
+    logs.push(logEntry);
 
     return new Response(null, { status: 204 });
   });
@@ -139,10 +151,17 @@ export function registerDriverApiRoutes(
       }
 
       // Handle lifecycle events
-      if (body.kind === "harness-exited") {
+      if (body.kind === "harness-starting") {
+        services.logger.info(
+          `[driver:${runId}] Harness starting: ${body.harnessCommand}`,
+        );
+      } else if (body.kind === "harness-exited") {
         // Update the run state based on the harness exit code
         const newState = body.exitCode === 0 ? "completed" : "failed";
         await services.runsService.updateRunState(runId, newState);
+        services.logger.info(
+          `[driver:${runId}] Harness exited with code ${body.exitCode}`,
+        );
       }
 
       return new Response(null, { status: 204 });

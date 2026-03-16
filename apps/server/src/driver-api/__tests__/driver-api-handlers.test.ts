@@ -23,6 +23,12 @@ function createApp() {
       getRun: vi.fn<() => Promise<Run | undefined>>(),
       updateRunState: vi.fn(),
     },
+    logger: {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
   };
 
   const app = new Hono();

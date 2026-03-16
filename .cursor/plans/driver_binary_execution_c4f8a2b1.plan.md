@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: driver-api
     content: Rework the internal driver API in `apps/server/src/` so it matches the slimmer v1 driver contract. It should stay separate from MCP, authenticate requests with the per-run driver token, and accept the log/lifecycle events the driver needs to send while supervising a harness run. Remove or replace any task-snapshot-oriented API behavior that no longer fits this scope.
-    status: in-progress
+    status: completed
   - id: host-log-ingest
     content: Wire driver log delivery through to the host's existing logging path. For v1, accept the driver's HTTP log payloads, shape them into a simple server-side format, and immediately write them to the server logs so run output is visible without introducing a more complex persistence pipeline yet.
-    status: pending
+    status: in-progress
   - id: driver-token
     content: Extend run preparation in `apps/server/src/workflow/WorkflowExecutionService.ts` and any supporting services so each run gets a random driver token. Pass that token to the sandboxed driver as a CLI argument and persist it only for the lifetime needed to validate driver API calls. Keep the token scoped to a single run.
     status: completed

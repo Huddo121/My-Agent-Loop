@@ -22,10 +22,10 @@ todos:
     status: completed
   - id: frontend-provider
     content: Add a frontend live-events integration that opens one `EventSource` per workspace tab and mounts inside `CurrentWorkspaceProvider`. Reuse the authenticated app shell and current-workspace selection that now come from `/api/session` and workspace bootstrap, so the provider only mounts once auth and workspace membership have been resolved. Derive subscriptions from the current UI state so the app always listens for workspace project updates and, when a project is selected, board updates for that project.
-    status: in-progress
+    status: completed
   - id: cache-updates
     content: Add React Query cache helpers for live events and use them in the live-events provider. `project.updated` should patch the projects cache, and `task.updated` should insert, replace, reorder, or remove board tasks based on the task payload and completion state without forcing a full refetch.
-    status: pending
+    status: in-progress
   - id: reconnect-behavior
     content: Make the frontend recreate the SSE connection when the subscription set changes and invalidate relevant queries once on reconnect or initial open so the UI can recover from missed events without implementing replay or `Last-Event-ID`. If the stream starts returning auth failures after logout or session expiry, stop reconnecting and let the normal signed-out app flow take over.
     status: pending

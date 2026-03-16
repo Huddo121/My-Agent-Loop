@@ -1,32 +1,17 @@
-import {
-  type RunId,
-  type SubtaskId,
-  subtaskSchema,
-  type TaskId,
-} from "@mono/api";
-import z from "zod";
-import type { DriverTaskFile } from "./task-file";
+import type { RunId, TaskId } from "@mono/api";
 
 const DRIVER_TOKEN_HEADER = "X-MAL-Driver-Token";
 
-const driverTaskSnapshotSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  subtasks: z.array(subtaskSchema),
-});
-
-const syncTaskSnapshotRequestSchema = z.object({
-  taskSnapshot: driverTaskSnapshotSchema,
-  subtaskId: z.string().optional(),
-  iteration: z.number().int().min(1),
-  harnessExitCode: z.number().int(),
-  progressState: z.enum(["none", "progress", "complete"]),
-  progressReason: z.string(),
-});
-
-export type SyncTaskSnapshotInput = z.infer<
-  typeof syncTaskSnapshotRequestSchema
->;
+export type LifecycleEvent =
+  | {
+      kind: "harness-starting";
+      harnessCommand: string;
+    }
+  | {
+      kind: "harness-exited";
+      exitCode: number;
+      signal: string | null;
+    };
 
 export class HostApiClient {
   constructor(
@@ -34,56 +19,62 @@ export class HostApiClient {
       baseUrl: string;
       runId: RunId;
       taskId: TaskId;
-      subtaskId?: SubtaskId;
       driverToken: string;
     },
   ) {}
 
-  async readCanonicalTaskSnapshot(): Promise<DriverTaskFile> {
-    const response = await fetch(this.buildTaskUrl(), {
-      method: "GET",
-      headers: this.headers(),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to read canonical task snapshot: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const parsed = driverTaskSnapshotSchema.parse(await response.json());
-    return parsed;
-  }
-
-  async syncTaskSnapshot(input: SyncTaskSnapshotInput): Promise<void> {
-    const request = syncTaskSnapshotRequestSchema.parse(input);
-    const response = await fetch(this.buildTaskUrl(), {
-      method: "PUT",
+  async sendLog(params: {
+    message: string;
+    stream: "stdout" | "stderr";
+  }): Promise<void> {
+    const response = await fetch(this.buildLogUrl(), {
+      method: "POST",
       headers: {
         ...this.headers(),
         "content-type": "application/json",
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        message: params.message,
+        stream: params.stream,
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to persist task snapshot: ${response.status} ${response.statusText}`,
+      console.error(
+        `Failed to send log to host: ${response.status} ${response.statusText}`,
       );
     }
   }
 
-  private buildTaskUrl(): URL {
-    const url = new URL(
-      `/internal/driver/runs/${this.options.runId}/tasks/${this.options.taskId}`,
+  async sendLifecycleEvent(event: LifecycleEvent): Promise<void> {
+    const response = await fetch(this.buildLifecycleUrl(), {
+      method: "POST",
+      headers: {
+        ...this.headers(),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(event),
+    });
+
+    if (!response.ok) {
+      console.error(
+        `Failed to send lifecycle event to host: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  private buildLogUrl(): URL {
+    return new URL(
+      `/internal/driver/runs/${this.options.runId}/tasks/${this.options.taskId}/logs`,
       this.options.baseUrl,
     );
+  }
 
-    if (this.options.subtaskId !== undefined) {
-      url.searchParams.set("subtaskId", this.options.subtaskId);
-    }
-
-    return url;
+  private buildLifecycleUrl(): URL {
+    return new URL(
+      `/internal/driver/runs/${this.options.runId}/tasks/${this.options.taskId}/lifecycle`,
+      this.options.baseUrl,
+    );
   }
 
   private headers(): Record<string, string> {

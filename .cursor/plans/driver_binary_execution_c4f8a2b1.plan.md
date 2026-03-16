@@ -4,7 +4,7 @@ overview: Add a dedicated Node-based driver app that is packaged as a single Lin
 todos:
   - id: driver-app
     content: Reshape `apps/driver` into the v1 driver shell. The app should remain a self-contained CLI program with its own `package.json`, `tsconfig.json`, and entrypoint, but its contract should now be limited to run metadata, harness command, host API base URL, and driver token. Remove task-file-specific CLI/runtime assumptions from this app unless they are still needed outside the driver.
-    status: pending
+    status: completed
   - id: driver-runtime
     content: Rework `apps/driver/src/` around the v1 runtime responsibilities only. The runtime should parse its CLI inputs, start the harness process, stream stdout/stderr and driver lifecycle events back to the host API, and exit with the harness result. Remove or replace any modules that still assume task-file management, retry loops, progress detection, or other in-sandbox orchestration behavior.
     status: pending

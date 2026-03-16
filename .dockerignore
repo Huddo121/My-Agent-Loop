@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+apps/*/dist
+apps/*/dist-sea
+apps/*/coverage
+packages/*/dist
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage
+.turbo
+
+# Misc
+*.env.local
+*.env.*.local

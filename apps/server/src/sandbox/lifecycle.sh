@@ -1,5 +1,33 @@
 #!/bin/bash
 
+# =============================================================================
+# Sandbox Lifecycle Script
+#
+# This script runs inside the sandbox container and orchestrates the execution
+# flow. It follows a clear ownership contract between SERVER and DRIVER:
+#
+# SERVER (workflow execution service) owns:
+#   - Creating /task.txt with the task description
+#   - Mounting harness config files (from AgentHarness.files)
+#   - Setting environment variables
+#   - Passing harness setup commands and run command to this script
+#
+# LIFECYCLE (this script) owns:
+#   - Running setup.sh if present (pre-driver setup)
+#   - Running harness-setup.sh with setup commands from harness.prepare()
+#   - Starting the driver binary
+#   - Running teardown.sh if present
+#
+# DRIVER owns:
+#   - Executing the harness command (from --harness-command CLI arg)
+#   - Forwarding stdout/stderr to the host API
+#   - Sending lifecycle events (harness-starting, harness-exited)
+#   - Exiting with the harness result
+#
+# The task file (/task.txt) is created by the SERVER before the container starts.
+# The driver does NOT create or manage the task file.
+# =============================================================================
+
 # Save current shell options and flags
 SAVED_SHELL_OPTIONS=$(set +o)
 SAVED_FLAGS="$-"
@@ -28,13 +56,39 @@ if [ -f /harness-setup.sh ]; then
   source /harness-setup.sh
 fi
 
-# Run the agent (injected by the workflow via AGENT_RUN_COMMAND)
-if [ -z "${AGENT_RUN_COMMAND:-}" ]; then
-  echo "AGENT_RUN_COMMAND not set"
+# Run the driver binary with CLI arguments
+# The driver is the long-lived process that:
+# 1. Starts the selected harness command
+# 2. Forwards logs to the host API
+# 3. Exits with the harness result
+if [ -z "${MAL_DRIVER_BINARY_PATH:-}" ]; then
+  echo "MAL_DRIVER_BINARY_PATH not set"
   exit 1
 fi
-eval "$AGENT_RUN_COMMAND"
-AGENT_EXIT_CODE=$?
+
+if [ -z "${MAL_DRIVER_CLI_ARGS:-}" ]; then
+  echo "MAL_DRIVER_CLI_ARGS not set"
+  exit 1
+fi
+
+echo "Starting driver binary: $MAL_DRIVER_BINARY_PATH"
+
+# Execute the driver binary with the provided CLI arguments
+# The driver will run the harness command and forward logs until the harness exits
+WAS_XTRACE_ENABLED=0
+case "$-" in
+  *x*) WAS_XTRACE_ENABLED=1 ;;
+esac
+
+set +x
+set +e
+eval "$MAL_DRIVER_BINARY_PATH $MAL_DRIVER_CLI_ARGS"
+DRIVER_EXIT_CODE=$?
+set -e
+
+if [ "$WAS_XTRACE_ENABLED" -eq 1 ]; then
+  set -x
+fi
 
 # Run teardown script if it exists (with 1 minute timeout)
 if [ -f /code/.agent-loop/teardown.sh ]; then
@@ -44,5 +98,5 @@ if [ -f /code/.agent-loop/teardown.sh ]; then
   }
 fi
 
-# Exit with the agent's exit code
-exit $AGENT_EXIT_CODE
+# Exit with the driver's exit code (which reflects the harness result)
+exit $DRIVER_EXIT_CODE

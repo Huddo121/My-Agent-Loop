@@ -4,10 +4,10 @@ overview: Add a general-purpose live event system backed by Server-Sent Events s
 todos:
   - id: shared-types
     content: Add a new `live-events` module in `packages/api` that exports typed subscriptions and events for the SSE system. Define Zod-backed types for `workspace-projects` and `project-board` subscriptions plus the initial `project.updated` and `task.updated` event payloads, and export them from the package barrel.
-    status: pending
+    status: completed
   - id: backend-service
     content: Create a server-side `LiveEventsService` that manages in-memory SSE subscribers. It should register and unregister connections, store each connection's workspace id and parsed subscriptions, publish only matching events, and support heartbeats or keepalives for long-lived idle streams.
-    status: pending
+    status: in-progress
   - id: sse-endpoint
     content: Add a raw Hono SSE endpoint at `/api/workspaces/:workspaceId/live-events` outside the Cerato API tree. Require an authenticated Better Auth session, return `401` when no session is present, and return `404` when the caller is not a member of the workspace. Accept repeated `subscription` query params, validate them using the shared `packages/api` schemas, reject invalid subscriptions with `400`, and clean up the subscription on abort or disconnect.
     status: pending

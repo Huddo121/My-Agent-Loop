@@ -6,7 +6,7 @@ todos:
     content: Create a new workspace app at `apps/driver`. Add its `package.json`, `tsconfig.json`, and source entrypoint. Keep it self-contained and avoid importing server internals directly unless a type or helper is intentionally moved to a shared package. The app should be a CLI program that accepts run metadata, harness command, task file path, host API base URL, and driver token as arguments.
     status: completed
   - id: driver-runtime
-    content: Implement the driver runtime in `apps/driver/src/`. Split it into small modules for CLI parsing, host API client, task-file loading/saving, harness process execution, git commit/reset helpers, retry handling, and progress detection. The runtime should support both single-task runs and subtask runs through the same loop, with subtask-aware behavior enabled when the task file contains subtasks.
+    content: Implement the driver runtime in `apps/driver/src/`. Split it into small modules for CLI parsing, host API client, task-file loading/saving, harness process execution, retry handling, and progress detection. The runtime should support both single-task runs and subtask runs through the same loop, with subtask-aware behavior enabled when the task file contains subtasks.
     status: completed
   - id: driver-api
     content: Add a dedicated internal driver API to `apps/server/src/` for driver-to-host communication. It should be separate from MCP and support reading the current canonical task state and persisting a task snapshot after each iteration. Authenticate requests with a random per-run token sent in a request header. Reject missing or invalid tokens.
@@ -41,7 +41,7 @@ isProject: false
 
 Today the server prepares a sandbox and executes one harness command directly via `AGENT_RUN_COMMAND`. That shape makes repeated in-sandbox orchestration awkward because the server has to own loop state, file updates, and retry semantics across the Docker boundary.
 
-The new architecture should route every run through a dedicated driver process inside the sandbox. This gives one place to manage task-file state, prompt selection, harness retries, git checkpoints, and communication back to the host.
+The new architecture should route every run through a dedicated driver process inside the sandbox. This gives one place to manage task-file state, prompt selection, harness retries, and communication back to the host.
 
 The driver should be implemented as a new Node app in the monorepo and shipped into the Linux sandbox image as a single executable binary.
 
@@ -72,7 +72,7 @@ Create `apps/driver` as a normal workspace app with:
 - `package.json`
 - `tsconfig.json`
 - `src/index.ts`
-- source modules for API client, task parsing, progress detection, git operations, and harness execution
+- source modules for API client, task parsing, progress detection, retry handling, and harness execution
 
 Keep the app self-contained. If shared contracts are needed, extract them into `packages/api` or a new small shared package rather than importing from `apps/server`.
 
@@ -95,7 +95,7 @@ The driver should:
 3. Re-read the task file.
 4. Decide whether forward progress was made.
 5. Sync the latest snapshot to the host API.
-6. Commit progress or reset/retry as needed.
+6. Restore the task file snapshot and retry when an iteration fails to make progress.
 7. Exit `0` only when the run is complete.
 
 The harness itself should be instructed to operate on the local task file, not to use MCP to persist task/subtask progress.

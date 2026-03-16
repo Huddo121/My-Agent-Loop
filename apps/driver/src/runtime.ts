@@ -1,5 +1,4 @@
 import type { DriverInvocation } from "./cli";
-import { commitWorkingTree, getHeadCommit, resetWorkingTree } from "./git";
 import { executeHarnessCommand } from "./harness-process";
 import { HostApiClient } from "./host-api";
 import { detectProgress, hasSubtasks } from "./progress";
@@ -23,7 +22,6 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
   }
 
   let checkpointSnapshot = initialSnapshotResult.value;
-  let checkpointCommit = await getHeadCommit(workingDirectory);
   let iteration = 1;
 
   while (true) {
@@ -50,15 +48,6 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
 
     if (!hasSubtasks(latestSnapshot)) {
       if (harnessResult.exitCode === 0) {
-        await checkpointProgress(
-          workingDirectory,
-          checkpointSnapshot,
-          latestSnapshot,
-          {
-            iteration,
-            reason: progress.reason,
-          },
-        );
         return;
       }
 
@@ -70,9 +59,7 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
       }
 
       await rollbackIteration({
-        workingDirectory,
         taskFilePath: invocation.taskFilePath,
-        checkpointCommit,
         checkpointSnapshot,
       });
 
@@ -81,28 +68,10 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
     }
 
     if (progress.kind === "complete") {
-      await checkpointProgress(
-        workingDirectory,
-        checkpointSnapshot,
-        latestSnapshot,
-        {
-          iteration,
-          reason: progress.reason,
-        },
-      );
       return;
     }
 
     if (progress.kind === "progress") {
-      checkpointCommit = await checkpointProgress(
-        workingDirectory,
-        checkpointSnapshot,
-        latestSnapshot,
-        {
-          iteration,
-          reason: progress.reason,
-        },
-      );
       checkpointSnapshot = latestSnapshot;
       retryController.recordProgress();
       iteration += 1;
@@ -117,9 +86,7 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
     }
 
     await rollbackIteration({
-      workingDirectory,
       taskFilePath: invocation.taskFilePath,
-      checkpointCommit,
       checkpointSnapshot,
     });
 
@@ -136,33 +103,10 @@ async function mustLoadTaskFile(taskFilePath: string): Promise<DriverTaskFile> {
   return result.value;
 }
 
-async function checkpointProgress(
-  workingDirectory: string,
-  _previousSnapshot: DriverTaskFile,
-  nextSnapshot: DriverTaskFile,
-  context: { iteration: number; reason: string },
-): Promise<string> {
-  return commitWorkingTree({
-    cwd: workingDirectory,
-    message: buildCommitMessage(
-      nextSnapshot,
-      context.iteration,
-      context.reason,
-    ),
-  });
-}
-
 async function rollbackIteration(options: {
-  workingDirectory: string;
   taskFilePath: string;
-  checkpointCommit: string;
   checkpointSnapshot: DriverTaskFile;
 }): Promise<void> {
-  await resetWorkingTree({
-    cwd: options.workingDirectory,
-    commitish: options.checkpointCommit,
-  });
-
   const writeResult = await saveTaskFile(
     options.taskFilePath,
     options.checkpointSnapshot,
@@ -170,25 +114,4 @@ async function rollbackIteration(options: {
   if (writeResult.success === false) {
     throw writeResult.error;
   }
-}
-
-function buildCommitMessage(
-  snapshot: DriverTaskFile,
-  iteration: number,
-  reason: string,
-): string {
-  const activeSubtask = snapshot.subtasks.find(
-    (subtask) => subtask.state === "in-progress" || subtask.state === "pending",
-  );
-
-  if (activeSubtask !== undefined) {
-    return `driver iteration ${iteration}: ${activeSubtask.title}`;
-  }
-
-  if (snapshot.subtasks.length > 0) {
-    return `driver iteration ${iteration}: subtasks complete`;
-  }
-
-  const shortReason = reason.slice(0, 60);
-  return `driver iteration ${iteration}: ${shortReason}`;
 }

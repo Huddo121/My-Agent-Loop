@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: sse-endpoint
     content: Add a raw Hono SSE endpoint at `/api/workspaces/:workspaceId/live-events` outside the Cerato API tree. Require an authenticated Better Auth session, return `401` when no session is present, and return `404` when the caller is not a member of the workspace. Accept repeated `subscription` query params, validate them using the shared `packages/api` schemas, reject invalid subscriptions with `400`, and clean up the subscription on abort or disconnect.
-    status: in-progress
+    status: completed
   - id: service-wiring
     content: Wire `LiveEventsService` into `apps/server/src/services.ts` and expose it through the server service container so HTTP handlers, MCP handlers, and workflow services can publish live events without reaching into lower-level connection state directly.
-    status: pending
+    status: completed
   - id: publish-task-events
     content: Publish `task.updated` events at the application edges where task state changes are already assembled into frontend DTOs. Cover task create, update, move, and complete in the HTTP handlers, the MCP task handlers, and workflow-driven task completion in `WorkflowExecutionService`.
     status: pending

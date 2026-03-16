@@ -21,7 +21,6 @@ import type { Workflow } from "./Workflow";
 
 const MCP_SERVER_URL = "http://host.docker.internal:3050/mcp";
 const DRIVER_HOST_API_BASE_URL = "http://host.docker.internal:3050";
-const DRIVER_RETRY_LIMIT = 3;
 
 const formatTaskFile = (task: Task): string => {
   let content = `# ${task.title}\n\n${task.description}\n`;
@@ -46,20 +45,16 @@ const shellQuote = (value: string): string =>
 const buildDriverCliArgs = (options: {
   runId: RunId;
   taskId: Task["id"];
-  taskFilePath: string;
   hostApiBaseUrl: string;
   driverToken: string;
   harnessCommand: string;
-  retryLimit: number;
 }): string =>
   [
     ["--run-id", options.runId],
     ["--task-id", options.taskId],
-    ["--task-file-path", options.taskFilePath],
     ["--host-api-base-url", options.hostApiBaseUrl],
     ["--driver-token", options.driverToken],
     ["--harness-command", options.harnessCommand],
-    ["--retry-limit", String(options.retryLimit)],
   ]
     .map(([flag, value]) => `${flag} ${shellQuote(value)}`)
     .join(" ");
@@ -218,16 +213,18 @@ export class WorkflowExecutionService {
       containerPath: "/harness-setup.sh",
     });
 
+    // Driver binary path - will be set during Docker build
+    const driverBinaryPath =
+      process.env.MAL_DRIVER_BINARY_PATH ?? "/code/.agent-loop/driver";
+
     const env: Record<string, string> = {
-      AGENT_RUN_COMMAND: preparation.runCommand,
+      MAL_DRIVER_BINARY_PATH: driverBinaryPath,
       MAL_DRIVER_CLI_ARGS: buildDriverCliArgs({
         runId,
         taskId: task.id,
-        taskFilePath: "/task.txt",
         hostApiBaseUrl: DRIVER_HOST_API_BASE_URL,
         driverToken,
         harnessCommand: preparation.runCommand,
-        retryLimit: DRIVER_RETRY_LIMIT,
       }),
       ...preparation.env,
     };

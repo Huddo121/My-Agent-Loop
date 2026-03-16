@@ -13,13 +13,13 @@ todos:
     status: completed
   - id: host-log-ingest
     content: Wire driver log delivery through to the host's existing logging path. For v1, accept the driver's HTTP log payloads, shape them into a simple server-side format, and immediately write them to the server logs so run output is visible without introducing a more complex persistence pipeline yet.
-    status: in-progress
+    status: completed
   - id: driver-token
     content: Extend run preparation in `apps/server/src/workflow/WorkflowExecutionService.ts` and any supporting services so each run gets a random driver token. Pass that token to the sandboxed driver as a CLI argument and persist it only for the lifetime needed to validate driver API calls. Keep the token scoped to a single run.
     status: completed
   - id: sandbox-startup
     content: Refactor sandbox startup so the driver is always the long-lived process inside the sandbox. Update `apps/server/src/sandbox/lifecycle.sh` and the workflow preparation code so lifecycle bootstraps environment/setup and then executes the driver binary, while the driver itself starts the selected harness command and forwards logs to the host until the harness exits.
-    status: pending
+    status: in-progress
   - id: harness-contract
     content: Update the harness preparation flow in `apps/server/src/harness/` so the server still resolves the chosen harness and produces one concrete command for the driver to execute. Keep this contract explicit about what the driver owns versus what server/lifecycle still owns, especially around any task-file setup that remains outside the driver.
     status: pending

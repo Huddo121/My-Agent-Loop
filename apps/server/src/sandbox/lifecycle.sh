@@ -28,13 +28,28 @@ if [ -f /harness-setup.sh ]; then
   source /harness-setup.sh
 fi
 
-# Run the agent (injected by the workflow via AGENT_RUN_COMMAND)
-if [ -z "${AGENT_RUN_COMMAND:-}" ]; then
-  echo "AGENT_RUN_COMMAND not set"
+# Run the driver binary with CLI arguments
+# The driver is the long-lived process that:
+# 1. Starts the selected harness command
+# 2. Forwards logs to the host API
+# 3. Exits with the harness result
+if [ -z "${MAL_DRIVER_BINARY_PATH:-}" ]; then
+  echo "MAL_DRIVER_BINARY_PATH not set"
   exit 1
 fi
-eval "$AGENT_RUN_COMMAND"
-AGENT_EXIT_CODE=$?
+
+if [ -z "${MAL_DRIVER_CLI_ARGS:-}" ]; then
+  echo "MAL_DRIVER_CLI_ARGS not set"
+  exit 1
+fi
+
+echo "Starting driver binary: $MAL_DRIVER_BINARY_PATH"
+echo "Driver CLI args: $MAL_DRIVER_CLI_ARGS"
+
+# Execute the driver binary with the provided CLI arguments
+# The driver will run the harness command and forward logs until the harness exits
+eval "$MAL_DRIVER_BINARY_PATH $MAL_DRIVER_CLI_ARGS"
+DRIVER_EXIT_CODE=$?
 
 # Run teardown script if it exists (with 1 minute timeout)
 if [ -f /code/.agent-loop/teardown.sh ]; then
@@ -44,5 +59,5 @@ if [ -f /code/.agent-loop/teardown.sh ]; then
   }
 fi
 
-# Exit with the agent's exit code
-exit $AGENT_EXIT_CODE
+# Exit with the driver's exit code (which reflects the harness result)
+exit $DRIVER_EXIT_CODE

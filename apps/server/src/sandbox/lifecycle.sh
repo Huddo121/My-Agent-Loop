@@ -72,12 +72,23 @@ if [ -z "${MAL_DRIVER_CLI_ARGS:-}" ]; then
 fi
 
 echo "Starting driver binary: $MAL_DRIVER_BINARY_PATH"
-echo "Driver CLI args: $MAL_DRIVER_CLI_ARGS"
 
 # Execute the driver binary with the provided CLI arguments
 # The driver will run the harness command and forward logs until the harness exits
+WAS_XTRACE_ENABLED=0
+case "$-" in
+  *x*) WAS_XTRACE_ENABLED=1 ;;
+esac
+
+set +x
+set +e
 eval "$MAL_DRIVER_BINARY_PATH $MAL_DRIVER_CLI_ARGS"
 DRIVER_EXIT_CODE=$?
+set -e
+
+if [ "$WAS_XTRACE_ENABLED" -eq 1 ]; then
+  set -x
+fi
 
 # Run teardown script if it exists (with 1 minute timeout)
 if [ -f /code/.agent-loop/teardown.sh ]; then

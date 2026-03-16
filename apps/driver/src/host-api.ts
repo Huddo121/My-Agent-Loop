@@ -27,40 +27,18 @@ export class HostApiClient {
     message: string;
     stream: "stdout" | "stderr";
   }): Promise<void> {
-    const response = await fetch(this.buildLogUrl(), {
-      method: "POST",
-      headers: {
-        ...this.headers(),
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    await this.post(
+      this.buildLogUrl(),
+      {
         message: params.message,
         stream: params.stream,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(
-        `Failed to send log to host: ${response.status} ${response.statusText}`,
-      );
-    }
+      },
+      "log",
+    );
   }
 
   async sendLifecycleEvent(event: LifecycleEvent): Promise<void> {
-    const response = await fetch(this.buildLifecycleUrl(), {
-      method: "POST",
-      headers: {
-        ...this.headers(),
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(event),
-    });
-
-    if (!response.ok) {
-      console.error(
-        `Failed to send lifecycle event to host: ${response.status} ${response.statusText}`,
-      );
-    }
+    await this.post(this.buildLifecycleUrl(), event, "lifecycle event");
   }
 
   private buildLogUrl(): URL {
@@ -81,5 +59,33 @@ export class HostApiClient {
     return {
       [DRIVER_TOKEN_HEADER]: this.options.driverToken,
     };
+  }
+
+  private async post(
+    url: URL,
+    body: unknown,
+    requestLabel: string,
+  ): Promise<void> {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        console.error(
+          `Failed to send ${requestLabel} to host: ${response.status} ${response.statusText}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Failed to send ${requestLabel} to host due to transport error:`,
+        error,
+      );
+    }
   }
 }

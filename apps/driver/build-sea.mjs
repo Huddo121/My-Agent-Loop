@@ -33,8 +33,11 @@ try {
       stdio: "inherit",
     },
   );
-} catch (e) {
-  console.error("Failed to generate SEA blob:", e.message);
+} catch (error) {
+  console.error(
+    "Failed to generate SEA blob:",
+    error instanceof Error ? error.message : String(error),
+  );
   process.exit(1);
 }
 
@@ -61,10 +64,14 @@ try {
     },
   );
   console.log(`SEA executable created at ${seaExeFile}`);
-} catch (e) {
+} catch (error) {
   console.log("Warning: Could not inject SEA blob into executable.");
   console.log(
     "This is expected when cross-compiling or on platforms without the sentinel.",
+  );
+  console.log(
+    "Injection error:",
+    error instanceof Error ? error.message : String(error),
   );
   console.log("The Docker build will create the proper SEA executable.");
   console.log("");

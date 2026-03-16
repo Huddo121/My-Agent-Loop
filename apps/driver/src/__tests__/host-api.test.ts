@@ -96,6 +96,34 @@ describe("HostApiClient", () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it("does not throw when log transport fails", async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const transportError = new Error("network down");
+      fetchMock.mockRejectedValue(transportError);
+
+      const client = new HostApiClient({
+        baseUrl: "http://localhost:3000",
+        runId: "run-123" as never,
+        taskId: "task-456" as never,
+        driverToken: "secret-token",
+      });
+
+      await expect(
+        client.sendLog({
+          message: "test",
+          stream: "stdout",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to send log to host due to transport error:",
+        transportError,
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
     it("constructs correct URL for different base URLs", async () => {
       fetchMock.mockResolvedValue({ ok: true, status: 204 });
 
@@ -247,6 +275,34 @@ describe("HostApiClient", () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Failed to send lifecycle event to host: 500 Internal Server Error",
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("does not throw when lifecycle transport fails", async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const transportError = new Error("network down");
+      fetchMock.mockRejectedValue(transportError);
+
+      const client = new HostApiClient({
+        baseUrl: "http://localhost:3000",
+        runId: "run-123" as never,
+        taskId: "task-456" as never,
+        driverToken: "secret-token",
+      });
+
+      await expect(
+        client.sendLifecycleEvent({
+          kind: "harness-starting",
+          harnessCommand: "echo hello",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to send lifecycle event to host due to transport error:",
+        transportError,
       );
       consoleErrorSpy.mockRestore();
     });

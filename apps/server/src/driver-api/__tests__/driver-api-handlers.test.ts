@@ -211,6 +211,7 @@ describe("driver api handlers", () => {
       );
 
       expect(response.status).toBe(204);
+      expect(services.db.transaction).toHaveBeenCalledTimes(1);
     });
 
     it("accepts stderr log events", async () => {
@@ -348,10 +349,8 @@ describe("driver api handlers", () => {
       );
 
       expect(response.status).toBe(204);
-      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
-        RUN_ID,
-        "completed",
-      );
+      expect(services.db.transaction).toHaveBeenCalledTimes(1);
+      expect(services.runsService.updateRunState).not.toHaveBeenCalled();
     });
 
     it("accepts harness-exited lifecycle event with non-zero exit code", async () => {
@@ -381,10 +380,7 @@ describe("driver api handlers", () => {
       );
 
       expect(response.status).toBe(204);
-      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
-        RUN_ID,
-        "failed",
-      );
+      expect(services.runsService.updateRunState).not.toHaveBeenCalled();
     });
 
     it("accepts harness-exited lifecycle event with signal", async () => {
@@ -414,10 +410,7 @@ describe("driver api handlers", () => {
       );
 
       expect(response.status).toBe(204);
-      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
-        RUN_ID,
-        "failed",
-      );
+      expect(services.runsService.updateRunState).not.toHaveBeenCalled();
     });
   });
 });

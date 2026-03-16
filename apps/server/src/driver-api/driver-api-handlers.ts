@@ -1,9 +1,10 @@
 import { badUserInput, notFound, unauthenticated } from "@mono/api";
 import type { Hono } from "hono";
 import z from "zod";
-import type { Logger } from "../logger/Logger";
 import type { RunId } from "../runs/RunId";
+import type { Run } from "../runs/RunsService";
 import type { Services } from "../services";
+import { withNewTransaction } from "../utils/transaction-context";
 
 const DRIVER_TOKEN_HEADER = "X-MAL-Driver-Token";
 
@@ -36,16 +37,6 @@ type DriverApiServices = Pick<
   "db" | "driverRunTokenStore" | "runsService" | "logger"
 >;
 
-/**
- * In-memory store for driver log events.
- * This is a simple implementation - a production system would use Redis streams.
- * Logs are keyed by runId, with an array of log entries.
- */
-const driverLogs = new Map<
-  RunId,
-  { timestamp: Date; stream: "stdout" | "stderr"; message: string }[]
->();
-
 export function registerDriverApiRoutes(
   app: Hono,
   services: DriverApiServices,
@@ -65,15 +56,15 @@ export function registerDriverApiRoutes(
     }
 
     const runId = ctx.req.param("runId") as RunId;
+    const taskId = ctx.req.param("taskId");
 
-    // Verify the run exists and has the correct taskId
-    const run = await services.runsService.getRun(runId);
+    const run = await getRunForTask(services, runId);
     if (run === undefined) {
       const response = notFound("Run not found.");
       return ctx.json(response[1], response[0]);
     }
 
-    if (run.taskId !== ctx.req.param("taskId")) {
+    if (run.taskId !== taskId) {
       const response = notFound("Task not found for this run.");
       return ctx.json(response[1], response[0]);
     }
@@ -86,28 +77,13 @@ export function registerDriverApiRoutes(
       return ctx.json(response[1], response[0]);
     }
 
-    // Shape the log into a simple server-side format and write to server logs
-    const logEntry = {
-      timestamp: new Date(),
-      stream: body.stream,
-      message: body.message,
-    };
-
     // Log immediately to server output for visibility
-    const logMessage = `[driver:${runId}] ${logEntry.stream}: ${logEntry.message}`;
+    const logMessage = `[driver:${runId}] ${body.stream}: ${body.message}`;
     if (body.stream === "stderr") {
       services.logger.error(logMessage);
     } else {
       services.logger.info(logMessage);
     }
-
-    // Also store in-memory for potential later retrieval
-    let logs = driverLogs.get(runId);
-    if (logs === undefined) {
-      logs = [];
-      driverLogs.set(runId, logs);
-    }
-    logs.push(logEntry);
 
     return new Response(null, { status: 204 });
   });
@@ -129,15 +105,15 @@ export function registerDriverApiRoutes(
       }
 
       const runId = ctx.req.param("runId") as RunId;
+      const taskId = ctx.req.param("taskId");
 
-      // Verify the run exists and has the correct taskId
-      const run = await services.runsService.getRun(runId);
+      const run = await getRunForTask(services, runId);
       if (run === undefined) {
         const response = notFound("Run not found.");
         return ctx.json(response[1], response[0]);
       }
 
-      if (run.taskId !== ctx.req.param("taskId")) {
+      if (run.taskId !== taskId) {
         const response = notFound("Task not found for this run.");
         return ctx.json(response[1], response[0]);
       }
@@ -156,11 +132,8 @@ export function registerDriverApiRoutes(
           `[driver:${runId}] Harness starting: ${body.harnessCommand}`,
         );
       } else if (body.kind === "harness-exited") {
-        // Update the run state based on the harness exit code
-        const newState = body.exitCode === 0 ? "completed" : "failed";
-        await services.runsService.updateRunState(runId, newState);
         services.logger.info(
-          `[driver:${runId}] Harness exited with code ${body.exitCode}`,
+          `[driver:${runId}] Harness exited with code ${body.exitCode}${body.signal === null ? "" : ` (${body.signal})`}`,
         );
       }
 
@@ -183,4 +156,13 @@ function authenticateDriverRequest(
   }
 
   return null;
+}
+
+async function getRunForTask(
+  services: DriverApiServices,
+  runId: RunId,
+): Promise<Run | undefined> {
+  return withNewTransaction(services.db, () =>
+    services.runsService.getRun(runId),
+  );
 }

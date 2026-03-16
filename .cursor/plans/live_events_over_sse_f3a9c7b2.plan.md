@@ -34,7 +34,7 @@ todos:
     status: completed
   - id: docs
     content: Add a decision record in `docs/decisions/` documenting the `LiveEvents` subsystem, the use of SSE, the in-memory process-local subscription registry, and the typed event payload approach. Update `docs/00-index.md` to link the new decision doc.
-    status: in-progress
+    status: completed
 isProject: false
 ---
 

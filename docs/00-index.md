@@ -10,4 +10,5 @@ My Agent Loop is a project that aims to make it easier to allow agents to more a
 - [Concepts](./03-concepts.md): More detailed information about the high level concepts in use in this project
 - [Decisions](./decisions): Architecture and design decisions
   - [BetterAuth and Workspace Memberships](./decisions/better-auth-workspace-memberships.md)
+  - [Live Events Over SSE](./decisions/live-events-over-sse.md)
 - [Ideas](./ideas): This is a folder of notes for things that I'm thinking about but not yet working on, or may never work on

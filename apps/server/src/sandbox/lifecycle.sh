@@ -1,5 +1,33 @@
 #!/bin/bash
 
+# =============================================================================
+# Sandbox Lifecycle Script
+#
+# This script runs inside the sandbox container and orchestrates the execution
+# flow. It follows a clear ownership contract between SERVER and DRIVER:
+#
+# SERVER (workflow execution service) owns:
+#   - Creating /task.txt with the task description
+#   - Mounting harness config files (from AgentHarness.files)
+#   - Setting environment variables
+#   - Passing harness setup commands and run command to this script
+#
+# LIFECYCLE (this script) owns:
+#   - Running setup.sh if present (pre-driver setup)
+#   - Running harness-setup.sh with setup commands from harness.prepare()
+#   - Starting the driver binary
+#   - Running teardown.sh if present
+#
+# DRIVER owns:
+#   - Executing the harness command (from --harness-command CLI arg)
+#   - Forwarding stdout/stderr to the host API
+#   - Sending lifecycle events (harness-starting, harness-exited)
+#   - Exiting with the harness result
+#
+# The task file (/task.txt) is created by the SERVER before the container starts.
+# The driver does NOT create or manage the task file.
+# =============================================================================
+
 # Save current shell options and flags
 SAVED_SHELL_OPTIONS=$(set +o)
 SAVED_FLAGS="$-"

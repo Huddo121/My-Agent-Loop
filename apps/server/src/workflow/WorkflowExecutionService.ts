@@ -42,6 +42,18 @@ const formatTaskFile = (task: Task): string => {
 const shellQuote = (value: string): string =>
   `'${value.replaceAll("'", `'"'"'`)}'`;
 
+/**
+ * Builds the CLI arguments for the driver binary.
+ *
+ * The harness command is produced by the harness's prepare() method and represents
+ * the concrete command the driver should execute. This is the "contract" between
+ * server and driver:
+ * - Server: resolves harness, calls prepare(), produces runCommand
+ * - Driver: receives runCommand via --harness-command, executes it, forwards logs
+ *
+ * The driver does not create the task file - that is a server responsibility.
+ * The driver simply executes the provided harness command.
+ */
 const buildDriverCliArgs = (options: {
   runId: RunId;
   taskId: Task["id"];
@@ -131,6 +143,9 @@ export class WorkflowExecutionService {
       return { success: false, error: checkoutResult.error };
     }
 
+    // Create the task file at /task.txt in the container.
+    // This is a SERVER responsibility - the driver does not create or manage the task file.
+    // The driver only executes the harness command which references this file.
     const taskFilePath = AbsoluteFilePath.joinPath(
       taskTempDirectory,
       "task.txt",

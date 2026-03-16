@@ -19,10 +19,10 @@ todos:
     status: completed
   - id: sandbox-startup
     content: Refactor sandbox startup so the driver is always the long-lived process inside the sandbox. Update `apps/server/src/sandbox/lifecycle.sh` and the workflow preparation code so lifecycle bootstraps environment/setup and then executes the driver binary, while the driver itself starts the selected harness command and forwards logs to the host until the harness exits.
-    status: in-progress
+    status: completed
   - id: harness-contract
     content: Update the harness preparation flow in `apps/server/src/harness/` so the server still resolves the chosen harness and produces one concrete command for the driver to execute. Keep this contract explicit about what the driver owns versus what server/lifecycle still owns, especially around any task-file setup that remains outside the driver.
-    status: pending
+    status: in-progress
   - id: sea-build
     content: Add build tooling for the driver binary. Bundle the v1 driver app into one CommonJS entry file, then package it as a single Linux executable using Node SEA (`node --build-sea`). Wire this into repo scripts and the Docker build so the sandbox image contains the driver binary and it does not rely on the workspace source tree at runtime.
     status: pending

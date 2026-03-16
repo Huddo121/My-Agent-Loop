@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: driver-runtime
     content: Rework `apps/driver/src/` around the v1 runtime responsibilities only. The runtime should parse its CLI inputs, start the harness process, stream stdout/stderr and driver lifecycle events back to the host API, and exit with the harness result. Remove or replace any modules that still assume task-file management, retry loops, progress detection, or other in-sandbox orchestration behavior.
-    status: pending
+    status: completed
   - id: driver-api
     content: Rework the internal driver API in `apps/server/src/` so it matches the slimmer v1 driver contract. It should stay separate from MCP, authenticate requests with the per-run driver token, and accept the log/lifecycle events the driver needs to send while supervising a harness run. Remove or replace any task-snapshot-oriented API behavior that no longer fits this scope.
     status: pending

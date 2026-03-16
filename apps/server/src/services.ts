@@ -127,6 +127,8 @@ const workflowManager = new DatabaseWorkflowManager(
   db,
 );
 
+const liveEventsService = new LiveEventsService();
+
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
@@ -136,6 +138,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   agentHarnessConfigRepository,
   harnessAuthService,
   forgeSecretRepository,
+  liveEventsService,
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
@@ -149,8 +152,6 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   db,
   forgeSecretRepository,
 );
-
-const liveEventsService = new LiveEventsService();
 
 export const services: Services = {
   db,

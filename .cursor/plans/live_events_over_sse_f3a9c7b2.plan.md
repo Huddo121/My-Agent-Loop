@@ -16,10 +16,10 @@ todos:
     status: completed
   - id: publish-task-events
     content: Publish `task.updated` events at the application edges where task state changes are already assembled into frontend DTOs. Cover task create, update, move, and complete in the HTTP handlers, the MCP task handlers, and workflow-driven task completion in `WorkflowExecutionService`.
-    status: pending
+    status: completed
   - id: publish-project-events
     content: Publish `project.updated` events whenever project queue state or project metadata changes in ways the UI should reflect live. Cover run start, stop, queue-state transitions in `WorkflowManager`, and project update flows that already return a full project DTO.
-    status: pending
+    status: in-progress
   - id: frontend-provider
     content: Add a frontend live-events integration that opens one `EventSource` per workspace tab and mounts inside `CurrentWorkspaceProvider`. Reuse the authenticated app shell and current-workspace selection that now come from `/api/session` and workspace bootstrap, so the provider only mounts once auth and workspace membership have been resolved. Derive subscriptions from the current UI state so the app always listens for workspace project updates and, when a project is selected, board updates for that project.
     status: pending

@@ -5,7 +5,7 @@ description: >
 
   TRIGGER WHEN: Executing a Plan file with multiple TODOs. Spawn one subagent per TODO.
 mode: subagent
-model: openai/gpt-5.3-codex-spark
+model: openai/codex-mini-latest
 ---
 
 Your role is to execute on a single TODO for the given plan file, the parent agent will tell you what the plan file is.

@@ -12,7 +12,7 @@ vi.mock("../../auth/session", () => ({
 const projectRouteHandlers = projectsHandlers[":projectId"];
 type ProjectGetContext = Parameters<typeof projectRouteHandlers.GET>[0];
 
-function createCtx() {
+function createCtx(overrides?: { body?: unknown }) {
   const ctx = {
     hono: {
       req: {
@@ -22,6 +22,7 @@ function createCtx() {
         param: () => ({ workspaceId: "workspace-1", projectId: "project-1" }),
       },
     },
+    body: overrides?.body,
     services: {
       db: {
         transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -33,9 +34,14 @@ function createCtx() {
       },
       projectsService: {
         getProject: vi.fn(),
+        updateProject: vi.fn(),
       },
       forgeSecretRepository: {
         hasForgeSecret: vi.fn(),
+        upsertForgeSecret: vi.fn(),
+      },
+      liveEventsService: {
+        publish: vi.fn().mockResolvedValue(undefined),
       },
     },
   };
@@ -62,5 +68,54 @@ describe("projects handlers", () => {
     );
 
     expect(response[0]).toBe(404);
+  });
+
+  it("publishes project.updated when updating a project", async () => {
+    requireAuthSession.mockResolvedValueOnce({
+      user: { id: "user-1" },
+    });
+    const ctx = createCtx({
+      body: { name: "Updated name" },
+    });
+    ctx.services.workspaceMembershipsService.canAccessProject.mockResolvedValueOnce(
+      true,
+    );
+    ctx.services.projectsService.updateProject.mockResolvedValueOnce({
+      id: "project-1",
+      workspaceId: "workspace-1",
+      name: "Updated name",
+      shortCode: "PRJ",
+      repositoryUrl: "https://github.com/owner/repo",
+      workflowConfiguration: {
+        version: "1",
+        onTaskCompleted: "push-branch",
+      },
+      queueState: "idle",
+      forgeType: "github",
+      forgeBaseUrl: "https://github.com",
+      agentConfig: null,
+    });
+    ctx.services.forgeSecretRepository.hasForgeSecret.mockResolvedValueOnce(
+      false,
+    );
+
+    const response = await projectsHandlers[":projectId"].PATCH(
+      ctx as unknown as Parameters<
+        (typeof projectsHandlers)[":projectId"]["PATCH"]
+      >[0],
+    );
+
+    expect(response[0]).toBe(200);
+    expect(ctx.services.liveEventsService.publish).toHaveBeenCalledWith(
+      "workspace-1",
+      expect.objectContaining({
+        type: "project.updated",
+        project: expect.objectContaining({
+          id: "project-1",
+          name: "Updated name",
+          hasForgeToken: false,
+        }),
+      }),
+    );
   });
 });

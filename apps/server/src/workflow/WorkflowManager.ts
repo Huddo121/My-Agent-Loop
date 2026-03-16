@@ -1,7 +1,9 @@
 import type { ProjectId, TaskId } from "@mono/api";
 import { match } from "ts-pattern";
 import type { Database } from "../db";
-import type { ProjectsService } from "../projects/ProjectsService";
+import type { ForgeSecretRepository } from "../forge-secrets";
+import type { LiveEventsService } from "../live-events";
+import type { Project, ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Run, RunsService } from "../runs/RunsService";
 import type { RunMode } from "../runs/runs-model";
@@ -35,6 +37,8 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     private readonly projectsService: ProjectsService,
     private readonly workflowQueues: WorkflowQueues,
     private readonly db: Database,
+    private readonly liveEventsService: LiveEventsService,
+    private readonly forgeSecretRepository: ForgeSecretRepository,
   ) {
     workflowMessengerService.onRunCompleted(this.handleRunCompleted.bind(this));
     workflowMessengerService.onRunFailed(this.handleRunFailed.bind(this));
@@ -85,14 +89,28 @@ export class DatabaseWorkflowManager implements WorkflowManager {
       .with("single", () => "processing-single" as const)
       .exhaustive();
 
-    await this.projectsService.updateProjectQueueState(
+    const updatedProject = await this.projectsService.updateProjectQueueState(
       projectId,
       newQueueState,
     );
+    if (updatedProject !== undefined) {
+      await this.publishProjectUpdated(updatedProject);
+    }
 
     const run = await this.queueProcessingOfTask(projectId, task.id);
 
     return { success: true, value: run.id };
+  }
+
+  private async publishProjectUpdated(project: Project): Promise<void> {
+    const hasForgeToken = await this.forgeSecretRepository.hasForgeSecret(
+      project.id,
+    );
+    const projectDto = { ...project, hasForgeToken };
+    await this.liveEventsService.publish(project.workspaceId, {
+      type: "project.updated",
+      project: projectDto,
+    });
   }
 
   private async queueProcessingOfTask(
@@ -143,17 +161,19 @@ export class DatabaseWorkflowManager implements WorkflowManager {
         .with("processing-loop", async () => {
           const nextTask = await this.taskQueue.getNextTask(projectId);
           if (nextTask === undefined) {
-            const project = await this.projectsService.updateProjectQueueState(
-              projectId,
-              "idle",
-            );
-            if (project === undefined) {
+            const updatedProject =
+              await this.projectsService.updateProjectQueueState(
+                projectId,
+                "idle",
+              );
+            if (updatedProject === undefined) {
               console.error(
                 "Failed to update project queue state, could not find project",
                 { projectId, runId },
               );
               return;
             }
+            await this.publishProjectUpdated(updatedProject);
             console.info(
               "No more tasks left to process, updated project queue state to idle",
               { projectId, runId },
@@ -164,17 +184,19 @@ export class DatabaseWorkflowManager implements WorkflowManager {
           await this.queueProcessingOfTask(project.id, nextTask.id);
         })
         .with("processing-single", async () => {
-          const project = await this.projectsService.updateProjectQueueState(
-            projectId,
-            "idle",
-          );
-          if (project === undefined) {
+          const updatedProject =
+            await this.projectsService.updateProjectQueueState(
+              projectId,
+              "idle",
+            );
+          if (updatedProject === undefined) {
             console.error(
               "Failed to update project queue state, could not find project",
               { projectId, runId },
             );
             return;
           }
+          await this.publishProjectUpdated(updatedProject);
           console.info(
             "Finished processing single task, updated project queue state to idle",
             { projectId, runId },
@@ -182,17 +204,19 @@ export class DatabaseWorkflowManager implements WorkflowManager {
           return;
         })
         .with("stopping", async () => {
-          const project = await this.projectsService.updateProjectQueueState(
-            projectId,
-            "idle",
-          );
-          if (project === undefined) {
+          const updatedProject =
+            await this.projectsService.updateProjectQueueState(
+              projectId,
+              "idle",
+            );
+          if (updatedProject === undefined) {
             console.error(
               "Failed to update project queue state, could not find project",
               { projectId, runId },
             );
             return;
           }
+          await this.publishProjectUpdated(updatedProject);
           console.info(
             "Run completed while queue was stopping, updated project queue state to idle",
             { projectId, runId },
@@ -228,10 +252,14 @@ export class DatabaseWorkflowManager implements WorkflowManager {
       // TODO: When we get to having multiple runs per project we'll need to think about what to do to other runs
       await match(queueState)
         .with("processing-loop", "processing-single", "stopping", async () => {
-          await this.projectsService.updateProjectQueueState(
-            projectId,
-            "failed",
-          );
+          const updatedProject =
+            await this.projectsService.updateProjectQueueState(
+              projectId,
+              "failed",
+            );
+          if (updatedProject !== undefined) {
+            await this.publishProjectUpdated(updatedProject);
+          }
           console.info("Updated project queue state to failed", {
             projectId,
             runId,

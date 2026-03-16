@@ -19,10 +19,10 @@ todos:
     status: completed
   - id: publish-project-events
     content: Publish `project.updated` events whenever project queue state or project metadata changes in ways the UI should reflect live. Cover run start, stop, queue-state transitions in `WorkflowManager`, and project update flows that already return a full project DTO.
-    status: in-progress
+    status: completed
   - id: frontend-provider
     content: Add a frontend live-events integration that opens one `EventSource` per workspace tab and mounts inside `CurrentWorkspaceProvider`. Reuse the authenticated app shell and current-workspace selection that now come from `/api/session` and workspace bootstrap, so the provider only mounts once auth and workspace membership have been resolved. Derive subscriptions from the current UI state so the app always listens for workspace project updates and, when a project is selected, board updates for that project.
-    status: pending
+    status: in-progress
   - id: cache-updates
     content: Add React Query cache helpers for live events and use them in the live-events provider. `project.updated` should patch the projects cache, and `task.updated` should insert, replace, reorder, or remove board tasks based on the task payload and completion state without forcing a full refetch.
     status: pending

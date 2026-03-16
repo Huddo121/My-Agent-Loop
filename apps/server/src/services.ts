@@ -118,6 +118,8 @@ const harnesses: readonly AgentHarness[] = [
 
 const workflowMessengerService = new WorkflowMessengerService();
 
+const liveEventsService = new LiveEventsService();
+
 const workflowManager = new DatabaseWorkflowManager(
   workflowMessengerService,
   taskQueue,
@@ -125,9 +127,9 @@ const workflowManager = new DatabaseWorkflowManager(
   projectsService,
   workflowQueues,
   db,
+  liveEventsService,
+  forgeSecretRepository,
 );
-
-const liveEventsService = new LiveEventsService();
 
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,

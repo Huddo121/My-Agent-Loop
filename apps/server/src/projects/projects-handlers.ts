@@ -223,7 +223,12 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-        return ok({ ...project, hasForgeToken });
+        const projectDto = { ...project, hasForgeToken };
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          { type: "project.updated", project: projectDto },
+        );
+        return ok(projectDto);
       });
     },
     DELETE: async (ctx) => {
@@ -391,10 +396,14 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-
+        const projectDto = { ...updatedProject, hasForgeToken };
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          { type: "project.updated", project: projectDto },
+        );
         return ok({
           runId: runIdSchema.parse(workflowResult.value),
-          project: { ...updatedProject, hasForgeToken },
+          project: projectDto,
         });
       });
     },
@@ -454,8 +463,12 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-
-        return ok({ project: { ...updatedProject, hasForgeToken } });
+        const projectDto = { ...updatedProject, hasForgeToken };
+        await ctx.services.liveEventsService.publish(project.workspaceId, {
+          type: "project.updated",
+          project: projectDto,
+        });
+        return ok({ project: projectDto });
       });
     },
   },

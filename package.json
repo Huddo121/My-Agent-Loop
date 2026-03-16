@@ -8,8 +8,11 @@
     "check": "biome check .",
     "check:fix": "biome check . --write",
     "dev": "moon :dev",
-    "drizzle": "pnpm run --filter @mono/server drizzle",
     "docker:build": "docker build -t my-agent-loop .",
+    "driver:build": "pnpm --filter @mono/driver build",
+    "driver:build:bundle": "pnpm --filter @mono/driver build:bundle",
+    "driver:build:sea": "pnpm --filter @mono/driver build:sea",
+    "drizzle": "pnpm run --filter @mono/server drizzle",
     "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
     "sync": "moon sync",
     "typecheck": "tsc --build"

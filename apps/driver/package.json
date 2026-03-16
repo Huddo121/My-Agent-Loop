@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:bundle": "node build.mjs",
+    "build:sea": "node build-sea.mjs",
+    "build": "pnpm build:bundle && pnpm build:sea"
   },
   "dependencies": {
     "@mono/api": "workspace:*",
@@ -12,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "25.0.9",
+    "esbuild": "0.25.1",
     "tsx": "4.21.0",
     "typescript": "5.9.3"
   }

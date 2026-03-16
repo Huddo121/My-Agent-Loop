@@ -22,10 +22,10 @@ todos:
     status: completed
   - id: harness-contract
     content: Update the harness preparation flow in `apps/server/src/harness/` so the server still resolves the chosen harness and produces one concrete command for the driver to execute. Keep this contract explicit about what the driver owns versus what server/lifecycle still owns, especially around any task-file setup that remains outside the driver.
-    status: in-progress
+    status: completed
   - id: sea-build
     content: Add build tooling for the driver binary. Bundle the v1 driver app into one CommonJS entry file, then package it as a single Linux executable using Node SEA (`node --build-sea`). Wire this into repo scripts and the Docker build so the sandbox image contains the driver binary and it does not rely on the workspace source tree at runtime.
-    status: pending
+    status: in-progress
   - id: dockerfile
     content: Update the root `Dockerfile` so it builds the v1 driver binary and copies that Linux executable into the sandbox image alongside the existing harness CLIs. The final image should be able to start the driver directly without needing the workspace source tree inside the container.
     status: pending

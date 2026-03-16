@@ -15,7 +15,7 @@ import type { Project } from "~/types";
 // They must be used inside CurrentWorkspaceProvider (e.g. on app routes after the setup gate).
 //
 
-const projectsQueryKey = (workspaceId: WorkspaceId) =>
+export const projectsQueryKey = (workspaceId: WorkspaceId) =>
   ["projects", workspaceId] as const;
 
 /**

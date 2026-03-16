@@ -5,7 +5,7 @@ import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import { useCurrentWorkspace } from "~/lib/workspaces";
 import type { NewTask, Task, UpdateTask } from "~/types";
 
-const tasksQueryKey = (projectId: ProjectId | null) =>
+export const tasksQueryKey = (projectId: ProjectId | null) =>
   ["tasks", projectId] as const;
 
 /**

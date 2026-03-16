@@ -1,7 +1,9 @@
 import { liveEventDtoSchema } from "@mono/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useParams } from "react-router";
 import { useCurrentWorkspace } from "~/lib/workspaces";
+import { applyProjectUpdated, applyTaskUpdated } from "./cache-helpers";
 
 /**
  * Opens one EventSource per workspace, subscribed to workspace-projects and
@@ -9,8 +11,8 @@ import { useCurrentWorkspace } from "~/lib/workspaces";
  * CurrentWorkspaceProvider after auth and workspace membership are resolved.
  * Recreates the stream when the derived subscription set changes.
  *
- * Cache updates are handled in the cache-updates TODO; this provider only
- * establishes the connection and receives events.
+ * On each parsed event, updates React Query caches via cache helpers so the
+ * board and projects stay in sync without full refetches.
  */
 export function LiveEventsProvider({
   children,
@@ -18,6 +20,7 @@ export function LiveEventsProvider({
   children: React.ReactNode;
 }) {
   const workspace = useCurrentWorkspace();
+  const queryClient = useQueryClient();
   const { projectId: routeProjectId } = useParams<{ projectId?: string }>();
 
   useEffect(() => {
@@ -37,9 +40,15 @@ export function LiveEventsProvider({
         const parsed = JSON.parse(ev.data);
         const result = liveEventDtoSchema.safeParse(parsed);
         if (result.success) {
-          // Cache updates will be wired in the cache-updates TODO
-          // For now we just receive and discard
-          void result.data;
+          const data = result.data;
+          switch (data.type) {
+            case "project.updated":
+              applyProjectUpdated(queryClient, data.project);
+              break;
+            case "task.updated":
+              applyTaskUpdated(queryClient, data.projectId, data.task);
+              break;
+          }
         }
       } catch {
         // Ignore unparseable messages
@@ -54,7 +63,7 @@ export function LiveEventsProvider({
     return () => {
       es.close();
     };
-  }, [workspace.id, routeProjectId]);
+  }, [workspace.id, routeProjectId, queryClient]);
 
   return <>{children}</>;
 }

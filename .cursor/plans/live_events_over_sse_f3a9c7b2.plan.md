@@ -25,10 +25,10 @@ todos:
     status: completed
   - id: cache-updates
     content: Add React Query cache helpers for live events and use them in the live-events provider. `project.updated` should patch the projects cache, and `task.updated` should insert, replace, reorder, or remove board tasks based on the task payload and completion state without forcing a full refetch.
-    status: in-progress
+    status: completed
   - id: reconnect-behavior
     content: Make the frontend recreate the SSE connection when the subscription set changes and invalidate relevant queries once on reconnect or initial open so the UI can recover from missed events without implementing replay or `Last-Event-ID`. If the stream starts returning auth failures after logout or session expiry, stop reconnecting and let the normal signed-out app flow take over.
-    status: pending
+    status: in-progress
   - id: tests
     content: Add tests for shared schema parsing, backend subscription filtering and cleanup, auth and membership enforcement on the SSE endpoint, event publication from task and project mutation paths, and frontend cache update helpers plus reconnect/subscription-change behavior.
     status: pending

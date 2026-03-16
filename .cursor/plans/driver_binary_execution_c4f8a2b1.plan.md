@@ -31,10 +31,10 @@ todos:
     status: completed
   - id: tests
     content: Add tests for the v1 driver and server integration. Cover CLI argument parsing, host API authentication, driver/harness log forwarding, lifecycle event delivery, and the end-to-end contract where the driver exits with the harness result.
-    status: in-progress
+    status: completed
   - id: docs
     content: Add a decision record in `docs/decisions/` describing the v1 driver architecture: every run goes through the driver, the driver is packaged as a single Node executable via SEA, and the driver-to-host API is token-authenticated and focused on log/lifecycle forwarding. Update `docs/00-index.md` to link the new decision doc.
-    status: pending
+    status: in-progress
 isProject: false
 ---
 

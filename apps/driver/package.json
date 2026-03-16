@@ -7,7 +7,9 @@
     "typecheck": "tsc --noEmit",
     "build:bundle": "node build.mjs",
     "build:sea": "node build-sea.mjs",
-    "build": "pnpm build:bundle && pnpm build:sea"
+    "build": "pnpm build:bundle && pnpm build:sea",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@mono/api": "workspace:*",
@@ -17,6 +19,7 @@
     "@types/node": "25.0.9",
     "esbuild": "0.25.1",
     "tsx": "4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.0.18"
   }
 }

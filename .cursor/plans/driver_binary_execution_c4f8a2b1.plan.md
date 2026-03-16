@@ -28,10 +28,10 @@ todos:
     status: completed
   - id: dockerfile
     content: Update the root `Dockerfile` so it builds the v1 driver binary and copies that Linux executable into the sandbox image alongside the existing harness CLIs. The final image should be able to start the driver directly without needing the workspace source tree inside the container.
-    status: in-progress
+    status: completed
   - id: tests
     content: Add tests for the v1 driver and server integration. Cover CLI argument parsing, host API authentication, driver/harness log forwarding, lifecycle event delivery, and the end-to-end contract where the driver exits with the harness result.
-    status: pending
+    status: in-progress
   - id: docs
     content: Add a decision record in `docs/decisions/` describing the v1 driver architecture: every run goes through the driver, the driver is packaged as a single Node executable via SEA, and the driver-to-host API is token-authenticated and focused on log/lifecycle forwarding. Update `docs/00-index.md` to link the new decision doc.
     status: pending

@@ -228,9 +228,9 @@ export class WorkflowExecutionService {
       containerPath: "/harness-setup.sh",
     });
 
-    // Driver binary path - will be set during Docker build
+    // Driver binary path - defaults to /usr/local/bin/driver (set during Docker build)
     const driverBinaryPath =
-      process.env.MAL_DRIVER_BINARY_PATH ?? "/code/.agent-loop/driver";
+      process.env.MAL_DRIVER_BINARY_PATH ?? "/usr/local/bin/driver";
 
     const env: Record<string, string> = {
       MAL_DRIVER_BINARY_PATH: driverBinaryPath,

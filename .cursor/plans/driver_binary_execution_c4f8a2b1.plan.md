@@ -25,10 +25,10 @@ todos:
     status: completed
   - id: sea-build
     content: Add build tooling for the driver binary. Bundle the v1 driver app into one CommonJS entry file, then package it as a single Linux executable using Node SEA (`node --build-sea`). Wire this into repo scripts and the Docker build so the sandbox image contains the driver binary and it does not rely on the workspace source tree at runtime.
-    status: in-progress
+    status: completed
   - id: dockerfile
     content: Update the root `Dockerfile` so it builds the v1 driver binary and copies that Linux executable into the sandbox image alongside the existing harness CLIs. The final image should be able to start the driver directly without needing the workspace source tree inside the container.
-    status: pending
+    status: in-progress
   - id: tests
     content: Add tests for the v1 driver and server integration. Cover CLI argument parsing, host API authentication, driver/harness log forwarding, lifecycle event delivery, and the end-to-end contract where the driver exits with the harness result.
     status: pending

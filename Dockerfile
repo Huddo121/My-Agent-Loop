@@ -49,7 +49,7 @@ RUN pnpm install
 RUN pnpm run driver:build
 
 # Move the driver binary to a common location
-RUN mkdir -p /usr/local/bin/driver && \
+RUN mkdir -p /usr/local/bin && \
     mv apps/driver/dist-sea/driver /usr/local/bin/driver && \
     chmod +x /usr/local/bin/driver
 

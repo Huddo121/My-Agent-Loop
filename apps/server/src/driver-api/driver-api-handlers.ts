@@ -1,46 +1,59 @@
-import {
-  badUserInput,
-  notFound,
-  type Subtask,
-  subtaskIdSchema,
-  subtaskSchema,
-  taskIdSchema,
-  unauthenticated,
-} from "@mono/api";
+import { badUserInput, notFound, unauthenticated } from "@mono/api";
 import type { Hono } from "hono";
 import z from "zod";
 import type { RunId } from "../runs/RunId";
 import type { Services } from "../services";
-import type { Task } from "../task-queue/TaskQueue";
-import { withNewTransaction } from "../utils/transaction-context";
 
 const DRIVER_TOKEN_HEADER = "X-MAL-Driver-Token";
 
-const driverTaskSnapshotSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  subtasks: z.array(subtaskSchema),
+/**
+ * Log event sent by the driver.
+ * stream: "stdout" or "stderr" - indicates which output stream the log line came from
+ */
+const logEventSchema = z.object({
+  message: z.string(),
+  stream: z.enum(["stdout", "stderr"]),
 });
 
-const syncTaskSnapshotRequestSchema = z.object({
-  taskSnapshot: driverTaskSnapshotSchema,
-  subtaskId: subtaskIdSchema.optional(),
-  iteration: z.number().int().min(1),
-  harnessExitCode: z.number().int(),
-  progressState: z.enum(["none", "progress", "complete"]),
-  progressReason: z.string(),
-});
+/**
+ * Lifecycle events sent by the driver to indicate harness state changes.
+ */
+const lifecycleEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("harness-starting"),
+    harnessCommand: z.string(),
+  }),
+  z.object({
+    kind: z.literal("harness-exited"),
+    exitCode: z.number().int(),
+    signal: z.string().nullable(),
+  }),
+]);
 
 type DriverApiServices = Pick<
   Services,
-  "db" | "driverRunTokenStore" | "runsService" | "taskQueue"
+  "db" | "driverRunTokenStore" | "runsService"
 >;
+
+/**
+ * In-memory store for driver log events.
+ * This is a simple implementation - a production system would use Redis streams.
+ * Logs are keyed by runId, with an array of log entries.
+ */
+const driverLogs = new Map<
+  RunId,
+  { timestamp: Date; stream: "stdout" | "stderr"; message: string }[]
+>();
 
 export function registerDriverApiRoutes(
   app: Hono,
   services: DriverApiServices,
 ): void {
-  app.get("/internal/driver/runs/:runId/tasks/:taskId", async (ctx) => {
+  /**
+   * Receive log events from the driver.
+   * POST /internal/driver/runs/:runId/tasks/:taskId/logs
+   */
+  app.post("/internal/driver/runs/:runId/tasks/:taskId/logs", async (ctx) => {
     const authFailure = authenticateDriverRequest(
       services,
       ctx.req.param("runId") as RunId,
@@ -50,81 +63,91 @@ export function registerDriverApiRoutes(
       return ctx.json(authFailure[1], authFailure[0]);
     }
 
-    return withNewTransaction(services.db, async () => {
-      const task = await getRunTaskOrNull(
-        services,
-        ctx.req.param("runId") as RunId,
-        ctx.req.param("taskId"),
-      );
-      if (task === null) {
-        const response = notFound();
-        return ctx.json(response[1], response[0]);
-      }
+    const runId = ctx.req.param("runId") as RunId;
 
-      const validationError = validateRequestedSubtask(
-        task,
-        ctx.req.query("subtaskId"),
-      );
-      if (validationError !== null) {
-        return ctx.json(validationError[1], validationError[0]);
-      }
-
-      return ctx.json(toDriverTaskSnapshot(task));
-    });
-  });
-
-  app.put("/internal/driver/runs/:runId/tasks/:taskId", async (ctx) => {
-    const authFailure = authenticateDriverRequest(
-      services,
-      ctx.req.param("runId") as RunId,
-      ctx.req.header(DRIVER_TOKEN_HEADER),
-    );
-    if (authFailure !== null) {
-      return ctx.json(authFailure[1], authFailure[0]);
-    }
-
-    let body: z.infer<typeof syncTaskSnapshotRequestSchema>;
-    try {
-      body = syncTaskSnapshotRequestSchema.parse(await ctx.req.json());
-    } catch {
-      const response = badUserInput("Invalid driver task snapshot payload.");
+    // Verify the run exists and has the correct taskId
+    const run = await services.runsService.getRun(runId);
+    if (run === undefined) {
+      const response = notFound("Run not found.");
       return ctx.json(response[1], response[0]);
     }
 
-    return withNewTransaction(services.db, async () => {
-      const task = await getRunTaskOrNull(
+    if (run.taskId !== ctx.req.param("taskId")) {
+      const response = notFound("Task not found for this run.");
+      return ctx.json(response[1], response[0]);
+    }
+
+    let body: z.infer<typeof logEventSchema>;
+    try {
+      body = logEventSchema.parse(await ctx.req.json());
+    } catch {
+      const response = badUserInput("Invalid log event payload.");
+      return ctx.json(response[1], response[0]);
+    }
+
+    // Store the log event
+    let logs = driverLogs.get(runId);
+    if (logs === undefined) {
+      logs = [];
+      driverLogs.set(runId, logs);
+    }
+    logs.push({
+      timestamp: new Date(),
+      stream: body.stream,
+      message: body.message,
+    });
+
+    return new Response(null, { status: 204 });
+  });
+
+  /**
+   * Receive lifecycle events from the driver.
+   * POST /internal/driver/runs/:runId/tasks/:taskId/lifecycle
+   */
+  app.post(
+    "/internal/driver/runs/:runId/tasks/:taskId/lifecycle",
+    async (ctx) => {
+      const authFailure = authenticateDriverRequest(
         services,
         ctx.req.param("runId") as RunId,
-        ctx.req.param("taskId"),
+        ctx.req.header(DRIVER_TOKEN_HEADER),
       );
-      if (task === null) {
-        const response = notFound();
+      if (authFailure !== null) {
+        return ctx.json(authFailure[1], authFailure[0]);
+      }
+
+      const runId = ctx.req.param("runId") as RunId;
+
+      // Verify the run exists and has the correct taskId
+      const run = await services.runsService.getRun(runId);
+      if (run === undefined) {
+        const response = notFound("Run not found.");
         return ctx.json(response[1], response[0]);
       }
 
-      const requestedSubtaskId = body.subtaskId ?? ctx.req.query("subtaskId");
-      const validationError = validateRequestedSubtask(
-        body.taskSnapshot,
-        requestedSubtaskId,
-      );
-      if (validationError !== null) {
-        return ctx.json(validationError[1], validationError[0]);
+      if (run.taskId !== ctx.req.param("taskId")) {
+        const response = notFound("Task not found for this run.");
+        return ctx.json(response[1], response[0]);
       }
 
-      const taskId = taskIdSchema.parse(ctx.req.param("taskId"));
-      const updatedTask = await services.taskQueue.updateTask(taskId, {
-        title: body.taskSnapshot.title,
-        description: body.taskSnapshot.description,
-        subtasks: body.taskSnapshot.subtasks,
-      });
-      if (updatedTask === undefined) {
-        const response = notFound();
+      let body: z.infer<typeof lifecycleEventSchema>;
+      try {
+        body = lifecycleEventSchema.parse(await ctx.req.json());
+      } catch {
+        const response = badUserInput("Invalid lifecycle event payload.");
         return ctx.json(response[1], response[0]);
+      }
+
+      // Handle lifecycle events
+      if (body.kind === "harness-exited") {
+        // Update the run state based on the harness exit code
+        const newState = body.exitCode === 0 ? "completed" : "failed";
+        await services.runsService.updateRunState(runId, newState);
       }
 
       return new Response(null, { status: 204 });
-    });
-  });
+    },
+  );
 }
 
 function authenticateDriverRequest(
@@ -141,48 +164,4 @@ function authenticateDriverRequest(
   }
 
   return null;
-}
-
-async function getRunTaskOrNull(
-  services: DriverApiServices,
-  runId: RunId,
-  taskId: string,
-): Promise<Task | null> {
-  const run = await services.runsService.getRun(runId);
-  if (run === undefined || run.taskId !== taskId) {
-    return null;
-  }
-
-  const task = await services.taskQueue.getTask(run.taskId);
-  return task ?? null;
-}
-
-function validateRequestedSubtask(
-  taskSnapshot: { subtasks: readonly Subtask[] },
-  rawSubtaskId: string | undefined,
-): ReturnType<typeof badUserInput> | null {
-  if (rawSubtaskId === undefined) {
-    return null;
-  }
-
-  const parsed = subtaskIdSchema.safeParse(rawSubtaskId);
-  if (!parsed.success) {
-    return badUserInput("Invalid subtask id.");
-  }
-
-  if (!taskSnapshot.subtasks.some((subtask) => subtask.id === parsed.data)) {
-    return badUserInput(
-      "Requested subtask was not found in the task snapshot.",
-    );
-  }
-
-  return null;
-}
-
-function toDriverTaskSnapshot(task: Task) {
-  return {
-    title: task.title,
-    description: task.description,
-    subtasks: task.subtasks,
-  };
 }

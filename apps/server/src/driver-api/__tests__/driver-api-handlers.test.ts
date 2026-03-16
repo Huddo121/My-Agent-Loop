@@ -21,10 +21,7 @@ function createApp() {
     driverRunTokenStore,
     runsService: {
       getRun: vi.fn<() => Promise<Run | undefined>>(),
-    },
-    taskQueue: {
-      getTask: vi.fn(),
-      updateTask: vi.fn(),
+      updateRunState: vi.fn(),
     },
   };
 
@@ -39,154 +36,382 @@ describe("driver api handlers", () => {
     vi.restoreAllMocks();
   });
 
-  it("rejects requests without a driver token", async () => {
-    const { app } = createApp();
+  describe("authentication", () => {
+    it("rejects log requests without a driver token", async () => {
+      const { app } = createApp();
 
-    const response = await app.request(
-      `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}`,
-    );
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        { method: "POST" },
+      );
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toMatchObject({
-      code: "unauthenticated",
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "unauthenticated",
+      });
     });
-  });
 
-  it("returns the canonical task snapshot for an authenticated run", async () => {
-    const { app, services, driverRunTokenStore } = createApp();
-    driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-    services.runsService.getRun.mockResolvedValueOnce({
-      id: RUN_ID,
-      taskId: TASK_ID,
-      startedAt: new Date(),
-      state: "in_progress",
+    it("rejects lifecycle requests without a driver token", async () => {
+      const { app } = createApp();
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        { method: "POST" },
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "unauthenticated",
+      });
     });
-    services.taskQueue.getTask.mockResolvedValueOnce({
-      id: TASK_ID,
-      title: "Implement driver API",
-      description: "Persist task snapshots after each iteration.",
-      subtasks: [
+
+    it("rejects invalid driver tokens for logs", async () => {
+      const { app, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
         {
-          id: "subtask-1",
-          title: "Add auth",
-          state: "in-progress",
-        },
-      ],
-    });
-
-    const response = await app.request(
-      `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}?subtaskId=subtask-1`,
-      {
-        headers: {
-          "X-MAL-Driver-Token": DRIVER_TOKEN,
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      title: "Implement driver API",
-      description: "Persist task snapshots after each iteration.",
-      subtasks: [
-        {
-          id: "subtask-1",
-          title: "Add auth",
-          state: "in-progress",
-        },
-      ],
-    });
-  });
-
-  it("rejects invalid driver tokens", async () => {
-    const { app, driverRunTokenStore } = createApp();
-    driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-
-    const response = await app.request(
-      `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}`,
-      {
-        headers: {
-          "X-MAL-Driver-Token": "wrong-token",
-        },
-      },
-    );
-
-    expect(response.status).toBe(401);
-  });
-
-  it("persists the latest task snapshot for an authenticated run", async () => {
-    const { app, services, driverRunTokenStore } = createApp();
-    driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-    services.runsService.getRun.mockResolvedValueOnce({
-      id: RUN_ID,
-      taskId: TASK_ID,
-      startedAt: new Date(),
-      state: "in_progress",
-    });
-    services.taskQueue.getTask.mockResolvedValueOnce({
-      id: TASK_ID,
-      title: "Before",
-      description: "Before",
-      subtasks: [
-        {
-          id: "subtask-1",
-          title: "Existing",
-          state: "pending",
-        },
-      ],
-    });
-    services.taskQueue.updateTask.mockResolvedValueOnce({
-      id: TASK_ID,
-      title: "After",
-      description: "After",
-      subtasks: [
-        {
-          id: "subtask-1",
-          title: "Existing",
-          state: "completed",
-        },
-      ],
-    });
-
-    const response = await app.request(
-      `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}`,
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          "X-MAL-Driver-Token": DRIVER_TOKEN,
-        },
-        body: JSON.stringify({
-          taskSnapshot: {
-            title: "After",
-            description: "After",
-            subtasks: [
-              {
-                id: "subtask-1",
-                title: "Existing",
-                state: "completed",
-              },
-            ],
+          method: "POST",
+          headers: {
+            "X-MAL-Driver-Token": "wrong-token",
           },
-          subtaskId: "subtask-1",
-          iteration: 2,
-          harnessExitCode: 0,
-          progressState: "progress",
-          progressReason: "Completed the requested subtask.",
-        }),
-      },
-    );
-
-    expect(response.status).toBe(204);
-    expect(services.taskQueue.updateTask).toHaveBeenCalledWith(TASK_ID, {
-      title: "After",
-      description: "After",
-      subtasks: [
-        {
-          id: "subtask-1",
-          title: "Existing",
-          state: "completed",
         },
-      ],
+      );
+
+      expect(response.status).toBe(401);
+    });
+
+    it("rejects invalid driver tokens for lifecycle", async () => {
+      const { app, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "X-MAL-Driver-Token": "wrong-token",
+          },
+        },
+      );
+
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe("logs endpoint", () => {
+    it("returns 404 when run does not exist", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce(undefined);
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            message: "test log",
+            stream: "stdout",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 404 when task does not match run", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: "different-task-id" as TaskId,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            message: "test log",
+            stream: "stdout",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 400 for invalid log payload", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            // missing required fields
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("accepts valid log events", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            message: "test log message",
+            stream: "stdout",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+    });
+
+    it("accepts stderr log events", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            message: "error message",
+            stream: "stderr",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+    });
+  });
+
+  describe("lifecycle endpoint", () => {
+    it("returns 404 when run does not exist", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce(undefined);
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-starting",
+            harnessCommand: "echo hello",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 400 for invalid lifecycle payload", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            // missing required fields
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("accepts harness-starting lifecycle event", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-starting",
+            harnessCommand: "echo hello",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+    });
+
+    it("accepts harness-exited lifecycle event with exit code 0", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-exited",
+            exitCode: 0,
+            signal: null,
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
+        RUN_ID,
+        "completed",
+      );
+    });
+
+    it("accepts harness-exited lifecycle event with non-zero exit code", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-exited",
+            exitCode: 1,
+            signal: null,
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
+        RUN_ID,
+        "failed",
+      );
+    });
+
+    it("accepts harness-exited lifecycle event with signal", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: TASK_ID,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/internal/driver/runs/${RUN_ID}/tasks/${TASK_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-exited",
+            exitCode: 137,
+            signal: "SIGKILL",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(204);
+      expect(services.runsService.updateRunState).toHaveBeenCalledWith(
+        RUN_ID,
+        "failed",
+      );
     });
   });
 });

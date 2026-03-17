@@ -22,6 +22,15 @@ vi.mock("../host-api", () => ({
 
 import { runDriver } from "../runtime";
 
+function createDeferred<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => {};
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+
+  return { promise, resolve };
+}
+
 const invocation: DriverInvocation = {
   runId: "run-123" as never,
   taskId: "task-456" as never,
@@ -70,5 +79,45 @@ describe("runDriver", () => {
     expect(consoleErrorSpy).toHaveBeenCalledTimes(3);
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it("does not block stream consumption on earlier log sends", async () => {
+    const firstLogSend = createDeferred<void>();
+    const secondLogSend = createDeferred<void>();
+
+    sendLogMock
+      .mockReturnValueOnce(firstLogSend.promise)
+      .mockReturnValueOnce(secondLogSend.promise);
+    executeHarnessCommandMock.mockImplementation(
+      async (
+        _options: { command: string; cwd: string },
+        onStreams: (streams: {
+          stdout: NodeJS.ReadableStream;
+          stderr: NodeJS.ReadableStream;
+        }) => void,
+      ) => {
+        onStreams({
+          stdout: Readable.from(["first\n", "second\n"]),
+          stderr: Readable.from([]),
+        });
+
+        return { exitCode: 0, signal: null };
+      },
+    );
+
+    const runDriverPromise = runDriver(invocation);
+    await vi.waitFor(() => expect(sendLogMock).toHaveBeenCalledTimes(2));
+    expect(sendLifecycleEventMock).toHaveBeenCalledTimes(1);
+
+    secondLogSend.resolve(undefined);
+    await Promise.resolve();
+    expect(sendLifecycleEventMock).toHaveBeenCalledTimes(1);
+
+    firstLogSend.resolve(undefined);
+    await vi.waitFor(() =>
+      expect(sendLifecycleEventMock).toHaveBeenCalledTimes(2),
+    );
+
+    await expect(runDriverPromise).resolves.toBeUndefined();
   });
 });

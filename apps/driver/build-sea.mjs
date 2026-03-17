@@ -1,6 +1,10 @@
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  handleSeaInjectionFailure,
+  isSeaInjectionRequired,
+} from "./build-sea-lib.mjs";
 
 const outdir = "dist-sea";
 const bundleFile = path.join(outdir, "index.cjs");
@@ -9,6 +13,7 @@ const seaExeFile =
   process.env.DRIVER_SEA_OUTPUT_FILE ?? path.join(outdir, "driver");
 const nodeBinaryPath = process.env.DRIVER_SEA_NODE_BINARY ?? process.execPath;
 const sentinelFuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
+const injectionRequired = isSeaInjectionRequired();
 
 // Check if the bundle exists
 if (!fs.existsSync(bundleFile)) {
@@ -72,16 +77,20 @@ try {
   );
   console.log(`SEA executable created at ${seaExeFile}`);
 } catch (error) {
-  console.log("Warning: Could not inject SEA blob into executable.");
-  console.log(
-    "This is expected when cross-compiling or on platforms without the sentinel.",
-  );
-  console.log(
-    "Injection error:",
-    error instanceof Error ? error.message : String(error),
-  );
-  console.log("");
-  console.log("Bundle created at:", bundleFile);
-  console.log("Blob created at:", seaBlobFile);
-  // Don't fail the build - we still have the bundle
+  try {
+    handleSeaInjectionFailure({
+      bundleFile,
+      seaBlobFile,
+      seaExeFile,
+      error,
+      injectionRequired,
+    });
+  } catch (injectionFailure) {
+    console.error(
+      injectionFailure instanceof Error
+        ? injectionFailure.message
+        : String(injectionFailure),
+    );
+    process.exit(1);
+  }
 }

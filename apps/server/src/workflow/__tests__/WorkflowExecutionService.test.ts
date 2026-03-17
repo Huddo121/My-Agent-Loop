@@ -7,7 +7,7 @@ import type {
   TaskId,
   WorkspaceId,
 } from "@mono/api";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DriverRunTokenStore } from "../../driver-api/DriverRunTokenStore";
 import type { AbsoluteFilePath } from "../../file-system/FilePath";
 import type { FileSystemService } from "../../file-system/FileSystemService";
@@ -39,6 +39,8 @@ afterEach(() => {
   for (const directory of tempDirectories.splice(0)) {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+
+  vi.useRealTimers();
 });
 
 describe("WorkflowExecutionService", () => {
@@ -131,6 +133,75 @@ describe("WorkflowExecutionService", () => {
     expect(
       driverRunTokenStore.isValidToken(
         createRunId("run-error"),
+        driverRunTokenStore.lastIssuedToken ?? "",
+      ),
+    ).toBe(false);
+    expect(sandboxService.stopSandboxCallCount).toBe(0);
+  });
+
+  it("does not stop an already-finished sandbox on success", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+
+    const service = createService({ driverRunTokenStore, sandboxService });
+    const result = await service.executeWorkflow(
+      createRunId("run-success"),
+      createTask("task-success"),
+      createProject("project-success"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(sandboxService.stopSandboxCallCount).toBe(0);
+  });
+
+  it("stops the sandbox when waiting for completion fails", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: false,
+      error: { reason: "container-not-running" },
+    });
+
+    const service = createService({ driverRunTokenStore, sandboxService });
+    const result = await service.executeWorkflow(
+      createRunId("run-wait-failure"),
+      createTask("task-wait-failure"),
+      createProject("project-wait-failure"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(false);
+    expect(sandboxService.stopSandboxCallCount).toBe(1);
+    expect(sandboxService.tokenWasValidWhenStopped).toBe(true);
+  });
+
+  it("keeps the driver token valid until a timed-out sandbox is stopped", async () => {
+    vi.useFakeTimers();
+
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new HangingSandboxService(driverRunTokenStore);
+    const service = createService({ driverRunTokenStore, sandboxService });
+
+    const executionPromise = service.executeWorkflow(
+      createRunId("run-timeout"),
+      createTask("task-timeout"),
+      createProject("project-timeout"),
+      createWorkflow(),
+    );
+
+    await vi.advanceTimersByTimeAsync(3600000);
+
+    const result = await executionPromise;
+
+    expect(result.success).toBe(false);
+    expect(sandboxService.stopSandboxCallCount).toBe(1);
+    expect(sandboxService.tokenWasValidWhenStopped).toBe(true);
+    expect(
+      driverRunTokenStore.isValidToken(
+        createRunId("run-timeout"),
         driverRunTokenStore.lastIssuedToken ?? "",
       ),
     ).toBe(false);
@@ -362,9 +433,11 @@ class RecordingDriverRunTokenStore implements DriverRunTokenStore {
 class RecordingSandboxService implements SandboxService {
   lastDriverCliArgs = "";
   tokenWasValidDuringWait = false;
+  tokenWasValidWhenStopped = false;
+  stopSandboxCallCount = 0;
 
   constructor(
-    private readonly driverRunTokenStore: RecordingDriverRunTokenStore,
+    protected readonly driverRunTokenStore: RecordingDriverRunTokenStore,
     private readonly waitResult: Result<
       WaitForSandboxToFinishSuccess,
       WaitForSandboxToFinishFailure
@@ -383,7 +456,18 @@ class RecordingSandboxService implements SandboxService {
     return { success: true, value: "started" } as const;
   }
 
-  async stopSandbox() {}
+  async stopSandbox() {
+    this.stopSandboxCallCount += 1;
+
+    const token = this.driverRunTokenStore.lastIssuedToken;
+    const runId = this.driverRunTokenStore.lastRunId;
+    if (token !== undefined && runId !== undefined) {
+      this.tokenWasValidWhenStopped = this.driverRunTokenStore.isValidToken(
+        runId,
+        token,
+      );
+    }
+  }
 
   async waitForSandboxToFinish() {
     const token = this.driverRunTokenStore.lastIssuedToken;
@@ -398,4 +482,34 @@ class RecordingSandboxService implements SandboxService {
   }
 
   async stopAllSandboxes() {}
+}
+
+class HangingSandboxService extends RecordingSandboxService {
+  constructor(driverRunTokenStore: RecordingDriverRunTokenStore) {
+    super(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+  }
+
+  override async stopSandbox() {
+    await super.stopSandbox();
+  }
+
+  override async waitForSandboxToFinish() {
+    const token = this.driverRunTokenStore.lastIssuedToken;
+    const runId = this.driverRunTokenStore.lastRunId;
+    if (token !== undefined && runId !== undefined) {
+      this.tokenWasValidDuringWait = this.driverRunTokenStore.isValidToken(
+        runId,
+        token,
+      );
+    }
+
+    return new Promise<
+      Result<WaitForSandboxToFinishSuccess, WaitForSandboxToFinishFailure>
+    >(() => {
+      // Intentionally never resolves to exercise timeout cleanup.
+    });
+  }
 }

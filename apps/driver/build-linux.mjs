@@ -46,6 +46,7 @@ execFileSync(process.execPath, [buildSeaScript], {
     ...process.env,
     DRIVER_SEA_NODE_BINARY: linuxNodeBinary,
     DRIVER_SEA_OUTPUT_FILE: outputFile,
+    DRIVER_SEA_INJECTION_REQUIRED: "1",
   },
 });
 

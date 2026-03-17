@@ -266,6 +266,8 @@ export class WorkflowExecutionService {
     const { repository, sandbox } = prepareResult.value;
 
     this.driverRunTokenStore.setToken(runId, driverToken);
+    let sandboxStarted = false;
+    let sandboxFinished = false;
 
     try {
       const startSandboxResult = await this.sandboxService.startSandbox(
@@ -279,6 +281,7 @@ export class WorkflowExecutionService {
           ),
         };
       }
+      sandboxStarted = true;
 
       const oneHourInMs = 3600000;
       const result = await timeout(
@@ -296,6 +299,7 @@ export class WorkflowExecutionService {
           ),
         };
       }
+      sandboxFinished = true;
 
       console.log(
         `Container ${sandbox.id} exited with code ${result.value.exitCode}, reason: ${result.value.reason}`,
@@ -331,7 +335,6 @@ export class WorkflowExecutionService {
         }
       }
 
-      await this.sandboxService.stopSandbox(sandbox.id);
       if (result.value.reason !== "completed") {
         return {
           success: false,
@@ -342,6 +345,9 @@ export class WorkflowExecutionService {
       }
       return { success: true, value: undefined };
     } finally {
+      if (sandboxStarted && sandboxFinished === false) {
+        await this.sandboxService.stopSandbox(sandbox.id);
+      }
       this.driverRunTokenStore.clearToken(runId);
     }
   }

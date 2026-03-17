@@ -36,6 +36,11 @@ describe("live-events shared contract", () => {
       }
     });
 
+    it("rejects project-board with empty projectId", () => {
+      expect(parseSubscriptionString("project-board:").success).toBe(false);
+      expect(parseSubscriptionString("project-board:   ").success).toBe(false);
+    });
+
     it("rejects invalid subscription strings", () => {
       expect(parseSubscriptionString("").success).toBe(false);
       expect(parseSubscriptionString("invalid").success).toBe(false);

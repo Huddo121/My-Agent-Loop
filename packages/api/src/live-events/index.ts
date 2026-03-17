@@ -56,7 +56,19 @@ export function parseSubscriptionString(input: string) {
   }
   const projectBoardPrefix = "project-board:";
   if (trimmed.startsWith(projectBoardPrefix)) {
-    const projectId = trimmed.slice(projectBoardPrefix.length);
+    const projectId = trimmed.slice(projectBoardPrefix.length).trim();
+    if (!projectId) {
+      return {
+        success: false as const,
+        error: new z.ZodError([
+          {
+            code: "custom",
+            path: [],
+            message: `Invalid subscription: "project-board:" requires a non-empty projectId`,
+          },
+        ]),
+      };
+    }
     return liveSubscriptionSchema.safeParse({
       type: "project-board",
       projectId,

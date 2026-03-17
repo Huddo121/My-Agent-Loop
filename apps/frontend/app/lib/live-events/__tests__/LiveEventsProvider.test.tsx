@@ -3,17 +3,9 @@ import { render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LiveEventsProvider } from "../LiveEventsProvider";
 
-const mockInvalidateQueries = vi.fn().mockResolvedValue(undefined);
-const mockQueryClient = {
-  invalidateQueries: mockInvalidateQueries,
-} as unknown as InstanceType<typeof QueryClient>;
-
-const { useQueryClient, mockSessionGet } = vi.hoisted(() => {
+const { mockSessionGet } = vi.hoisted(() => {
   const mockSessionGet = vi.fn();
-  return {
-    useQueryClient: vi.fn(() => mockQueryClient),
-    mockSessionGet,
-  };
+  return { mockSessionGet };
 });
 const { useParams } = vi.hoisted(() => ({
   useParams: vi.fn(),
@@ -22,21 +14,20 @@ const { useCurrentWorkspace } = vi.hoisted(() => ({
   useCurrentWorkspace: vi.fn(),
 }));
 
+const listeners: Record<string, ((ev: MessageEvent) => void)[]> = {};
+
 let eventSourceInstance: {
   url: string;
   onopen: (() => void) | null;
   onerror: (() => void) | null;
-  onmessage: ((ev: { data: string }) => void) | null;
+  addEventListener: (type: string, handler: (ev: MessageEvent) => void) => void;
+  removeEventListener: (
+    type: string,
+    handler: (ev: MessageEvent) => void,
+  ) => void;
+  dispatchEvent: (type: string, data: string) => void;
   close: () => void;
 } | null = null;
-
-vi.mock("@tanstack/react-query", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
-  return {
-    ...actual,
-    useQueryClient,
-  };
-});
 
 vi.mock("react-router", () => ({
   useParams,
@@ -58,22 +49,49 @@ vi.stubGlobal(
     url: string;
     onopen: (() => void) | null = null;
     onerror: (() => void) | null = null;
-    onmessage: ((ev: { data: string }) => void) | null = null;
 
     constructor(url: string) {
       this.url = url;
       eventSourceInstance = this;
     }
 
+    addEventListener(type: string, handler: (ev: MessageEvent) => void) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(handler);
+    }
+
+    removeEventListener(type: string, handler: (ev: MessageEvent) => void) {
+      if (!listeners[type]) return;
+      listeners[type] = listeners[type].filter((h) => h !== handler);
+    }
+
+    dispatchEvent(type: string, data: string) {
+      for (const h of listeners[type] ?? []) {
+        h(new MessageEvent(type, { data }));
+      }
+    }
+
     close() {
       eventSourceInstance = null;
+      for (const k of Object.keys(listeners)) {
+        delete listeners[k];
+      }
     }
   },
 );
 
 describe("LiveEventsProvider", () => {
+  let queryClient: QueryClient;
+  let invalidateSpy: ReturnType<typeof vi.fn>;
+  let setQueryDataSpy: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = new QueryClient();
+    invalidateSpy = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue(undefined);
+    setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
     useCurrentWorkspace.mockReturnValue({ id: "ws-1" });
     useParams.mockReturnValue({});
     mockSessionGet.mockResolvedValue({ status: 200 });
@@ -88,7 +106,7 @@ describe("LiveEventsProvider", () => {
   it("invalidates projects and tasks queries on stream open", async () => {
     useParams.mockReturnValue({ projectId: "proj-1" });
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <LiveEventsProvider>
           <div>children</div>
         </LiveEventsProvider>
@@ -106,10 +124,10 @@ describe("LiveEventsProvider", () => {
     eventSourceInstance?.onopen?.();
 
     await waitFor(() => {
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["projects", "ws-1"],
       });
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["tasks", "proj-1"],
       });
     });
@@ -120,7 +138,7 @@ describe("LiveEventsProvider", () => {
     mockSessionGet.mockResolvedValue({ status: 401 });
 
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <LiveEventsProvider>
           <div>children</div>
         </LiveEventsProvider>
@@ -143,10 +161,57 @@ describe("LiveEventsProvider", () => {
     }
   });
 
+  it("updates cache when project.updated event is received", async () => {
+    useParams.mockReturnValue({ projectId: "proj-1" });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LiveEventsProvider>
+          <div>children</div>
+        </LiveEventsProvider>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(eventSourceInstance).toBeTruthy();
+    });
+
+    const projectPayload = {
+      type: "project.updated",
+      project: {
+        id: "proj-1",
+        workspaceId: "ws-1",
+        name: "Updated",
+        shortCode: "UPD",
+        repositoryUrl: "https://github.com/owner/repo",
+        workflowConfiguration: {
+          version: "1",
+          onTaskCompleted: "push-branch",
+        },
+        queueState: "idle",
+        forgeType: "github",
+        forgeBaseUrl: "https://github.com",
+        hasForgeToken: false,
+        agentConfig: null,
+      },
+    };
+
+    eventSourceInstance?.dispatchEvent?.(
+      "project.updated",
+      JSON.stringify(projectPayload),
+    );
+
+    await waitFor(() => {
+      expect(setQueryDataSpy).toHaveBeenCalledWith(
+        ["projects", "ws-1"],
+        expect.any(Function),
+      );
+    });
+  });
+
   it("updates subscription URL when selected project changes", async () => {
     useParams.mockReturnValue({ projectId: "proj-1" });
     const { rerender } = render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <LiveEventsProvider>
           <div>children</div>
         </LiveEventsProvider>

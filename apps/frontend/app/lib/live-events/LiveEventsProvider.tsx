@@ -58,7 +58,7 @@ export function LiveEventsProvider({
       invalidateOnOpen();
     };
 
-    es.onmessage = (ev) => {
+    const handleEvent = (ev: MessageEvent) => {
       try {
         const parsed = JSON.parse(ev.data);
         const result = liveEventDtoSchema.safeParse(parsed);
@@ -78,6 +78,9 @@ export function LiveEventsProvider({
       }
     };
 
+    es.addEventListener("project.updated", handleEvent);
+    es.addEventListener("task.updated", handleEvent);
+
     es.onerror = async () => {
       // EventSource does not expose HTTP status. When the server returns 401,
       // the connection fails and we cannot distinguish it from other failures.
@@ -94,6 +97,8 @@ export function LiveEventsProvider({
     };
 
     return () => {
+      es.removeEventListener("project.updated", handleEvent);
+      es.removeEventListener("task.updated", handleEvent);
       es.close();
     };
   }, [workspace.id, routeProjectId, queryClient]);

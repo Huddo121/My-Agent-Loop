@@ -145,9 +145,45 @@ describe("harness-process", () => {
         () => {},
       );
 
-      // The current implementation returns 128 for any signal
-      expect(result.exitCode).toBe(128);
+      expect(result.exitCode).toBe(137);
       expect(result.signal).toBe("SIGKILL");
+    });
+
+    it("maps SIGTERM to the conventional shell exit code", async () => {
+      const mockStdout = new Readable({
+        read() {
+          this.push(null);
+        },
+      });
+      const mockStderr = new Readable({
+        read() {
+          this.push(null);
+        },
+      });
+
+      const mockChild = {
+        stdout: mockStdout,
+        stderr: mockStderr,
+        on: vi.fn((event: string, callback: (...args: unknown[]) => void) => {
+          if (event === "exit") {
+            setImmediate(() => callback(null, "SIGTERM"));
+          }
+          return mockChild;
+        }),
+      } as unknown as ReturnType<typeof spawn>;
+
+      spawnMock.mockReturnValue(mockChild);
+
+      const result = await executeHarnessCommand(
+        {
+          command: "sleep 100",
+          cwd: "/test/dir",
+        },
+        () => {},
+      );
+
+      expect(result.exitCode).toBe(143);
+      expect(result.signal).toBe("SIGTERM");
     });
 
     it("rejects when stdout/stderr cannot be captured", async () => {

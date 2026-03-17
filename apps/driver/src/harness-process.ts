@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { constants as osConstants } from "node:os";
 import type { Readable } from "node:stream";
 
 export type HarnessExecutionResult = {
@@ -52,5 +53,14 @@ function signalToExitCode(signal: NodeJS.Signals | null): number {
     return 1;
   }
 
-  return 128;
+  const signalNumber = getSignalNumber(signal);
+  if (signalNumber === undefined) {
+    return 1;
+  }
+
+  return 128 + signalNumber;
+}
+
+function getSignalNumber(signal: NodeJS.Signals): number | undefined {
+  return osConstants.signals[signal as keyof typeof osConstants.signals];
 }

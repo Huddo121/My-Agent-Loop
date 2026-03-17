@@ -22,7 +22,6 @@ export async function runDriver(invocation: DriverInvocation): Promise<void> {
   const hostApiClient = new HostApiClient({
     baseUrl: invocation.hostApiBaseUrl,
     runId: invocation.runId,
-    taskId: invocation.taskId,
     driverToken: invocation.driverToken,
   });
 

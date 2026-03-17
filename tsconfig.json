@@ -12,6 +12,9 @@
       "path": "apps/server"
     },
     {
+      "path": "packages/driver-api"
+    },
+    {
       "path": "packages/api"
     }
   ]

@@ -1,9 +1,10 @@
 import { serve } from "@hono/node-server";
 import { myAgentLoopApi } from "@mono/api";
+import { driverApi } from "@mono/driver-api";
 import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
-import { registerDriverApiRoutes } from "./driver-api/driver-api-handlers";
+import { driverApiHandlers } from "./driver-api/driver-api-handlers";
 import { startMcp } from "./mcp";
 import { services } from "./services";
 import { sessionHandlers } from "./session/session-handlers";
@@ -35,12 +36,18 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGHUP", () => shutdown("SIGHUP"));
 
+const serverApi = {
+  ...myAgentLoopApi,
+  ...driverApi,
+};
+
 const app = createHonoServer(
-  myAgentLoopApi,
+  serverApi,
   {
     session: sessionHandlers,
     admin: adminHandlers,
     workspaces: workspacesHandlers,
+    internal: driverApiHandlers,
   },
   services,
 );
@@ -48,8 +55,6 @@ const app = createHonoServer(
 app.on(["GET", "POST"], "/api/auth/*", async (ctx) => {
   return auth.handler(ctx.req.raw);
 });
-
-registerDriverApiRoutes(app, services);
 
 serve(app, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`);

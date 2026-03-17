@@ -13,381 +13,121 @@ describe("HostApiClient", () => {
     vi.unstubAllGlobals();
   });
 
-  describe("sendLog", () => {
-    it("sends log to correct URL with authentication header", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLog({
-        message: "test log message",
-        stream: "stdout",
-      });
-
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      const [url, options] = fetchMock.mock.calls[0];
-
-      expect(url.toString()).toBe(
-        "http://localhost:3000/internal/driver/runs/run-123/tasks/task-456/logs",
-      );
-      expect(options.method).toBe("POST");
-      expect(options.headers).toMatchObject({
-        "X-MAL-Driver-Token": "secret-token",
-        "content-type": "application/json",
-      });
-      expect(JSON.parse(options.body as string)).toEqual({
-        message: "test log message",
-        stream: "stdout",
-      });
+  it("sends logs through the shared driver contract", async () => {
+    fetchMock.mockResolvedValue({
+      status: 200,
+      json: vi.fn().mockResolvedValue({ ok: true }),
     });
 
-    it("sends stderr log correctly", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLog({
-        message: "error message",
-        stream: "stderr",
-      });
-
-      const [, options] = fetchMock.mock.calls[0];
-      expect(JSON.parse(options.body as string)).toEqual({
-        message: "error message",
-        stream: "stderr",
-      });
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
     });
 
-    it("logs error when server returns non-OK response", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 401,
-        statusText: "Unauthorized",
-      });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLog({
-        message: "test",
-        stream: "stdout",
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to send log to host: 401 Unauthorized",
-      );
-      consoleErrorSpy.mockRestore();
+    await client.sendLog({
+      message: "test log message",
+      stream: "stdout",
     });
 
-    it("does not throw when log transport fails", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      const transportError = new Error("network down");
-      fetchMock.mockRejectedValue(transportError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
 
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await expect(
-        client.sendLog({
-          message: "test",
-          stream: "stdout",
-        }),
-      ).resolves.toBeUndefined();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to send log to host due to transport error:",
-        transportError,
-      );
-      consoleErrorSpy.mockRestore();
+    expect(url).toBe(
+      "http://localhost:3000/api/internal/driver/runs/run-123/logs",
+    );
+    expect(options.method).toBe("POST");
+    expect(options.headers).toMatchObject({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-MAL-Driver-Token": "secret-token",
     });
-
-    it("constructs correct URL for different base URLs", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "https://api.production.example.com",
-        runId: "run-456" as never,
-        taskId: "task-789" as never,
-        driverToken: "another-token",
-      });
-
-      await client.sendLog({
-        message: "test",
-        stream: "stdout",
-      });
-
-      const [url] = fetchMock.mock.calls[0];
-      expect(url.toString()).toBe(
-        "https://api.production.example.com/internal/driver/runs/run-456/tasks/task-789/logs",
-      );
+    expect(JSON.parse(options.body as string)).toEqual({
+      message: "test log message",
+      stream: "stdout",
     });
   });
 
-  describe("sendLifecycleEvent", () => {
-    it("sends harness-starting event correctly", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLifecycleEvent({
-        kind: "harness-starting",
-        harnessCommand: "echo hello world",
-      });
-
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      const [url, options] = fetchMock.mock.calls[0];
-
-      expect(url.toString()).toBe(
-        "http://localhost:3000/internal/driver/runs/run-123/tasks/task-456/lifecycle",
-      );
-      expect(options.method).toBe("POST");
-      expect(options.headers).toMatchObject({
-        "X-MAL-Driver-Token": "secret-token",
-        "content-type": "application/json",
-      });
-      expect(JSON.parse(options.body as string)).toEqual({
-        kind: "harness-starting",
-        harnessCommand: "echo hello world",
-      });
+  it("sends lifecycle events through the shared driver contract", async () => {
+    fetchMock.mockResolvedValue({
+      status: 200,
+      json: vi.fn().mockResolvedValue({ ok: true }),
     });
 
-    it("sends harness-exited event with exit code 0", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLifecycleEvent({
-        kind: "harness-exited",
-        exitCode: 0,
-        signal: null,
-      });
-
-      const [, options] = fetchMock.mock.calls[0];
-      expect(JSON.parse(options.body as string)).toEqual({
-        kind: "harness-exited",
-        exitCode: 0,
-        signal: null,
-      });
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
     });
 
-    it("sends harness-exited event with non-zero exit code", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLifecycleEvent({
-        kind: "harness-exited",
-        exitCode: 1,
-        signal: null,
-      });
-
-      const [, options] = fetchMock.mock.calls[0];
-      expect(JSON.parse(options.body as string)).toEqual({
-        kind: "harness-exited",
-        exitCode: 1,
-        signal: null,
-      });
+    await client.sendLifecycleEvent({
+      kind: "harness-starting",
+      harnessCommand: "echo hello world",
     });
 
-    it("sends harness-exited event with signal", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
+    const [url, options] = fetchMock.mock.calls[0];
 
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLifecycleEvent({
-        kind: "harness-exited",
-        exitCode: 137,
-        signal: "SIGKILL",
-      });
-
-      const [, options] = fetchMock.mock.calls[0];
-      expect(JSON.parse(options.body as string)).toEqual({
-        kind: "harness-exited",
-        exitCode: 137,
-        signal: "SIGKILL",
-      });
+    expect(url).toBe(
+      "http://localhost:3000/api/internal/driver/runs/run-123/lifecycle",
+    );
+    expect(options.headers).toMatchObject({
+      "X-MAL-Driver-Token": "secret-token",
     });
-
-    it("logs error when server returns non-OK response", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: "Internal Server Error",
-      });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await client.sendLifecycleEvent({
-        kind: "harness-starting",
-        harnessCommand: "echo hello",
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to send lifecycle event to host: 500 Internal Server Error",
-      );
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("does not throw when lifecycle transport fails", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      const transportError = new Error("network down");
-      fetchMock.mockRejectedValue(transportError);
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "secret-token",
-      });
-
-      await expect(
-        client.sendLifecycleEvent({
-          kind: "harness-starting",
-          harnessCommand: "echo hello",
-        }),
-      ).resolves.toBeUndefined();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to send lifecycle event to host due to transport error:",
-        transportError,
-      );
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("includes driver token in all lifecycle requests", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "my-driver-token-12345",
-      });
-
-      // Send harness-starting
-      await client.sendLifecycleEvent({
-        kind: "harness-starting",
-        harnessCommand: "echo hello",
-      });
-
-      let [, options] = fetchMock.mock.calls[0];
-      expect(options.headers).toMatchObject({
-        "X-MAL-Driver-Token": "my-driver-token-12345",
-      });
-
-      // Send harness-exited
-      await client.sendLifecycleEvent({
-        kind: "harness-exited",
-        exitCode: 0,
-        signal: null,
-      });
-
-      [, options] = fetchMock.mock.calls[1];
-      expect(options.headers).toMatchObject({
-        "X-MAL-Driver-Token": "my-driver-token-12345",
-      });
+    expect(JSON.parse(options.body as string)).toEqual({
+      kind: "harness-starting",
+      harnessCommand: "echo hello world",
     });
   });
 
-  describe("authentication header", () => {
-    it("uses X-MAL-Driver-Token header name", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
-
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "token-with-special-chars!@#$%",
-      });
-
-      await client.sendLog({
-        message: "test",
-        stream: "stdout",
-      });
-
-      const [, options] = fetchMock.mock.calls[0];
-      expect(options.headers).toHaveProperty("X-MAL-Driver-Token");
-      expect(options.headers["X-MAL-Driver-Token"]).toBe(
-        "token-with-special-chars!@#$%",
-      );
+  it("logs application errors returned by the host", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    fetchMock.mockResolvedValue({
+      status: 401,
+      json: vi
+        .fn()
+        .mockResolvedValue({ code: "unauthenticated", result: "error" }),
     });
 
-    it("uses same header for log and lifecycle endpoints", async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 204 });
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
 
-      const client = new HostApiClient({
-        baseUrl: "http://localhost:3000",
-        runId: "run-123" as never,
-        taskId: "task-456" as never,
-        driverToken: "shared-token",
-      });
+    await client.sendLog({ message: "test", stream: "stdout" });
 
-      await client.sendLog({ message: "log", stream: "stdout" });
-      await client.sendLifecycleEvent({
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to send log to host: 401 unauthenticated",
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("does not throw when transport fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const transportError = new Error("network down");
+    fetchMock.mockRejectedValue(transportError);
+
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
+
+    await expect(
+      client.sendLifecycleEvent({
         kind: "harness-starting",
-        harnessCommand: "echo",
-      });
+        harnessCommand: "echo hello",
+      }),
+    ).resolves.toBeUndefined();
 
-      const [, logOptions] = fetchMock.mock.calls[0];
-      const [, lifecycleOptions] = fetchMock.mock.calls[1];
-
-      expect(logOptions.headers["X-MAL-Driver-Token"]).toBe(
-        lifecycleOptions.headers["X-MAL-Driver-Token"],
-      );
-      expect(logOptions.headers["X-MAL-Driver-Token"]).toBe("shared-token");
-    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to send lifecycle event to host due to transport error:",
+      transportError,
+    );
+    consoleErrorSpy.mockRestore();
   });
 });

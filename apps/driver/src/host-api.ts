@@ -1,90 +1,124 @@
-import type { RunId, TaskId } from "@mono/api";
+import {
+  createDriverApiClient,
+  DRIVER_TOKEN_HEADER,
+  type DriverLifecycleEvent,
+  type DriverLogEvent,
+} from "@mono/driver-api";
 
-const DRIVER_TOKEN_HEADER = "X-MAL-Driver-Token";
+export type LifecycleEvent = DriverLifecycleEvent;
 
-export type LifecycleEvent =
-  | {
-      kind: "harness-starting";
-      harnessCommand: string;
-    }
-  | {
-      kind: "harness-exited";
-      exitCode: number;
-      signal: string | null;
+type DriverApiClient = {
+  internal: {
+    driver: {
+      runs: {
+        ":runId": {
+          logs: {
+            POST: (input: {
+              pathParams: { runId: string };
+              headers: Record<typeof DRIVER_TOKEN_HEADER, string>;
+              body: DriverLogEvent;
+            }) => Promise<{
+              status: number;
+              responseBody: { code?: string } | { ok: true };
+            }>;
+          };
+          lifecycle: {
+            POST: (input: {
+              pathParams: { runId: string };
+              headers: Record<typeof DRIVER_TOKEN_HEADER, string>;
+              body: DriverLifecycleEvent;
+            }) => Promise<{
+              status: number;
+              responseBody: { code?: string } | { ok: true };
+            }>;
+          };
+        };
+      };
     };
+  };
+};
 
 export class HostApiClient {
+  private readonly client: DriverApiClient;
+
   constructor(
     private readonly options: {
       baseUrl: string;
-      runId: RunId;
-      taskId: TaskId;
+      runId: string;
       driverToken: string;
     },
-  ) {}
+  ) {
+    this.client = createDriverApiClient(
+      this.options.baseUrl,
+    ) as DriverApiClient;
+  }
 
-  async sendLog(params: {
-    message: string;
-    stream: "stdout" | "stderr";
-  }): Promise<void> {
-    await this.post(
-      this.buildLogUrl(),
-      {
-        message: params.message,
-        stream: params.stream,
-      },
-      "log",
-    );
+  async sendLog(event: DriverLogEvent): Promise<void> {
+    try {
+      const response = await this.client.internal.driver.runs[
+        ":runId"
+      ].logs.POST({
+        pathParams: { runId: this.options.runId },
+        headers: this.headers(),
+        body: event,
+      });
+
+      this.logUnexpectedResponse("log", response);
+    } catch (error) {
+      console.error(
+        "Failed to send log to host due to transport error:",
+        error,
+      );
+    }
   }
 
   async sendLifecycleEvent(event: LifecycleEvent): Promise<void> {
-    await this.post(this.buildLifecycleUrl(), event, "lifecycle event");
+    try {
+      const response = await this.client.internal.driver.runs[
+        ":runId"
+      ].lifecycle.POST({
+        pathParams: { runId: this.options.runId },
+        headers: this.headers(),
+        body: event,
+      });
+
+      this.logUnexpectedResponse("lifecycle event", response);
+    } catch (error) {
+      console.error(
+        "Failed to send lifecycle event to host due to transport error:",
+        error,
+      );
+    }
   }
 
-  private buildLogUrl(): URL {
-    return new URL(
-      `/internal/driver/runs/${this.options.runId}/tasks/${this.options.taskId}/logs`,
-      this.options.baseUrl,
-    );
-  }
-
-  private buildLifecycleUrl(): URL {
-    return new URL(
-      `/internal/driver/runs/${this.options.runId}/tasks/${this.options.taskId}/lifecycle`,
-      this.options.baseUrl,
-    );
-  }
-
-  private headers(): Record<string, string> {
+  private headers(): Record<typeof DRIVER_TOKEN_HEADER, string> {
     return {
       [DRIVER_TOKEN_HEADER]: this.options.driverToken,
     };
   }
 
-  private async post(
-    url: URL,
-    body: unknown,
+  private logUnexpectedResponse(
     requestLabel: string,
-  ): Promise<void> {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          ...this.headers(),
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+    response:
+      | Awaited<
+          ReturnType<
+            DriverApiClient["internal"]["driver"]["runs"][":runId"]["logs"]["POST"]
+          >
+        >
+      | Awaited<
+          ReturnType<
+            DriverApiClient["internal"]["driver"]["runs"][":runId"]["lifecycle"]["POST"]
+          >
+        >,
+  ): void {
+    if (response.status !== 200) {
+      const responseCode =
+        "code" in response.responseBody
+          ? response.responseBody.code
+          : undefined;
 
-      if (!response.ok) {
-        console.error(
-          `Failed to send ${requestLabel} to host: ${response.status} ${response.statusText}`,
-        );
-      }
-    } catch (error) {
       console.error(
-        `Failed to send ${requestLabel} to host due to transport error:`,
-        error,
+        `Failed to send ${requestLabel} to host: ${response.status} ${responseCode ?? "unknown-error"}`,
       );
     }
   }

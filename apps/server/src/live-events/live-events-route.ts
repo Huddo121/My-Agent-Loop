@@ -9,6 +9,7 @@ import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { requireAuthSession } from "../auth/session";
 import type { Services } from "../services";
+import { withNewTransaction } from "../utils/transaction-context";
 
 /**
  * Raw Hono GET handler for live-events SSE at /api/workspaces/:workspaceId/live-events.
@@ -26,11 +27,12 @@ export async function handleLiveEvents(
     return c.json(body, 401);
   }
 
-  const canAccess =
-    await services.workspaceMembershipsService.isWorkspaceMember(
+  const canAccess = await withNewTransaction(services.db, async () =>
+    services.workspaceMembershipsService.isWorkspaceMember(
       authSession.user.id,
       workspaceId as WorkspaceId,
-    );
+    ),
+  );
   if (!canAccess) {
     const [, body] = notFound();
     return c.json(body, 404);

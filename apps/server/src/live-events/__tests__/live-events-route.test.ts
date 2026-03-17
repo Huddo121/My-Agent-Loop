@@ -6,8 +6,16 @@ const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
 }));
 
+const { withNewTransaction } = vi.hoisted(() => ({
+  withNewTransaction: vi.fn((_db: unknown, fn: () => Promise<unknown>) => fn()),
+}));
+
 vi.mock("../../auth/session", () => ({
   requireAuthSession,
+}));
+
+vi.mock("../../utils/transaction-context", () => ({
+  withNewTransaction,
 }));
 
 let abortCallbacks: (() => void)[] = [];

@@ -266,7 +266,6 @@ export class WorkflowExecutionService {
     const { repository, sandbox } = prepareResult.value;
 
     this.driverRunTokenStore.setToken(runId, driverToken);
-    let sandboxStarted = false;
     let sandboxFinished = false;
 
     try {
@@ -281,8 +280,6 @@ export class WorkflowExecutionService {
           ),
         };
       }
-      sandboxStarted = true;
-
       const oneHourInMs = 3600000;
       const result = await timeout(
         this.sandboxService.waitForSandboxToFinish(sandbox.id),
@@ -345,7 +342,7 @@ export class WorkflowExecutionService {
       }
       return { success: true, value: undefined };
     } finally {
-      if (sandboxStarted && sandboxFinished === false) {
+      if (sandboxFinished === false) {
         await this.sandboxService.stopSandbox(sandbox.id);
       }
       this.driverRunTokenStore.clearToken(runId);

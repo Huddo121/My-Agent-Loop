@@ -24,6 +24,7 @@ import type {
   SandboxId,
   SandboxInitOptions,
   SandboxService,
+  StartSandboxFailure,
   WaitForSandboxToFinishFailure,
   WaitForSandboxToFinishSuccess,
 } from "../../sandbox/SandboxService";
@@ -170,6 +171,33 @@ describe("WorkflowExecutionService", () => {
       createRunId("run-wait-failure"),
       createTask("task-wait-failure"),
       createProject("project-wait-failure"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(false);
+    expect(sandboxService.stopSandboxCallCount).toBe(1);
+    expect(sandboxService.tokenWasValidWhenStopped).toBe(true);
+  });
+
+  it("stops the sandbox when startup fails after creation", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+      {
+        success: false,
+        error: { reason: "container-not-found" },
+      },
+    );
+
+    const service = createService({ driverRunTokenStore, sandboxService });
+    const result = await service.executeWorkflow(
+      createRunId("run-start-failure"),
+      createTask("task-start-failure"),
+      createProject("project-start-failure"),
       createWorkflow(),
     );
 
@@ -442,6 +470,10 @@ class RecordingSandboxService implements SandboxService {
       WaitForSandboxToFinishSuccess,
       WaitForSandboxToFinishFailure
     >,
+    private readonly startResult: Result<"started", StartSandboxFailure> = {
+      success: true,
+      value: "started",
+    },
   ) {}
 
   async createNewSandbox(options: SandboxInitOptions): Promise<Sandbox> {
@@ -453,7 +485,7 @@ class RecordingSandboxService implements SandboxService {
   }
 
   async startSandbox() {
-    return { success: true, value: "started" } as const;
+    return this.startResult;
   }
 
   async stopSandbox() {

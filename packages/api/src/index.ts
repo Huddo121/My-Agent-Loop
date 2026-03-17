@@ -5,6 +5,7 @@ import { workspacesApi } from "./workspaces/workspaces-api";
 export * from "./admin/admin-api";
 export * from "./handler-utils";
 export * from "./harnesses/harnesses-model";
+export * from "./live-events";
 export * from "./projects/projects-api";
 export * from "./projects/projects-model";
 export * from "./runs/runs-api";

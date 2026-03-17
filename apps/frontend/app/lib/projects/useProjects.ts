@@ -1,5 +1,6 @@
 import type {
   CreateProjectRequest,
+  ProjectDto,
   ProjectId,
   UpdateProjectRequest,
   WorkspaceId,
@@ -8,14 +9,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import { handleUnauthenticated } from "~/lib/auth/api-errors";
 import { useCurrentWorkspace } from "~/lib/workspaces";
-import type { Project } from "~/types";
 
 //
 // These hooks are expected to be private to the projects directory.
 // They must be used inside CurrentWorkspaceProvider (e.g. on app routes after the setup gate).
 //
 
-const projectsQueryKey = (workspaceId: WorkspaceId) =>
+export const projectsQueryKey = (workspaceId: WorkspaceId) =>
   ["projects", workspaceId] as const;
 
 /**
@@ -25,7 +25,7 @@ export function useProjectsQuery() {
   const workspace = useCurrentWorkspace();
   return useQuery({
     queryKey: projectsQueryKey(workspace.id),
-    queryFn: async (): Promise<Project[]> => {
+    queryFn: async (): Promise<ProjectDto[]> => {
       const response = await apiClient.workspaces[":workspaceId"].projects.GET({
         pathParams: { workspaceId: workspace.id },
       });
@@ -50,7 +50,7 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: async (
       createProjectRequest: CreateProjectRequest,
-    ): Promise<Project> => {
+    ): Promise<ProjectDto> => {
       const response = await apiClient.workspaces[":workspaceId"].projects.POST(
         {
           pathParams: { workspaceId: workspace.id },
@@ -69,7 +69,7 @@ export function useCreateProject() {
       throw new Error("Failed to create project");
     },
     onSuccess: (newProject) => {
-      queryClient.setQueryData<Project[]>(
+      queryClient.setQueryData<ProjectDto[]>(
         projectsQueryKey(workspace.id),
         (old) => {
           if (!old) return [newProject];
@@ -91,7 +91,7 @@ export function useUpdateProject() {
     }: {
       projectId: ProjectId;
       updateProjectRequest: UpdateProjectRequest;
-    }): Promise<Project> => {
+    }): Promise<ProjectDto> => {
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].PATCH({
@@ -99,7 +99,7 @@ export function useUpdateProject() {
         body: updateProjectRequest,
       });
       if (response.status === 200) {
-        return response.responseBody as Project;
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -113,7 +113,7 @@ export function useUpdateProject() {
       throw new Error("Failed to update project");
     },
     onSuccess: (updatedProject) => {
-      queryClient.setQueryData<Project[]>(
+      queryClient.setQueryData<ProjectDto[]>(
         projectsQueryKey(workspace.id),
         (old) => {
           if (!old) return [updatedProject];
@@ -140,7 +140,7 @@ export function useStartRun() {
     }: {
       projectId: ProjectId;
       mode: "single" | "loop";
-    }): Promise<{ runId: string; project: Project }> => {
+    }): Promise<{ runId: string; project: ProjectDto }> => {
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].run.POST({
@@ -160,7 +160,7 @@ export function useStartRun() {
     },
     onSuccess: (result) => {
       const updatedProject = result.project;
-      queryClient.setQueryData<Project[]>(
+      queryClient.setQueryData<ProjectDto[]>(
         projectsQueryKey(workspace.id),
         (old) => {
           if (!old) return [updatedProject];
@@ -192,7 +192,7 @@ export function useStopQueue() {
     }: {
       projectId: ProjectId;
       stopImmediately: boolean;
-    }): Promise<{ project: Project }> => {
+    }): Promise<{ project: ProjectDto }> => {
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
       ].stop.POST({
@@ -215,7 +215,7 @@ export function useStopQueue() {
     },
     onSuccess: (result) => {
       const updatedProject = result.project;
-      queryClient.setQueryData<Project[]>(
+      queryClient.setQueryData<ProjectDto[]>(
         projectsQueryKey(workspace.id),
         (old) => {
           if (!old) return [updatedProject];

@@ -20,7 +20,10 @@ import { withNewTransaction } from "../utils/transaction-context";
 type WorkspaceProjectsTasksApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
 
-function toTaskDto(task: Task, config: ScopedHarnessConfig | null): TaskDto {
+export function toTaskDto(
+  task: Task,
+  config: ScopedHarnessConfig | null,
+): TaskDto {
   const agentConfig: AgentConfig | null = config
     ? { harnessId: config.harnessId, modelId: config.modelId }
     : null;
@@ -109,9 +112,24 @@ export const tasksHandlers: HonoHandlersFor<
           task.id,
           config,
         );
-        return ok(toTaskDto(task, config));
+        const dto = toTaskDto(task, config);
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          {
+            type: "task.updated",
+            projectId: projectId as ProjectId,
+            task: dto,
+          },
+        );
+        return ok(dto);
       }
-      return ok(toTaskDto(task, null));
+      const dto = toTaskDto(task, null);
+      await ctx.services.liveEventsService.publish(workspaceId as WorkspaceId, {
+        type: "task.updated",
+        projectId: projectId as ProjectId,
+        task: dto,
+      });
+      return ok(dto);
     });
   },
 
@@ -200,7 +218,16 @@ export const tasksHandlers: HonoHandlersFor<
             config,
           );
         }
-        return ok(toTaskDto(task, config));
+        const dto = toTaskDto(task, config);
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          {
+            type: "task.updated",
+            projectId: projectId as ProjectId,
+            task: dto,
+          },
+        );
+        return ok(dto);
       });
     },
 
@@ -232,7 +259,16 @@ export const tasksHandlers: HonoHandlersFor<
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             completedTask.id,
           );
-        return ok(toTaskDto(completedTask, config));
+        const dto = toTaskDto(completedTask, config);
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          {
+            type: "task.updated",
+            projectId: projectId as ProjectId,
+            task: dto,
+          },
+        );
+        return ok(dto);
       });
     },
 
@@ -269,7 +305,16 @@ export const tasksHandlers: HonoHandlersFor<
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             movedTask.id,
           );
-        return ok(toTaskDto(movedTask, config));
+        const dto = toTaskDto(movedTask, config);
+        await ctx.services.liveEventsService.publish(
+          workspaceId as WorkspaceId,
+          {
+            type: "task.updated",
+            projectId: projectId as ProjectId,
+            task: dto,
+          },
+        );
+        return ok(dto);
       });
     },
   },

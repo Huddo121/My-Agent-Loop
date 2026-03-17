@@ -2,13 +2,17 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../root";
 
-const { useSession, useAppSessionQuery, useWorkspaceContext } = vi.hoisted(
-  () => ({
-    useSession: vi.fn(),
-    useAppSessionQuery: vi.fn(),
-    useWorkspaceContext: vi.fn(),
-  }),
-);
+const {
+  useSession,
+  useAppSessionQuery,
+  useWorkspaceContext,
+  useCurrentWorkspace,
+} = vi.hoisted(() => ({
+  useSession: vi.fn(),
+  useAppSessionQuery: vi.fn(),
+  useWorkspaceContext: vi.fn(),
+  useCurrentWorkspace: vi.fn(),
+}));
 
 vi.mock("react-router", () => ({
   Links: () => null,
@@ -25,6 +29,10 @@ vi.mock("../components/auth", () => ({
 
 vi.mock("../components/workspaces", () => ({
   WorkspaceSetup: () => <div>workspace-setup</div>,
+}));
+
+vi.mock("../lib/live-events", () => ({
+  LiveEventsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 vi.mock("../components/ui/sidebar", () => ({
@@ -48,6 +56,7 @@ vi.mock("../lib/workspaces", () => ({
   }) => children,
   WorkspaceProvider: ({ children }: { children: React.ReactNode }) => children,
   useWorkspaceContext,
+  useCurrentWorkspace,
 }));
 
 describe("App root auth gating", () => {
@@ -55,6 +64,7 @@ describe("App root auth gating", () => {
     useAppSessionQuery.mockReset();
     useSession.mockReset();
     useWorkspaceContext.mockReset();
+    useCurrentWorkspace.mockReset();
   });
 
   afterEach(() => {
@@ -107,6 +117,7 @@ describe("App root auth gating", () => {
       currentWorkspace: { id: "workspace-1" },
       isLoadingWorkspaces: false,
     });
+    useCurrentWorkspace.mockReturnValue({ id: "workspace-1" });
 
     render(<App />);
 

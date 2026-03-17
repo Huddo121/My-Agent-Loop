@@ -38,5 +38,5 @@ The driver does not create, read, reconcile, or persist the task file in v1. Any
 - The driver token is validated on every API call and scoped to a single run
 - Log delivery goes through the existing logging path: the server accepts HTTP log payloads from the driver, shapes them into a simple server-side format, and writes them to server logs
 - Sandbox startup now executes the driver binary as the long-lived process, which then starts the selected harness command
-- The driver binary is built during Docker build and copied into the sandbox image
+- The driver binary is built before Docker build and copied into the sandbox image as a prebuilt artifact
 - The driver app remains self-contained in `apps/driver` with its own `package.json`, `tsconfig.json`, and entrypoint

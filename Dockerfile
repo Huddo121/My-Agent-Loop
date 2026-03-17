@@ -19,9 +19,6 @@ RUN mkdir -p /etc/apt/keyrings && \
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install postject for SEA injection
-RUN npm install -g postject
-
 # ENV OLLAMA_API_BASE=http://host.docker.internal:11434
 
 # Install OpenCode harness CLI
@@ -38,19 +35,9 @@ RUN npm install -g @openai/codex
 
 ENV PATH="/root/.local/bin:/root/.opencode/bin:${PATH}"
 
-# Copy entire monorepo to get workspace dependencies
-COPY . /code
-WORKDIR /code
+# Copy the prebuilt driver binary into the image
+COPY apps/driver/dist-sea/driver /usr/local/bin/driver
 
-# Install all dependencies (including workspace packages)
-RUN pnpm install
-
-# Build the driver binary
-RUN pnpm run driver:build
-
-# Move the driver binary to a common location
-RUN mkdir -p /usr/local/bin && \
-    mv apps/driver/dist-sea/driver /usr/local/bin/driver && \
-    chmod +x /usr/local/bin/driver
+RUN chmod +x /usr/local/bin/driver && mkdir -p /code
 
 WORKDIR /code

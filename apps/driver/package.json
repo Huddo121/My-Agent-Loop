@@ -6,6 +6,7 @@
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build:bundle": "node build.mjs",
+    "build:linux": "pnpm build:bundle && node build-linux.mjs",
     "build:sea": "node build-sea.mjs",
     "build": "pnpm build:bundle && pnpm build:sea",
     "test": "vitest",

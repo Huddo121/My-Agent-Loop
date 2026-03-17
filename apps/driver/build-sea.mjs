@@ -5,7 +5,10 @@ import * as path from "node:path";
 const outdir = "dist-sea";
 const bundleFile = path.join(outdir, "index.cjs");
 const seaBlobFile = path.join(outdir, "sea-blob.blob");
-const seaExeFile = path.join(outdir, "driver");
+const seaExeFile =
+  process.env.DRIVER_SEA_OUTPUT_FILE ?? path.join(outdir, "driver");
+const nodeBinaryPath = process.env.DRIVER_SEA_NODE_BINARY ?? process.execPath;
+const sentinelFuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
 
 // Check if the bundle exists
 if (!fs.existsSync(bundleFile)) {
@@ -43,11 +46,15 @@ try {
 
 console.log("Blob generated, creating executable...");
 
-// Get the path to the current node executable
-const nodePath = process.execPath;
+if (!fs.existsSync(nodeBinaryPath)) {
+  console.error(`Node binary not found at ${nodeBinaryPath}`);
+  process.exit(1);
+}
+
+fs.mkdirSync(path.dirname(seaExeFile), { recursive: true });
 
 // Copy the node binary to the output location
-fs.copyFileSync(nodePath, seaExeFile);
+fs.copyFileSync(nodeBinaryPath, seaExeFile);
 
 // Make it executable
 fs.chmodSync(seaExeFile, 0o755);
@@ -58,7 +65,7 @@ fs.chmodSync(seaExeFile, 0o755);
 console.log("Attempting to inject blob into executable...");
 try {
   execSync(
-    `npx postject "${seaExeFile}" NODE_SEA_BLOB "${seaBlobFile}" --overwrite`,
+    `npx postject "${seaExeFile}" NODE_SEA_BLOB "${seaBlobFile}" --overwrite --sentinel-fuse ${sentinelFuse}`,
     {
       stdio: "inherit",
     },
@@ -73,7 +80,6 @@ try {
     "Injection error:",
     error instanceof Error ? error.message : String(error),
   );
-  console.log("The Docker build will create the proper SEA executable.");
   console.log("");
   console.log("Bundle created at:", bundleFile);
   console.log("Blob created at:", seaBlobFile);

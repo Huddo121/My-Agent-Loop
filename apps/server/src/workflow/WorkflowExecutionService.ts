@@ -258,7 +258,7 @@ export class WorkflowExecutionService {
     runId: RunId,
     workflow: Workflow,
   ): Promise<Result<void, Error>> {
-    const driverToken = randomBytes(32).toString("base64url");
+    const driverToken = randomBytes(48).toString("base64url");
     const prepareResult = await this.prepare(project, runId, task, driverToken);
     if (prepareResult.success === false) {
       return { success: false, error: prepareResult.error };

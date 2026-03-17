@@ -1,9 +1,16 @@
-import { notFound, ok, unauthenticated } from "@mono/api";
+import {
+  badUserInput,
+  notFound,
+  ok,
+  runIdSchema,
+  unauthenticated,
+} from "@mono/api";
 import { DRIVER_TOKEN_HEADER, type DriverApi } from "@mono/driver-api";
 import type { HonoHandlersFor } from "cerato";
 import type { RunId } from "../runs/RunId";
 import type { Run } from "../runs/RunsService";
 import type { Services } from "../services";
+import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 
 type DriverApiServices = Pick<
@@ -20,21 +27,16 @@ export const driverApiHandlers: HonoHandlersFor<
     runs: {
       ":runId": {
         logs: async (ctx) => {
-          const runId = ctx.hono.req.param("runId") as RunId;
-
-          const authFailure = authenticateDriverRequest(
+          const requestResult = await getAuthenticatedRun(
             ctx.services,
-            runId,
+            ctx.hono.req.param("runId"),
             ctx.hono.req.header(DRIVER_TOKEN_HEADER),
           );
-          if (authFailure !== null) {
-            return authFailure;
+          if (requestResult.success === false) {
+            return requestResult.error;
           }
 
-          const run = await getRun(ctx.services, runId);
-          if (run === undefined) {
-            return notFound("Run not found.");
-          }
+          const { runId } = requestResult.value;
 
           const logMessage = `[driver:${runId}] ${ctx.body.stream}: ${ctx.body.message}`;
           if (ctx.body.stream === "stderr") {
@@ -46,21 +48,16 @@ export const driverApiHandlers: HonoHandlersFor<
           return ok({ ok: true });
         },
         lifecycle: async (ctx) => {
-          const runId = ctx.hono.req.param("runId") as RunId;
-
-          const authFailure = authenticateDriverRequest(
+          const requestResult = await getAuthenticatedRun(
             ctx.services,
-            runId,
+            ctx.hono.req.param("runId"),
             ctx.hono.req.header(DRIVER_TOKEN_HEADER),
           );
-          if (authFailure !== null) {
-            return authFailure;
+          if (requestResult.success === false) {
+            return requestResult.error;
           }
 
-          const run = await getRun(ctx.services, runId);
-          if (run === undefined) {
-            return notFound("Run not found.");
-          }
+          const { runId } = requestResult.value;
 
           if (ctx.body.kind === "harness-starting") {
             ctx.services.logger.info(
@@ -79,27 +76,88 @@ export const driverApiHandlers: HonoHandlersFor<
   },
 };
 
+type DriverRequestFailure =
+  | ReturnType<typeof badUserInput>
+  | ReturnType<typeof notFound>
+  | ReturnType<typeof unauthenticated>;
+
+async function getAuthenticatedRun(
+  services: DriverApiServices,
+  rawRunId: string,
+  driverToken: string | undefined,
+): Promise<Result<{ run: Run; runId: RunId }, DriverRequestFailure>> {
+  const runIdResult = parseRunId(rawRunId);
+  if (runIdResult.success === false) {
+    return runIdResult;
+  }
+
+  const authResult = authenticateDriverRequest(
+    services,
+    runIdResult.value,
+    driverToken,
+  );
+  if (authResult.success === false) {
+    return authResult;
+  }
+
+  const runResult = await getRun(services, runIdResult.value);
+  if (runResult.success === false) {
+    return runResult;
+  }
+
+  return {
+    success: true,
+    value: {
+      run: runResult.value,
+      runId: runIdResult.value,
+    },
+  };
+}
+
+function parseRunId(
+  rawRunId: string,
+): Result<RunId, ReturnType<typeof badUserInput>> {
+  const result = runIdSchema.safeParse(rawRunId);
+  if (!result.success) {
+    return { success: false, error: badUserInput("Run ID is invalid.") };
+  }
+
+  return { success: true, value: result.data as unknown as RunId };
+}
+
 function authenticateDriverRequest(
   services: DriverApiServices,
   runId: RunId,
   driverToken: string | undefined,
-): ReturnType<typeof unauthenticated> | null {
+): Result<void, ReturnType<typeof unauthenticated>> {
   if (driverToken === undefined || driverToken.length === 0) {
-    return unauthenticated("Driver token is required.");
+    return {
+      success: false,
+      error: unauthenticated("Driver token is required."),
+    };
   }
 
   if (!services.driverRunTokenStore.isValidToken(runId, driverToken)) {
-    return unauthenticated("Driver token is invalid.");
+    return {
+      success: false,
+      error: unauthenticated("Driver token is invalid."),
+    };
   }
 
-  return null;
+  return { success: true, value: undefined };
 }
 
 async function getRun(
   services: DriverApiServices,
   runId: RunId,
-): Promise<Run | undefined> {
-  return withNewTransaction(services.db, () =>
+): Promise<Result<Run, ReturnType<typeof notFound>>> {
+  const run = await withNewTransaction(services.db, () =>
     services.runsService.getRun(runId),
   );
+
+  if (run === undefined) {
+    return { success: false, error: notFound("Run not found.") };
+  }
+
+  return { success: true, value: run };
 }

@@ -85,6 +85,39 @@ describe("driver api handlers", () => {
         code: "unauthenticated",
       });
     });
+
+    it("rejects requests with an invalid driver token", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: "task-1" as never,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/api/internal/driver/runs/${RUN_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": "wrong-token",
+          },
+          body: JSON.stringify({
+            message: "test log",
+            stream: "stdout",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "unauthenticated",
+        message: "Driver token is invalid.",
+      });
+      expect(services.runsService.getRun).not.toHaveBeenCalled();
+    });
   });
 
   describe("logs endpoint", () => {

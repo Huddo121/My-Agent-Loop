@@ -106,6 +106,8 @@ describe("WorkflowExecutionService", () => {
 
     expect(firstStore.lastIssuedToken).toBeDefined();
     expect(secondStore.lastIssuedToken).toBeDefined();
+    expect(firstStore.lastIssuedToken).toHaveLength(64);
+    expect(secondStore.lastIssuedToken).toHaveLength(64);
     expect(firstStore.lastIssuedToken).not.toEqual(secondStore.lastIssuedToken);
   });
 

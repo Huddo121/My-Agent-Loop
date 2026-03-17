@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import type { RunId } from "../runs/RunId";
 
 export interface DriverRunTokenStore {
@@ -8,10 +7,10 @@ export interface DriverRunTokenStore {
 }
 
 export class InMemoryDriverRunTokenStore implements DriverRunTokenStore {
-  private readonly tokens = new Map<RunId, Buffer>();
+  private readonly tokens = new Map<RunId, string>();
 
   setToken(runId: RunId, token: string): void {
-    this.tokens.set(runId, Buffer.from(token, "utf8"));
+    this.tokens.set(runId, token);
   }
 
   clearToken(runId: RunId): void {
@@ -24,11 +23,6 @@ export class InMemoryDriverRunTokenStore implements DriverRunTokenStore {
       return false;
     }
 
-    const actual = Buffer.from(candidateToken, "utf8");
-    if (expected.length !== actual.length) {
-      return false;
-    }
-
-    return timingSafeEqual(expected, actual);
+    return expected === candidateToken;
   }
 }

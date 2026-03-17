@@ -19,7 +19,7 @@ if (!fs.existsSync(bundleFile)) {
 // Generate the SEA blob using the experimental-sea-config
 console.log("Generating SEA blob...");
 
-// For Node.js 24.x, we use the older approach
+// For Node.js 24.x, write the SEA config file explicitly before invoking Node.
 const seaConfig = {
   main: bundleFile,
   output: seaBlobFile,

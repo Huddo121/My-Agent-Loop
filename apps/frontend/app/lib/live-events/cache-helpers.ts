@@ -1,13 +1,7 @@
-import type { ProjectDto, ProjectId, TaskDto, WorkspaceId } from "@mono/api";
+import type { ProjectDto, ProjectId, TaskDto } from "@mono/api";
 import type { QueryClient } from "@tanstack/react-query";
 import { tasksQueryKey } from "~/hooks/useTasks";
 import { projectsQueryKey } from "~/lib/projects/useProjects";
-import type { Project, Task } from "~/types";
-
-function taskPosition(task: Task | TaskDto): number {
-  const pos = "position" in task ? (task as TaskDto).position : undefined;
-  return typeof pos === "number" ? pos : 0;
-}
 
 /**
  * Patch or insert a project in the workspace projects cache.
@@ -15,21 +9,19 @@ function taskPosition(task: Task | TaskDto): number {
  */
 export function applyProjectUpdated(
   queryClient: QueryClient,
-  project: ProjectDto | Project,
+  project: ProjectDto,
 ): void {
-  const workspaceId = project.workspaceId as WorkspaceId;
-  const key = projectsQueryKey(workspaceId);
+  const key = projectsQueryKey(project.workspaceId);
 
-  queryClient.setQueryData<Project[]>(key, (old) => {
-    const next = project as Project;
-    if (!old) return [next];
+  queryClient.setQueryData<ProjectDto[]>(key, (old) => {
+    if (!old) return [project];
     const idx = old.findIndex((p) => p.id === project.id);
     if (idx >= 0) {
       const nextList = [...old];
-      nextList[idx] = next;
+      nextList[idx] = project;
       return nextList;
     }
-    return [...old, next];
+    return [...old, project];
   });
 }
 
@@ -41,17 +33,16 @@ export function applyProjectUpdated(
  */
 export function applyTaskUpdated(
   queryClient: QueryClient,
-  projectId: string,
+  projectId: ProjectId,
   task: TaskDto,
 ): void {
-  const key = tasksQueryKey(projectId as ProjectId);
+  const key = tasksQueryKey(projectId);
   const completedOn = task.completedOn;
 
-  queryClient.setQueryData<Task[]>(key, (old) => {
-    const taskAsTask = task as unknown as Task;
+  queryClient.setQueryData<TaskDto[]>(key, (old) => {
     if (!old) {
       if (completedOn) return undefined;
-      return [taskAsTask];
+      return [task];
     }
 
     const idx = old.findIndex((t) => t.id === task.id);
@@ -63,13 +54,13 @@ export function applyTaskUpdated(
 
     if (idx >= 0) {
       const next = [...old];
-      next[idx] = taskAsTask;
-      next.sort((a, b) => taskPosition(a) - taskPosition(b));
+      next[idx] = task;
+      next.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       return next;
     }
 
-    const next = [...old, taskAsTask];
-    next.sort((a, b) => taskPosition(a) - taskPosition(b));
+    const next = [...old, task];
+    next.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     return next;
   });
 }

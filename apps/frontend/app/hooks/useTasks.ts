@@ -1,4 +1,4 @@
-import type { MoveTaskRequest, ProjectId, TaskId } from "@mono/api";
+import type { MoveTaskRequest, ProjectId, TaskDto, TaskId } from "@mono/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api-client";
 import { handleUnauthenticated } from "~/lib/auth/api-errors";
@@ -15,7 +15,7 @@ export function useTasks(projectId: ProjectId | null) {
   const workspace = useCurrentWorkspace();
   return useQuery({
     queryKey: tasksQueryKey(projectId),
-    queryFn: async (): Promise<Task[]> => {
+    queryFn: async (): Promise<TaskDto[]> => {
       if (projectId === null) throw new Error("Project ID is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
@@ -23,7 +23,7 @@ export function useTasks(projectId: ProjectId | null) {
         pathParams: { workspaceId: workspace.id, projectId },
       });
       if (response.status === 200) {
-        return response.responseBody as Task[];
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -42,7 +42,7 @@ export function useCreateTask(projectId: ProjectId | null) {
   const workspace = useCurrentWorkspace();
 
   return useMutation({
-    mutationFn: async (newTask: NewTask): Promise<Task> => {
+    mutationFn: async (newTask: NewTask): Promise<TaskDto> => {
       if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
@@ -51,7 +51,7 @@ export function useCreateTask(projectId: ProjectId | null) {
         body: newTask,
       });
       if (response.status === 200) {
-        return response.responseBody as Task;
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -60,7 +60,7 @@ export function useCreateTask(projectId: ProjectId | null) {
     },
     onSuccess: (newTask) => {
       if (!projectId) return;
-      queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
+      queryClient.setQueryData<TaskDto[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [newTask];
         return [...old, newTask];
       });
@@ -76,7 +76,7 @@ export function useCompleteTask(projectId: ProjectId | null) {
   const workspace = useCurrentWorkspace();
 
   return useMutation({
-    mutationFn: async (taskId: TaskId): Promise<Task> => {
+    mutationFn: async (taskId: TaskId): Promise<TaskDto> => {
       if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
@@ -84,7 +84,7 @@ export function useCompleteTask(projectId: ProjectId | null) {
         pathParams: { workspaceId: workspace.id, projectId, taskId },
       });
       if (response.status === 200) {
-        return response.responseBody as Task;
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -93,7 +93,7 @@ export function useCompleteTask(projectId: ProjectId | null) {
     },
     onSuccess: (updatedTask) => {
       if (!projectId) return;
-      queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
+      queryClient.setQueryData<TaskDto[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [updatedTask];
         return old.map((task) =>
           task.id === updatedTask.id ? updatedTask : task,
@@ -117,7 +117,7 @@ export function useUpdateTask(projectId: ProjectId | null) {
     }: {
       taskId: TaskId;
       task: UpdateTask;
-    }): Promise<Task> => {
+    }): Promise<TaskDto> => {
       if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
@@ -126,7 +126,7 @@ export function useUpdateTask(projectId: ProjectId | null) {
         body: task,
       });
       if (response.status === 200) {
-        return response.responseBody as Task;
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -135,7 +135,7 @@ export function useUpdateTask(projectId: ProjectId | null) {
     },
     onSuccess: (updatedTask) => {
       if (!projectId) return;
-      queryClient.setQueryData<Task[]>(tasksQueryKey(projectId), (old) => {
+      queryClient.setQueryData<TaskDto[]>(tasksQueryKey(projectId), (old) => {
         if (!old) return [updatedTask];
         return old.map((task) =>
           task.id === updatedTask.id ? updatedTask : task,
@@ -161,7 +161,7 @@ export function useMoveTask(projectId: ProjectId | null) {
       taskId: TaskId;
       request: MoveTaskRequest;
       optimisticTasks: Task[];
-    }): Promise<Task> => {
+    }): Promise<TaskDto> => {
       if (!projectId) throw new Error("Project is required");
       const response = await apiClient.workspaces[":workspaceId"].projects[
         ":projectId"
@@ -170,12 +170,7 @@ export function useMoveTask(projectId: ProjectId | null) {
         body: request,
       });
       if (response.status === 200) {
-        return {
-          ...response.responseBody,
-          completedOn: response.responseBody.completedOn
-            ? new Date(response.responseBody.completedOn)
-            : null,
-        };
+        return response.responseBody;
       }
       if (response.status === 401) {
         return handleUnauthenticated();
@@ -186,10 +181,10 @@ export function useMoveTask(projectId: ProjectId | null) {
       if (!projectId) return;
 
       await queryClient.cancelQueries({ queryKey: tasksQueryKey(projectId) });
-      const previousTasks = queryClient.getQueryData<Task[]>(
+      const previousTasks = queryClient.getQueryData<TaskDto[]>(
         tasksQueryKey(projectId),
       );
-      queryClient.setQueryData<Task[]>(
+      queryClient.setQueryData<TaskDto[]>(
         tasksQueryKey(projectId),
         optimisticTasks,
       );
@@ -198,7 +193,7 @@ export function useMoveTask(projectId: ProjectId | null) {
     onError: (_err, _variables, context) => {
       if (!projectId) return;
       if (context?.previousTasks) {
-        queryClient.setQueryData<Task[]>(
+        queryClient.setQueryData<TaskDto[]>(
           tasksQueryKey(projectId),
           context.previousTasks,
         );

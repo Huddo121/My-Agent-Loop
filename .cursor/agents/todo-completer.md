@@ -5,7 +5,6 @@ description: >
 
   TRIGGER WHEN: Executing a Plan file with multiple TODOs. Spawn one subagent per TODO.
 mode: subagent
-model: opencode/minimax-m2.5-free
 ---
 
 Your role is to execute on a single TODO for the given plan file, the parent agent will tell you what the plan file is.

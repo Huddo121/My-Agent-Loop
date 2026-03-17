@@ -75,6 +75,7 @@ echo "Starting driver binary: $MAL_DRIVER_BINARY_PATH"
 
 # Execute the driver binary with the provided CLI arguments
 # The driver will run the harness command and forward logs until the harness exits
+# Remember whether the `x` flag (xtrace) was enabled so we can restore it after running the driver
 WAS_XTRACE_ENABLED=0
 case "$-" in
   *x*) WAS_XTRACE_ENABLED=1 ;;

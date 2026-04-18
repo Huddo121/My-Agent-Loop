@@ -29,6 +29,7 @@ import {
   type HarnessAuthService,
 } from "./harness/HarnessAuthService";
 import { OpenCodeHarness } from "./harness/OpenCodeHarness";
+import { LiveEventsService } from "./live-events";
 import { ConsoleLogger, type Logger } from "./logger/Logger";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
@@ -74,6 +75,7 @@ export interface Services {
   harnessAuthService: HarnessAuthService;
   harnesses: readonly AgentHarness[];
   logger: Logger;
+  liveEventsService: LiveEventsService;
 }
 
 const encryptionService = new DefaultEncryptionService(
@@ -124,6 +126,8 @@ const harnesses: readonly AgentHarness[] = [
 
 const workflowMessengerService = new WorkflowMessengerService();
 
+const liveEventsService = new LiveEventsService();
+
 const workflowManager = new DatabaseWorkflowManager(
   workflowMessengerService,
   taskQueue,
@@ -131,6 +135,8 @@ const workflowManager = new DatabaseWorkflowManager(
   projectsService,
   workflowQueues,
   db,
+  liveEventsService,
+  forgeSecretRepository,
 );
 
 const workflowExecutionService = new WorkflowExecutionService(
@@ -143,6 +149,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   harnessAuthService,
   forgeSecretRepository,
   driverRunTokenStore,
+  liveEventsService,
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
@@ -179,4 +186,5 @@ export const services: Services = {
   workflowQueues,
   backgroundWorkflowProcessor,
   logger,
+  liveEventsService,
 };

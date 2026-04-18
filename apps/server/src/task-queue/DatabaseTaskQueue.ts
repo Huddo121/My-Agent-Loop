@@ -53,6 +53,15 @@ export class DatabaseTaskQueue implements TaskQueue {
     return fromTaskEntity(entity);
   }
 
+  async getProjectIdForTask(taskId: TaskId): Promise<ProjectId | undefined> {
+    const tx = getTransaction();
+    const entity = await tx.query.tasksTable.findFirst({
+      where: eq(tasksTable.id, taskId),
+      columns: { projectId: true },
+    });
+    return entity?.projectId;
+  }
+
   async addTask(projectId: ProjectId, task: NewTask): Promise<Task> {
     const tx = getTransaction();
 

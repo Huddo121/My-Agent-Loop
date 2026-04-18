@@ -16,7 +16,8 @@ export type Task = {
   id: TaskId;
   title: string;
   description: string;
-  completedOn: Date | null | undefined;
+  completedOn?: Date | null | undefined;
+  position?: number | null | undefined;
   agentConfig: AgentConfig | null;
   subtasks: Subtask[];
 };

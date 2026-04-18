@@ -5,6 +5,7 @@ import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
 import { driverApiHandlers } from "./driver-api/driver-api-handlers";
+import { handleLiveEvents } from "./live-events/live-events-route";
 import { startMcp } from "./mcp";
 import { services } from "./services";
 import { sessionHandlers } from "./session/session-handlers";
@@ -54,6 +55,10 @@ const app = createHonoServer(
 
 app.on(["GET", "POST"], "/api/auth/*", async (ctx) => {
   return auth.handler(ctx.req.raw);
+});
+
+app.get("/api/workspaces/:workspaceId/live-events", async (ctx) => {
+  return handleLiveEvents(ctx, services);
 });
 
 serve(app, (info) => {

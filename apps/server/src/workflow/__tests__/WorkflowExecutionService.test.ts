@@ -2,6 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type {
+  LiveEventDto,
+  LiveSubscription,
   ProjectId,
   ProjectShortCode,
   TaskId,
@@ -17,6 +19,7 @@ import type { GitService } from "../../git/GitService";
 import type { AgentHarness, AgentHarnessPreparation } from "../../harness";
 import type { AgentHarnessConfigRepository } from "../../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../../harness/HarnessAuthService";
+import { LiveEventsService, type RegisterOptions, type SendSSE } from "../../live-events";
 import type { Project } from "../../projects/ProjectsService";
 import type { RunId } from "../../runs/RunId";
 import type {
@@ -250,6 +253,7 @@ function createService(options: {
     createHarnessAuthService(),
     createForgeSecretRepository(),
     options.driverRunTokenStore,
+    createLiveEventsService(),
   );
 }
 
@@ -298,6 +302,9 @@ function createTaskQueue(): TaskQueue {
       return [];
     },
     async getTask() {
+      return undefined;
+    },
+    async getProjectIdForTask() {
       return undefined;
     },
     async addTask() {
@@ -436,6 +443,81 @@ function createForgeSecretRepository(): ForgeSecretRepository {
       return true;
     },
   };
+}
+
+function createLiveEventsService(): LiveEventsService {
+  return new FakeLiveEventsService();
+}
+
+/**
+ * One successful `register()` call: workspace scope, subscriptions, and the
+ * client `send` callback so tests can drive or assert on SSE delivery.
+ */
+interface FakeLiveEventsRegistration {
+  readonly id: string;
+  readonly workspaceId: WorkspaceId;
+  readonly subscriptions: LiveSubscription[];
+  readonly send: SendSSE;
+}
+
+/**
+ * Test double for `LiveEventsService`: records traffic and exposes each
+ * operation as a replaceable function (`registerHandler`, etc.) so callers
+ * can wrap or replace them with `vi.fn()` without reimplementing capture logic.
+ */
+class FakeLiveEventsService extends LiveEventsService {
+  private nextFakeRegistrationId = 0;
+  private readonly activeConnectionIds = new Set<string>();
+
+  /** Every register() in order; `send` is the callback passed by production code. */
+  registrations: FakeLiveEventsRegistration[] = [];
+  unregisterConnectionIds: string[] = [];
+  publishCalls: Array<{ workspaceId: WorkspaceId; event: LiveEventDto }> = [];
+
+  registerHandler = (options: RegisterOptions): string => {
+    const id = `fake-live-events-${++this.nextFakeRegistrationId}`;
+    this.registrations.push({
+      id,
+      workspaceId: options.workspaceId,
+      subscriptions: options.subscriptions,
+      send: options.send,
+    });
+    this.activeConnectionIds.add(id);
+    return id;
+  };
+
+  unregisterHandler = (connectionId: string): void => {
+    this.unregisterConnectionIds.push(connectionId);
+    this.activeConnectionIds.delete(connectionId);
+  };
+
+  publishHandler = async (
+    workspaceId: WorkspaceId,
+    event: LiveEventDto,
+  ): Promise<void> => {
+    this.publishCalls.push({ workspaceId, event });
+  };
+
+  getSubscriberCountHandler = (): number => this.activeConnectionIds.size;
+
+  override register(options: RegisterOptions): string {
+    return this.registerHandler(options);
+  }
+
+  override unregister(connectionId: string): void {
+    this.unregisterHandler(connectionId);
+  }
+
+  override async publish(
+    workspaceId: WorkspaceId,
+    event: LiveEventDto,
+  ): Promise<void> {
+    await this.publishHandler(workspaceId, event);
+  }
+
+  override getSubscriberCount(): number {
+    return this.getSubscriberCountHandler();
+  }
 }
 
 class RecordingDriverRunTokenStore implements DriverRunTokenStore {

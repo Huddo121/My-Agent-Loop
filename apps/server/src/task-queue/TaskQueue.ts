@@ -37,6 +37,7 @@ export interface TaskQueue {
     options?: GetAllTasksOptions,
   ): Promise<Task[]>;
   getTask(id: TaskId): Promise<Task | undefined>;
+  getProjectIdForTask(taskId: TaskId): Promise<ProjectId | undefined>;
   addTask(projectId: ProjectId, task: NewTask): Promise<Task>;
   updateTask(id: TaskId, task: UpdateTask): Promise<Task | undefined>;
   getNextTask(projectId: ProjectId): Promise<Task | undefined>;

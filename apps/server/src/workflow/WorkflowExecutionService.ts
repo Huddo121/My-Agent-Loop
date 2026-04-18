@@ -11,10 +11,12 @@ import type { ForgeGitCredentials, GitService } from "../git/GitService";
 import type { AgentHarness } from "../harness";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../harness/HarnessAuthService";
+import type { LiveEventsService } from "../live-events";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
+import { toTaskDto } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
 import type { Workflow } from "./Workflow";
@@ -87,6 +89,7 @@ export class WorkflowExecutionService {
     private readonly harnessAuthService: HarnessAuthService,
     private readonly forgeSecretRepository: ForgeSecretRepository,
     private readonly driverRunTokenStore: DriverRunTokenStore,
+    private readonly liveEventsService: LiveEventsService,
   ) {}
 
   async executeWorkflow(
@@ -325,6 +328,15 @@ export class WorkflowExecutionService {
             ),
           };
         } else {
+          const config = await this.harnessConfig.getTaskConfig(
+            completedTask.id,
+          );
+          const dto = toTaskDto(completedTask, config);
+          await this.liveEventsService.publish(project.workspaceId, {
+            type: "task.updated",
+            projectId: project.id,
+            task: dto,
+          });
           console.info("Marked task as completed", {
             taskId: task.id,
             task: completedTask,

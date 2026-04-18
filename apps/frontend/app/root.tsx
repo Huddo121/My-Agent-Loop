@@ -16,6 +16,7 @@ import {
 } from "./components/ui/sidebar";
 import { WorkspaceSetup } from "./components/workspaces";
 import { authClient, useAppSessionQuery } from "./lib/auth";
+import { LiveEventsProvider } from "./lib/live-events";
 import {
   CurrentWorkspaceProvider,
   useWorkspaceContext,
@@ -107,8 +108,10 @@ function AuthenticatedAppContent() {
   if (!currentWorkspace) return null;
   return (
     <CurrentWorkspaceProvider workspace={currentWorkspace}>
-      <Outlet />
-      <FloatingSidebarTrigger />
+      <LiveEventsProvider>
+        <Outlet />
+        <FloatingSidebarTrigger />
+      </LiveEventsProvider>
     </CurrentWorkspaceProvider>
   );
 }

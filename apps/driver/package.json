@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build:bundle": "node build.mjs",
-    "build:linux": "pnpm build:bundle && node build-linux.mjs",
-    "build:sea": "node build-sea.mjs",
-    "build": "pnpm build:bundle && pnpm build:sea",
+    "build:bundle": "moon driver:build-bundle",
+    "build:linux": "moon driver:build-linux",
+    "build:sea": "moon driver:build-sea",
+    "build": "moon driver:build",
     "test": "vitest",
     "test:run": "vitest run"
   },

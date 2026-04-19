@@ -14,6 +14,8 @@ Every sandboxed execution routes through a dedicated driver process inside the s
 
 The driver is written in TypeScript/Node, bundled into one CommonJS entrypoint, then packaged as a Linux executable with Node SEA. Bundling first avoids runtime module/file lookup issues inside the SEA binary. The final sandbox image contains the driver binary and does not rely on the workspace source tree at runtime.
 
+Driver builds are kicked off through Moon tasks, not direct package-filtered PNPM builds. The driver bundle task depends on the API package build tasks (`api:build` and `driver-api:build`) before running esbuild. This keeps local Docker builds from accidentally using stale or missing workspace dependency output when preparing `apps/driver/dist-sea/driver`.
+
 ### Token-authenticated driver-to-host API
 
 The driver talks to a dedicated internal HTTP API on the host, not MCP. The server generates a random per-run token and passes it as a CLI argument. The driver sends that token in a request header on every log or lifecycle call. The API is internal runtime surface area and is not mixed into MCP handlers.

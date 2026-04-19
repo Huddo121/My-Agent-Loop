@@ -15,7 +15,7 @@ await esbuild.build({
   entryPoints: [entryFile],
   bundle: true,
   platform: "node",
-  target: "node22",
+  target: "node24",
   outfile,
   format: "cjs",
   external: ["node:*"],

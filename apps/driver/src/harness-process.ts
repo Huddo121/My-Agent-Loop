@@ -58,6 +58,7 @@ function signalToExitCode(signal: NodeJS.Signals | null): number {
     return 1;
   }
 
+  // Shells conventionally report signal-terminated processes as 128 + signal number.
   return 128 + signalNumber;
 }
 

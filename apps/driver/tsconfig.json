@@ -1,8 +1,10 @@
 {
-  "include": ["./src", "./build-sea-lib.d.ts", "./build-sea-lib.d.mts"],
+  "include": ["./src", "./build-sea-lib.mjs"],
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
+    "allowJs": true,
+    "checkJs": true,
+    "rootDir": ".",
     "outDir": "./dist",
     "types": ["node"],
     "paths": {

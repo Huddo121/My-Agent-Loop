@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build:bundle": "node build.mjs",
     "build:linux": "pnpm build:bundle && node build-linux.mjs",

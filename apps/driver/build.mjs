@@ -21,10 +21,6 @@ await esbuild.build({
   external: ["node:*"],
   sourcemap: false,
   minify: false,
-  loader: {
-    // Ensure zod is bundled properly
-    ".ts": "ts",
-  },
 });
 
 console.log(`Bundled to ${outfile}`);

@@ -1,42 +1,12 @@
 import {
   createDriverApiClient,
   DRIVER_TOKEN_HEADER,
+  type DriverApiClient,
   type DriverLifecycleEvent,
   type DriverLogEvent,
 } from "@mono/driver-api";
 
 export type LifecycleEvent = DriverLifecycleEvent;
-
-type DriverApiClient = {
-  internal: {
-    driver: {
-      runs: {
-        ":runId": {
-          logs: {
-            POST: (input: {
-              pathParams: { runId: string };
-              headers: Record<typeof DRIVER_TOKEN_HEADER, string>;
-              body: DriverLogEvent;
-            }) => Promise<{
-              status: number;
-              responseBody: { code?: string } | { ok: true };
-            }>;
-          };
-          lifecycle: {
-            POST: (input: {
-              pathParams: { runId: string };
-              headers: Record<typeof DRIVER_TOKEN_HEADER, string>;
-              body: DriverLifecycleEvent;
-            }) => Promise<{
-              status: number;
-              responseBody: { code?: string } | { ok: true };
-            }>;
-          };
-        };
-      };
-    };
-  };
-};
 
 export class HostApiClient {
   private readonly client: DriverApiClient;
@@ -48,9 +18,7 @@ export class HostApiClient {
       driverToken: string;
     },
   ) {
-    this.client = createDriverApiClient(
-      this.options.baseUrl,
-    ) as DriverApiClient;
+    this.client = createDriverApiClient(this.options.baseUrl);
   }
 
   async sendLog(event: DriverLogEvent): Promise<void> {

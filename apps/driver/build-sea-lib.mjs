@@ -1,7 +1,28 @@
+// @ts-check
+
+/**
+ * @typedef {object} SeaInjectionFailureOptions
+ * @property {string} bundleFile
+ * @property {string} seaBlobFile
+ * @property {string} seaExeFile
+ * @property {unknown} error
+ * @property {boolean} injectionRequired
+ */
+
+/**
+ * The env parameter is injectable for tests; production callers use process.env.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
 export function isSeaInjectionRequired(env = process.env) {
   return env.DRIVER_SEA_INJECTION_REQUIRED === "1";
 }
 
+/**
+ * @param {SeaInjectionFailureOptions} options
+ * @returns {void}
+ */
 export function handleSeaInjectionFailure({
   bundleFile,
   seaBlobFile,

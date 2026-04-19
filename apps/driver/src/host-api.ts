@@ -2,6 +2,7 @@ import {
   createDriverApiClient,
   DRIVER_TOKEN_HEADER,
   type DriverApiClient,
+  type DriverApiPostResponse,
   type DriverLifecycleEvent,
   type DriverLogEvent,
 } from "@mono/driver-api";
@@ -65,17 +66,7 @@ export class HostApiClient {
 
   private logUnexpectedResponse(
     requestLabel: string,
-    response:
-      | Awaited<
-          ReturnType<
-            DriverApiClient["internal"]["driver"]["runs"][":runId"]["logs"]["POST"]
-          >
-        >
-      | Awaited<
-          ReturnType<
-            DriverApiClient["internal"]["driver"]["runs"][":runId"]["lifecycle"]["POST"]
-          >
-        >,
+    response: DriverApiPostResponse,
   ): void {
     if (response.status !== 200) {
       const responseCode =

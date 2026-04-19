@@ -1,4 +1,9 @@
-import { type ClientsForApi, createClientsFromApi, Endpoint } from "cerato";
+import {
+  type ClientsForApi,
+  createClientsFromApi,
+  Endpoint,
+  type FetchClientResult,
+} from "cerato";
 import z from "zod";
 
 const badUserInputSchema = z.object({
@@ -82,6 +87,9 @@ export const driverApi = {
 
 export type DriverApi = typeof driverApi;
 export type DriverApiClient = ClientsForApi<DriverApi>;
+export type DriverApiPostResponse = FetchClientResult<
+  typeof authenticatedDriverPostEndpoint
+>;
 
 export function createDriverApiClient(baseUrl: string): DriverApiClient {
   return createClientsFromApi(driverApi, ["api"], baseUrl);

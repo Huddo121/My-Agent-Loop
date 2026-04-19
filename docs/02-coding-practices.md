@@ -34,6 +34,19 @@ We want to limit the number of different libraries and tools that are used. If w
 
 Node.js code should target the current active LTS release, matching the repository's `.nvmrc`. Avoid targeting older Node versions merely because they are the minimum required by a feature.
 
+### Moon task overrides
+
+Top-level Moon tasks may fan out across every app and package. If a project needs to participate in a top-level task but should not run real work for that task, define a project-local `moon.yml` task override with `command: noop` and `local: true`. Prefer this over adding placeholder package scripts such as `"dev": "true"` to `package.json`.
+
+For example, library packages and non-interactive apps that should not launch a development server can use:
+
+```yaml
+tasks:
+  dev:
+    command: noop
+    local: true
+```
+
 ### JavaScript build helpers
 
 JavaScript build scripts and helpers should carry their own types with JSDoc and `// @ts-check`. Avoid adding sibling `.d.ts` or `.d.mts` files for local build helper modules.

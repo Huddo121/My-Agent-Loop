@@ -150,6 +150,10 @@ const workflowExecutionService = new WorkflowExecutionService(
   forgeSecretRepository,
   driverRunTokenStore,
   liveEventsService,
+  {
+    mcpServerUrl: env.MCP_SERVER_URL,
+    driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+  },
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(

@@ -39,7 +39,10 @@ import type { Task, TaskQueue } from "../../task-queue/TaskQueue";
 import { ProtectedString } from "../../utils/ProtectedString";
 import type { Result } from "../../utils/Result";
 import type { Workflow } from "../Workflow";
-import { WorkflowExecutionService } from "../WorkflowExecutionService";
+import {
+  WorkflowExecutionService,
+  type WorkflowExecutionServiceOptions,
+} from "../WorkflowExecutionService";
 
 const tempDirectories: string[] = [];
 
@@ -119,6 +122,34 @@ describe("WorkflowExecutionService", () => {
     expect(firstStore.lastIssuedToken).toHaveLength(64);
     expect(secondStore.lastIssuedToken).toHaveLength(64);
     expect(firstStore.lastIssuedToken).not.toEqual(secondStore.lastIssuedToken);
+  });
+
+  it("passes the configured host API base URL to the driver", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService,
+      workflowExecutionOptions: {
+        mcpServerUrl: "http://host.docker.internal:3050/mcp",
+        driverHostApiBaseUrl: "http://host.docker.internal:3000",
+      },
+    });
+
+    await service.executeWorkflow(
+      createRunId("run-host-api"),
+      createTask("task-host-api"),
+      createProject("project-host-api"),
+      createWorkflow(),
+    );
+
+    expect(sandboxService.lastDriverCliArgs).toContain(
+      "--host-api-base-url 'http://host.docker.internal:3000'",
+    );
   });
 
   it("clears the driver token after sandbox failures", async () => {
@@ -246,6 +277,7 @@ describe("WorkflowExecutionService", () => {
 function createService(options: {
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  workflowExecutionOptions?: WorkflowExecutionServiceOptions;
 }): WorkflowExecutionService {
   return new WorkflowExecutionService(
     createTaskQueue(),
@@ -258,6 +290,7 @@ function createService(options: {
     createForgeSecretRepository(),
     options.driverRunTokenStore,
     createLiveEventsService(),
+    options.workflowExecutionOptions,
   );
 }
 

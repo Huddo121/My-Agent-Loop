@@ -22,6 +22,8 @@ The default local SEA build writes to `apps/driver/dist-sea/driver`, which may b
 
 The driver talks to a dedicated internal HTTP API on the host, not MCP. The server generates a random per-run token and passes it as a CLI argument. The driver sends that token in a request header on every log or lifecycle call. The API is internal runtime surface area and is not mixed into MCP handlers.
 
+When the driver runs inside the Docker sandbox, the host API base URL defaults to `http://host.docker.internal:<server-port>`. This must point at the main Hono API server, not the MCP server. Override `DRIVER_HOST_API_BASE_URL` at server startup when the sandbox needs a different route back to the host.
+
 ### Log and lifecycle forwarding scope
 
 The driver's responsibility is deliberately narrow:

@@ -3,6 +3,16 @@ import {
   type DriverLifecycleEvent,
   type DriverLogEvent,
 } from "@mono/driver-api";
+import z from "zod";
+
+const hostResponseBodySchema = z.union([
+  z.object({ ok: z.literal(true) }),
+  z.object({
+    result: z.literal("error"),
+    code: z.string(),
+    message: z.string().optional(),
+  }),
+]);
 
 export class HostApiClient {
   constructor(
@@ -66,11 +76,11 @@ export class HostApiClient {
   }
 
   private urlFor(endpoint: "logs" | "lifecycle"): string {
-    const baseUrl = this.options.baseUrl.endsWith("/")
-      ? this.options.baseUrl.slice(0, -1)
-      : this.options.baseUrl;
+    const url = new URL(this.options.baseUrl);
+    url.pathname = `/api/internal/driver/runs/${this.options.runId}/${endpoint}`;
+    url.search = "";
 
-    return `${baseUrl}/api/internal/driver/runs/${encodeURIComponent(this.options.runId)}/${endpoint}`;
+    return url.toString();
   }
 
   private logUnexpectedResponse(
@@ -78,9 +88,10 @@ export class HostApiClient {
     response: HostResponse,
   ): void {
     if (response.status !== 200) {
-      const responseCode = isObjectWithCode(response.responseBody)
-        ? response.responseBody.code
-        : undefined;
+      const responseCode =
+        response.responseBody !== undefined && "code" in response.responseBody
+          ? response.responseBody.code
+          : undefined;
 
       console.error(
         `Failed to send ${requestLabel} to host: ${response.status} ${responseCode ?? "unknown-error"}`,
@@ -91,27 +102,40 @@ export class HostApiClient {
 
 type HostResponse = {
   status: number;
-  responseBody: unknown;
+  responseBody: HostResponseBody | undefined;
 };
 
-async function parseResponseBody(response: Response): Promise<unknown> {
+type HostResponseBody = z.infer<typeof hostResponseBodySchema>;
+
+async function parseResponseBody(
+  response: Response,
+): Promise<HostResponseBody | undefined> {
   const responseText = await response.text();
   if (responseText.length === 0) {
     return undefined;
   }
 
+  let responseJson: unknown;
   try {
-    return JSON.parse(responseText);
-  } catch {
+    responseJson = JSON.parse(responseText);
+  } catch (error) {
+    console.error("Failed to parse host response as JSON", {
+      status: response.status,
+      body: responseText,
+      error,
+    });
     return undefined;
   }
-}
 
-function isObjectWithCode(value: unknown): value is { code: string } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    typeof value.code === "string"
-  );
+  const parseResult = hostResponseBodySchema.safeParse(responseJson);
+  if (!parseResult.success) {
+    console.error("Failed to parse host response body", {
+      status: response.status,
+      body: responseJson,
+      error: parseResult.error,
+    });
+    return undefined;
+  }
+
+  return parseResult.data;
 }

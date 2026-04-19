@@ -21,8 +21,15 @@ import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
 import type { Workflow } from "./Workflow";
 
-const MCP_SERVER_URL = "http://host.docker.internal:3050/mcp";
-const DRIVER_HOST_API_BASE_URL = "http://host.docker.internal:3050";
+export type WorkflowExecutionServiceOptions = {
+  mcpServerUrl: string;
+  driverHostApiBaseUrl: string;
+};
+
+const defaultOptions: WorkflowExecutionServiceOptions = {
+  mcpServerUrl: "http://host.docker.internal:3050/mcp",
+  driverHostApiBaseUrl: "http://host.docker.internal:3000",
+};
 
 const formatTaskFile = (task: Task): string => {
   let content = `# ${task.title}\n\n${task.description}\n`;
@@ -90,6 +97,7 @@ export class WorkflowExecutionService {
     private readonly forgeSecretRepository: ForgeSecretRepository,
     private readonly driverRunTokenStore: DriverRunTokenStore,
     private readonly liveEventsService: LiveEventsService,
+    private readonly options: WorkflowExecutionServiceOptions = defaultOptions,
   ) {}
 
   async executeWorkflow(
@@ -181,7 +189,7 @@ export class WorkflowExecutionService {
     const preparation = harness.prepare({
       projectId: project.id,
       taskId: task.id,
-      mcpServerUrl: MCP_SERVER_URL,
+      mcpServerUrl: this.options.mcpServerUrl,
       credentials: credential,
       modelId,
     });
@@ -240,7 +248,7 @@ export class WorkflowExecutionService {
       MAL_DRIVER_CLI_ARGS: buildDriverCliArgs({
         runId,
         taskId: task.id,
-        hostApiBaseUrl: DRIVER_HOST_API_BASE_URL,
+        hostApiBaseUrl: this.options.driverHostApiBaseUrl,
         driverToken,
         harnessCommand: preparation.runCommand,
       }),

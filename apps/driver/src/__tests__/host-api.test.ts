@@ -133,6 +133,59 @@ describe("HostApiClient", () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it("logs invalid JSON returned by the host", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    fetchMock.mockResolvedValue(
+      new Response("not-json", {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
+
+    await client.sendLog({ message: "test", stream: "stdout" });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to parse host response as JSON",
+      expect.objectContaining({ status: 502, body: "not-json" }),
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to send log to host: 502 unknown-error",
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("logs invalid response bodies returned by the host", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    fetchMock.mockResolvedValue(jsonResponse({ nope: true }, 502));
+
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
+
+    await client.sendLog({ message: "test", stream: "stdout" });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to parse host response body",
+      expect.objectContaining({ status: 502, body: { nope: true } }),
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to send log to host: 502 unknown-error",
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
   it("does not throw when transport fails", async () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")

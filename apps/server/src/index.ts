@@ -5,6 +5,7 @@ import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
 import { driverApiHandlers } from "./driver-api/driver-api-handlers";
+import { env } from "./env";
 import { handleLiveEvents } from "./live-events/live-events-route";
 import { startMcp } from "./mcp";
 import { services } from "./services";
@@ -61,7 +62,7 @@ app.get("/api/workspaces/:workspaceId/live-events", async (ctx) => {
   return handleLiveEvents(ctx, services);
 });
 
-serve(app, (info) => {
+serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`);
 });
 

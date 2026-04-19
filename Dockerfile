@@ -36,7 +36,7 @@ RUN npm install -g @openai/codex
 ENV PATH="/root/.local/bin:/root/.opencode/bin:${PATH}"
 
 # Copy the prebuilt driver binary into the image
-COPY apps/driver/dist-sea/driver /usr/local/bin/driver
+COPY apps/driver/dist-sea/linux/driver /usr/local/bin/driver
 
 RUN chmod +x /usr/local/bin/driver && mkdir -p /code
 

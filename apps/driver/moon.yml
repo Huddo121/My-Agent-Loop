@@ -22,7 +22,7 @@ tasks:
     deps:
       - driver:build-bundle
     outputs:
-      - dist-sea/driver
+      - dist-sea/linux/driver
       - dist-sea/sea-blob.blob
       - dist-sea/sea-config.json
       - dist-sea/.node-linux

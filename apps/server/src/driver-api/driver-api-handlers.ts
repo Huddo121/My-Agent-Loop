@@ -2,12 +2,11 @@ import {
   badUserInput,
   notFound,
   ok,
-  runIdSchema,
   unauthenticated,
 } from "@mono/api";
 import { DRIVER_TOKEN_HEADER, type DriverApi } from "@mono/driver-api";
 import type { HonoHandlersFor } from "cerato";
-import type { RunId } from "../runs/RunId";
+import { type RunId, runIdSchema } from "../runs/RunId";
 import type { Run } from "../runs/RunsService";
 import type { Services } from "../services";
 import type { Result } from "../utils/Result";
@@ -122,7 +121,7 @@ function parseRunId(
     return { success: false, error: badUserInput("Run ID is invalid.") };
   }
 
-  return { success: true, value: result.data as unknown as RunId };
+  return { success: true, value: result.data };
 }
 
 function authenticateDriverRequest(

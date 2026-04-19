@@ -18,6 +18,12 @@ export type BeginWorkflowError =
   | { reason: "project-not-found" }
   | { reason: "project-already-processing-tasks" };
 
+type QueuedRun = {
+  projectId: ProjectId;
+  run: Run;
+  taskId: TaskId;
+};
+
 /**
  * The WorkflowManager is responsible for the orchestration of the workflow.
  * It deals with the state of projects and responding to changes in run state.
@@ -48,58 +54,79 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     projectId: ProjectId,
     mode: RunMode,
   ): Promise<Result<RunId, BeginWorkflowError>> {
-    const project = await this.projectsService.getProject(projectId);
-    if (project === undefined) {
-      console.error("Project not found", { projectId, mode });
-      return { success: false, error: { reason: "project-not-found" } };
-    }
+    const runResult = await withNewTransaction(
+      this.db,
+      async (): Promise<Result<QueuedRun, BeginWorkflowError>> => {
+        const project = await this.projectsService.getProject(projectId);
+        if (project === undefined) {
+          console.error("Project not found", { projectId, mode });
+          return { success: false, error: { reason: "project-not-found" } };
+        }
 
-    const queueState = project.queueState;
+        const queueState = project.queueState;
 
-    const canStart = match(queueState)
-      .with("idle", "failed", "stopping", () => true)
-      .with("processing-loop", "processing-single", () => false)
-      .exhaustive();
+        const canStart = match(queueState)
+          .with("idle", "failed", "stopping", () => true)
+          .with("processing-loop", "processing-single", () => false)
+          .exhaustive();
 
-    if (!canStart) {
-      console.warn(
-        "Can not start workflow, project is already processing tasks",
-        {
-          projectId,
-          mode,
-          queueState,
-        },
-      );
-      return {
-        success: false,
-        error: { reason: "project-already-processing-tasks" },
-      };
-    }
+        if (!canStart) {
+          console.warn(
+            "Can not start workflow, project is already processing tasks",
+            {
+              projectId,
+              mode,
+              queueState,
+            },
+          );
+          return {
+            success: false,
+            error: { reason: "project-already-processing-tasks" },
+          };
+        }
 
-    // Pick a task to process
-    const task = await this.taskQueue.getNextTask(projectId);
+        // Pick a task to process
+        const task = await this.taskQueue.getNextTask(projectId);
 
-    if (task === undefined) {
-      console.info("No tasks left to process", { projectId, mode });
-      return { success: false, error: { reason: "no-tasks-available" } };
-    }
+        if (task === undefined) {
+          console.info("No tasks left to process", { projectId, mode });
+          return { success: false, error: { reason: "no-tasks-available" } };
+        }
 
-    const newQueueState = match(mode)
-      .with("loop", () => "processing-loop" as const)
-      .with("single", () => "processing-single" as const)
-      .exhaustive();
+        const newQueueState = match(mode)
+          .with("loop", () => "processing-loop" as const)
+          .with("single", () => "processing-single" as const)
+          .exhaustive();
 
-    const updatedProject = await this.projectsService.updateProjectQueueState(
-      projectId,
-      newQueueState,
+        const updatedProject =
+          await this.projectsService.updateProjectQueueState(
+            projectId,
+            newQueueState,
+          );
+        if (updatedProject !== undefined) {
+          await this.publishProjectUpdated(updatedProject);
+        }
+
+        const run = await this.runsService.createRun(task.id);
+
+        return {
+          success: true,
+          value: {
+            projectId,
+            run,
+            taskId: task.id,
+          },
+        };
+      },
     );
-    if (updatedProject !== undefined) {
-      await this.publishProjectUpdated(updatedProject);
+
+    if (runResult.success === false) {
+      return runResult;
     }
 
-    const run = await this.queueProcessingOfTask(projectId, task.id);
+    await this.queueRun(runResult.value);
 
-    return { success: true, value: run.id };
+    return { success: true, value: runResult.value.run.id };
   }
 
   private async publishProjectUpdated(project: Project): Promise<void> {
@@ -113,12 +140,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     });
   }
 
-  private async queueProcessingOfTask(
-    projectId: ProjectId,
-    taskId: TaskId,
-  ): Promise<Run> {
-    const run = await this.runsService.createRun(taskId);
-
+  private async queueRun({ projectId, run, taskId }: QueuedRun): Promise<void> {
     const newJob = await this.workflowQueues.runQueue.add(`run-${run.id}`, {
       projectId,
       taskId,
@@ -130,8 +152,6 @@ export class DatabaseWorkflowManager implements WorkflowManager {
       runId: run.id,
       jobId: newJob.id,
     });
-
-    return run;
   }
 
   /**
@@ -144,7 +164,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     projectId: ProjectId,
     runId: RunId,
   ): Promise<void> {
-    return await withNewTransaction(this.db, async () => {
+    const queuedRun = await withNewTransaction(this.db, async () => {
       // Look up the run mode
       const project = await this.projectsService.getProject(projectId);
       if (project === undefined) {
@@ -157,7 +177,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
       const queueState = project.queueState;
 
       // Check if we're in loop mode, if so, check if there's more tasks
-      await match(queueState)
+      return await match(queueState)
         .with("processing-loop", async () => {
           const nextTask = await this.taskQueue.getNextTask(projectId);
           if (nextTask === undefined) {
@@ -181,7 +201,12 @@ export class DatabaseWorkflowManager implements WorkflowManager {
             return;
           }
 
-          await this.queueProcessingOfTask(project.id, nextTask.id);
+          const run = await this.runsService.createRun(nextTask.id);
+          return {
+            projectId: project.id,
+            run,
+            taskId: nextTask.id,
+          };
         })
         .with("processing-single", async () => {
           const updatedProject =
@@ -232,6 +257,10 @@ export class DatabaseWorkflowManager implements WorkflowManager {
         })
         .exhaustive();
     });
+
+    if (queuedRun !== undefined) {
+      await this.queueRun(queuedRun);
+    }
   }
 
   private async handleRunFailed(

@@ -3,6 +3,7 @@ import {
   type MyAgentLoopApi,
   notFound,
   ok,
+  type ProjectDto,
   type ProjectId,
   runIdSchema,
   unauthenticated,
@@ -24,6 +25,10 @@ import { withNewTransaction } from "../utils/transaction-context";
 
 type WorkspaceProjectsApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"];
+
+type RunProjectResponse = ResponsesForEndpoint<
+  WorkspaceProjectsApi["children"][":projectId"]["children"]["run"]
+>;
 
 export const projectsHandlers: HonoHandlersFor<
   ["workspaces", ":workspaceId", "projects"],
@@ -314,97 +319,135 @@ export const projectsHandlers: HonoHandlersFor<
       }
 
       const mode = ctx.body.mode;
-      return await withNewTransaction(ctx.services.db, async () => {
-        const canAccess =
-          await ctx.services.workspaceMembershipsService.canAccessProject(
-            authSession.user.id,
-            workspaceId as WorkspaceId,
+      const canStartResult = await withNewTransaction(
+        ctx.services.db,
+        async (): Promise<
+          | { success: true; projectId: ProjectId }
+          | { success: false; response: RunProjectResponse }
+        > => {
+          const canAccess =
+            await ctx.services.workspaceMembershipsService.canAccessProject(
+              authSession.user.id,
+              workspaceId as WorkspaceId,
+              projectId as ProjectId,
+            );
+          if (!canAccess) {
+            return {
+              success: false,
+              response: notFound("The project could not be found"),
+            };
+          }
+          const project = await ctx.services.projectsService.getProject(
             projectId as ProjectId,
           );
-        if (!canAccess) {
-          return notFound("The project could not be found");
-        }
-        const project = await ctx.services.projectsService.getProject(
-          projectId as ProjectId,
-        );
 
-        if (project === undefined) {
-          return notFound("The project could not be found");
-        }
+          if (project === undefined) {
+            return {
+              success: false,
+              response: notFound("The project could not be found"),
+            };
+          }
 
-        const isReviewWorkflow =
-          project.workflowConfiguration.onTaskCompleted === "push-branch" ||
-          project.workflowConfiguration.onTaskCompleted ===
-            "push-branch-and-create-mr";
-        if (isReviewWorkflow && mode === "loop") {
-          console.warn(
-            "Can not start workflow because the project is configured to use a review workflow",
-            { projectId },
-          );
-          return [400, { reason: "cannot-loop-with-review-workflow" }] as const;
-        }
-
-        const workflowResult = await ctx.services.workflowManager.startWorkflow(
-          project.id,
-          mode,
-        );
-
-        if (workflowResult.success === false) {
-          return match(workflowResult.error)
-            .returnType<
-              ResponsesForEndpoint<
-                WorkspaceProjectsApi["children"][":projectId"]["children"]["run"]
-              >
-            >()
-            .with({ reason: "no-tasks-available" }, () => {
-              console.warn(
-                "Can not start workflow because no tasks are available",
-                { projectId },
-              );
-              return [400, { reason: "no-tasks-available" }] as const;
-            })
-            .with({ reason: "project-not-found" }, () => {
-              console.warn(
-                "Can not start workflow because the project could not be found",
-                { projectId },
-              );
-              return notFound("The project could not be found");
-            })
-            .with({ reason: "project-already-processing-tasks" }, () => {
-              console.warn(
-                "Can not start workflow because the project is already processing tasks",
-                { projectId },
-              );
-              return [
+          const isReviewWorkflow =
+            project.workflowConfiguration.onTaskCompleted === "push-branch" ||
+            project.workflowConfiguration.onTaskCompleted ===
+              "push-branch-and-create-mr";
+          if (isReviewWorkflow && mode === "loop") {
+            console.warn(
+              "Can not start workflow because the project is configured to use a review workflow",
+              { projectId },
+            );
+            return {
+              success: false,
+              response: [
                 400,
-                { reason: "project-already-processing-tasks" },
-              ] as const;
-            })
-            .exhaustive();
-        }
+                { reason: "cannot-loop-with-review-workflow" },
+              ] as const,
+            };
+          }
 
-        // Fetch the updated project within the same transaction
-        const updatedProject = await ctx.services.projectsService.getProject(
-          projectId as ProjectId,
-        );
+          return { success: true, projectId: project.id };
+        },
+      );
 
-        if (updatedProject === undefined) {
-          return notFound("The project could not be found");
-        }
+      if (canStartResult.success === false) {
+        return canStartResult.response;
+      }
 
-        const hasForgeToken =
-          await ctx.services.forgeSecretRepository.hasForgeSecret(
+      const workflowResult = await ctx.services.workflowManager.startWorkflow(
+        canStartResult.projectId,
+        mode,
+      );
+
+      if (workflowResult.success === false) {
+        return match(workflowResult.error)
+          .returnType<RunProjectResponse>()
+          .with({ reason: "no-tasks-available" }, () => {
+            console.warn(
+              "Can not start workflow because no tasks are available",
+              {
+                projectId,
+              },
+            );
+            return [400, { reason: "no-tasks-available" }] as const;
+          })
+          .with({ reason: "project-not-found" }, () => {
+            console.warn(
+              "Can not start workflow because the project could not be found",
+              { projectId },
+            );
+            return notFound("The project could not be found");
+          })
+          .with({ reason: "project-already-processing-tasks" }, () => {
+            console.warn(
+              "Can not start workflow because the project is already processing tasks",
+              { projectId },
+            );
+            return [
+              400,
+              { reason: "project-already-processing-tasks" },
+            ] as const;
+          })
+          .exhaustive();
+      }
+
+      const updatedProjectResult = await withNewTransaction(
+        ctx.services.db,
+        async (): Promise<
+          | { success: true; project: ProjectDto }
+          | { success: false; response: RunProjectResponse }
+        > => {
+          const updatedProject = await ctx.services.projectsService.getProject(
             projectId as ProjectId,
           );
-        const projectDto = { ...updatedProject, hasForgeToken };
-        await ctx.services.liveEventsService.publish(
-          workspaceId as WorkspaceId,
-          { type: "project.updated", project: projectDto },
-        );
-        return ok({
-          runId: runIdSchema.parse(workflowResult.value),
-          project: projectDto,
-        });
+
+          if (updatedProject === undefined) {
+            return {
+              success: false,
+              response: notFound("The project could not be found"),
+            };
+          }
+
+          const hasForgeToken =
+            await ctx.services.forgeSecretRepository.hasForgeSecret(
+              projectId as ProjectId,
+            );
+          const projectDto = { ...updatedProject, hasForgeToken };
+          await ctx.services.liveEventsService.publish(
+            workspaceId as WorkspaceId,
+            { type: "project.updated", project: projectDto },
+          );
+          return { success: true, project: projectDto };
+        },
+      );
+
+      if (updatedProjectResult.success === false) {
+        return updatedProjectResult.response;
+      }
+
+      return ok({
+        runId: runIdSchema.parse(workflowResult.value),
+        project: updatedProjectResult.project,
       });
     },
     stop: async (ctx) => {

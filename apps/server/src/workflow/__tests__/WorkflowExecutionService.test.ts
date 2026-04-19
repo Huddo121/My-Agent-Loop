@@ -19,7 +19,11 @@ import type { GitService } from "../../git/GitService";
 import type { AgentHarness, AgentHarnessPreparation } from "../../harness";
 import type { AgentHarnessConfigRepository } from "../../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../../harness/HarnessAuthService";
-import { LiveEventsService, type RegisterOptions, type SendSSE } from "../../live-events";
+import {
+  LiveEventsService,
+  type RegisterOptions,
+  type SendSSE,
+} from "../../live-events";
 import type { Project } from "../../projects/ProjectsService";
 import type { RunId } from "../../runs/RunId";
 import type {

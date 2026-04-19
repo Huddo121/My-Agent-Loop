@@ -34,6 +34,10 @@ We want to limit the number of different libraries and tools that are used. If w
 
 Node.js code should target the current active LTS release, matching the repository's `.nvmrc`. Avoid targeting older Node versions merely because they are the minimum required by a feature.
 
+### JavaScript build helpers
+
+JavaScript build scripts and helpers should carry their own types with JSDoc and `// @ts-check`. Avoid adding sibling `.d.ts` or `.d.mts` files for local build helper modules.
+
 ### Internal implementations and 'privacy'
 
 Typescript has limited facilities for marking code as "private". Classes can have private instance variables and methods, and a package can choose not to export a value, and that's about it. This is obviously very annoying if you want to break up your code, or export functions so that they can be tested, but in doing so you lose any real ability to prevent their use somewhere unexpected.

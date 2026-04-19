@@ -14,10 +14,7 @@ describe("HostApiClient", () => {
   });
 
   it("sends logs through the shared driver contract", async () => {
-    fetchMock.mockResolvedValue({
-      status: 200,
-      json: vi.fn().mockResolvedValue({ ok: true }),
-    });
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }, 200));
 
     const client = new HostApiClient({
       baseUrl: "http://localhost:3000",
@@ -49,10 +46,7 @@ describe("HostApiClient", () => {
   });
 
   it("sends lifecycle events through the shared driver contract", async () => {
-    fetchMock.mockResolvedValue({
-      status: 200,
-      json: vi.fn().mockResolvedValue({ ok: true }),
-    });
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }, 200));
 
     const client = new HostApiClient({
       baseUrl: "http://localhost:3000",
@@ -83,12 +77,9 @@ describe("HostApiClient", () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    fetchMock.mockResolvedValue({
-      status: 401,
-      json: vi
-        .fn()
-        .mockResolvedValue({ code: "unauthenticated", result: "error" }),
-    });
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: "unauthenticated", result: "error" }, 401),
+    );
 
     const client = new HostApiClient({
       baseUrl: "http://localhost:3000",
@@ -100,6 +91,44 @@ describe("HostApiClient", () => {
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "Failed to send log to host: 401 unauthenticated",
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("does not log a transport error when the host returns an empty success body", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
+
+    await client.sendLog({ message: "test", stream: "stdout" });
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("logs unknown application errors when the host returns an empty error body", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }));
+
+    const client = new HostApiClient({
+      baseUrl: "http://localhost:3000",
+      runId: "run-123",
+      driverToken: "secret-token",
+    });
+
+    await client.sendLog({ message: "test", stream: "stdout" });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to send log to host: 502 unknown-error",
     );
     consoleErrorSpy.mockRestore();
   });
@@ -131,3 +160,10 @@ describe("HostApiClient", () => {
     consoleErrorSpy.mockRestore();
   });
 });
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}

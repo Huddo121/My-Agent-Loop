@@ -6,8 +6,6 @@ import {
   type DriverLogEvent,
 } from "@mono/driver-api";
 
-export type LifecycleEvent = DriverLifecycleEvent;
-
 export class HostApiClient {
   private readonly client: DriverApiClient;
 
@@ -40,7 +38,7 @@ export class HostApiClient {
     }
   }
 
-  async sendLifecycleEvent(event: LifecycleEvent): Promise<void> {
+  async sendLifecycleEvent(event: DriverLifecycleEvent): Promise<void> {
     try {
       const response = await this.client.internal.driver.runs[
         ":runId"

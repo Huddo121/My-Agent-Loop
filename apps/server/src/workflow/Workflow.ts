@@ -16,8 +16,7 @@ export type WorkflowConfiguration = {
   onTaskCompleted: OnTaskCompletedAction;
 };
 
-const commitMessage = (task: Task) =>
-  `${task.title}\n\n${task.description}\n\nTask ID: ${task.id}`;
+const commitMessage = (task: Task) => `${task.title}\n\n${task.description}`;
 
 const commitAndPushThenMergeToMaster =
   (gitService: GitService) =>

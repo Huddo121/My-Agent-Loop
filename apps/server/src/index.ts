@@ -1,8 +1,11 @@
 import { serve } from "@hono/node-server";
 import { myAgentLoopApi } from "@mono/api";
+import { driverApi } from "@mono/driver-api";
 import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
+import { driverApiHandlers } from "./driver-api/driver-api-handlers";
+import { env } from "./env";
 import { handleLiveEvents } from "./live-events/live-events-route";
 import { startMcp } from "./mcp";
 import { services } from "./services";
@@ -35,12 +38,18 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGHUP", () => shutdown("SIGHUP"));
 
+const serverApi = {
+  ...myAgentLoopApi,
+  ...driverApi,
+};
+
 const app = createHonoServer(
-  myAgentLoopApi,
+  serverApi,
   {
     session: sessionHandlers,
     admin: adminHandlers,
     workspaces: workspacesHandlers,
+    internal: driverApiHandlers,
   },
   services,
 );
@@ -53,7 +62,7 @@ app.get("/api/workspaces/:workspaceId/live-events", async (ctx) => {
   return handleLiveEvents(ctx, services);
 });
 
-serve(app, (info) => {
+serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`);
 });
 

@@ -10,6 +10,10 @@ import type { Branded } from "../utils/Branded";
  */
 export type RunId = Branded<string, "RunId">;
 
+export const runIdSchema = runIdDtoSchema.transform((runId): RunId => {
+  return runId as unknown as RunId;
+});
+
 export const asRunIdDto = (runId: RunId): RunIdDto =>
   runIdDtoSchema.parse(runId);
 

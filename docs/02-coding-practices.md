@@ -30,6 +30,27 @@ These should be avoided. This applies to both imports from different folders, or
 
 We want to limit the number of different libraries and tools that are used. If we use a library in one package or app, we shouldn't use an alternative in another just because. When selecting a library or tool, do a quick check to see if there are any alternatives that are already in use within the project.
 
+### Runtime versions
+
+Node.js code should target the current active LTS release, matching the repository's `.nvmrc`. Avoid targeting older Node versions merely because they are the minimum required by a feature.
+
+### Moon task overrides
+
+Top-level Moon tasks may fan out across every app and package. If a project needs to participate in a top-level task but should not run real work for that task, define a project-local `moon.yml` task override with `command: noop` and `local: true`. Prefer this over adding placeholder package scripts such as `"dev": "true"` to `package.json`.
+
+For example, library packages and non-interactive apps that should not launch a development server can use:
+
+```yaml
+tasks:
+  dev:
+    command: noop
+    local: true
+```
+
+### JavaScript build helpers
+
+JavaScript build scripts and helpers should carry their own types with JSDoc and `// @ts-check`. Avoid adding sibling `.d.ts` or `.d.mts` files for local build helper modules.
+
 ### Internal implementations and 'privacy'
 
 Typescript has limited facilities for marking code as "private". Classes can have private instance variables and methods, and a package can choose not to export a value, and that's about it. This is obviously very annoying if you want to break up your code, or export functions so that they can be tested, but in doing so you lose any real ability to prevent their use somewhere unexpected.

@@ -1,0 +1,32 @@
+tasks:
+  dev:
+    command: noop
+    local: true
+  build-bundle:
+    command: node build.mjs
+    deps:
+      - api:build
+      - driver-api:build
+    outputs:
+      - dist-sea/index.cjs
+  build-sea:
+    command: node build-sea.mjs
+    deps:
+      - driver:build-bundle
+    outputs:
+      - dist-sea/driver
+      - dist-sea/sea-blob.blob
+      - dist-sea/sea-config.json
+  build-linux:
+    command: node build-linux.mjs
+    deps:
+      - driver:build-bundle
+    outputs:
+      - dist-sea/linux/driver
+      - dist-sea/sea-blob.blob
+      - dist-sea/sea-config.json
+      - dist-sea/.node-linux
+  build:
+    command: noop
+    deps:
+      - driver:build-sea

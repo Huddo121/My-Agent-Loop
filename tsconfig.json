@@ -3,10 +3,16 @@
   "files": [],
   "references": [
     {
+      "path": "apps/driver"
+    },
+    {
       "path": "apps/frontend"
     },
     {
       "path": "apps/server"
+    },
+    {
+      "path": "packages/driver-api"
     },
     {
       "path": "packages/api"

@@ -5,10 +5,14 @@
     "rootDir": "src",
     "outDir": "./dist",
     "paths": {
-      "@mono/api": ["../../packages/api/src/index.ts"]
+      "@mono/api": ["../../packages/api/src/index.ts"],
+      "@mono/driver-api": ["../../packages/driver-api/src/index.ts"]
     }
   },
   "references": [
+    {
+      "path": "../../packages/driver-api"
+    },
     {
       "path": "../../packages/api"
     }

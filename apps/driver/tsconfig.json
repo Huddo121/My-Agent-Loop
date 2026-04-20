@@ -1,0 +1,25 @@
+{
+  "include": ["./src", "./build-sea-lib.mjs"],
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "rootDir": ".",
+    "outDir": "./dist",
+    "types": ["node"],
+    "paths": {
+      "@mono/api": ["../../packages/api/src/index.ts"],
+      "@mono/api/*": ["../../packages/api/src/*"],
+      "@mono/driver-api": ["../../packages/driver-api/src/index.ts"],
+      "@mono/driver-api/*": ["../../packages/driver-api/src/*"]
+    }
+  },
+  "references": [
+    {
+      "path": "../../packages/driver-api"
+    },
+    {
+      "path": "../../packages/api"
+    }
+  ]
+}

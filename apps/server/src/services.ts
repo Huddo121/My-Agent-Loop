@@ -4,6 +4,10 @@ import {
   type WorkspaceMembershipsService,
 } from "./auth/WorkspaceMembershipsService";
 import { type Database, db } from "./db";
+import {
+  type DriverRunTokenStore,
+  InMemoryDriverRunTokenStore,
+} from "./driver-api/DriverRunTokenStore";
 import { env } from "./env";
 import type { RelativeFilePath } from "./file-system/FilePath";
 import { LocalFileSystemService } from "./file-system/FileSystemService";
@@ -26,6 +30,7 @@ import {
 } from "./harness/HarnessAuthService";
 import { OpenCodeHarness } from "./harness/OpenCodeHarness";
 import { LiveEventsService } from "./live-events";
+import { ConsoleLogger, type Logger } from "./logger/Logger";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
 import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
@@ -53,6 +58,7 @@ import type { WorkspacesService } from "./workspaces/WorkspacesService";
 export interface Services {
   db: Database;
   taskQueue: TaskQueue;
+  driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
@@ -68,6 +74,7 @@ export interface Services {
   agentHarnessConfigRepository: AgentHarnessConfigRepository;
   harnessAuthService: HarnessAuthService;
   harnesses: readonly AgentHarness[];
+  logger: Logger;
   liveEventsService: LiveEventsService;
 }
 
@@ -85,6 +92,7 @@ const sandboxService = new DockerSandboxService(
 );
 
 const taskQueue = new DatabaseTaskQueue();
+const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
 const harnessAuthService = new EnvHarnessAuthService({
@@ -140,7 +148,12 @@ const workflowExecutionService = new WorkflowExecutionService(
   agentHarnessConfigRepository,
   harnessAuthService,
   forgeSecretRepository,
+  driverRunTokenStore,
   liveEventsService,
+  {
+    mcpServerUrl: env.MCP_SERVER_URL,
+    driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+  },
 );
 
 const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
@@ -155,9 +168,12 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   forgeSecretRepository,
 );
 
+const logger: Logger = ConsoleLogger;
+
 export const services: Services = {
   db,
   taskQueue,
+  driverRunTokenStore,
   sandboxService,
   gitService,
   workflowManager,
@@ -173,5 +189,6 @@ export const services: Services = {
   harnesses,
   workflowQueues,
   backgroundWorkflowProcessor,
+  logger,
   liveEventsService,
 };

@@ -29,19 +29,23 @@ let eventSourceInstance: {
   close: () => void;
 } | null = null;
 
-vi.mock("react-router", () => ({
+vi.mock(import("react-router"), () => ({
   useParams,
 }));
 
-vi.mock("~/lib/workspaces", () => ({
+vi.mock(import("~/lib/workspaces"), () => ({
   useCurrentWorkspace,
 }));
 
-vi.mock("~/lib/api-client", () => ({
-  apiClient: {
-    session: { GET: mockSessionGet },
-  },
-}));
+vi.mock(
+  import("~/lib/api-client"),
+  () =>
+    ({
+      apiClient: {
+        session: { GET: mockSessionGet },
+      },
+    }) as unknown as Awaited<typeof import("~/lib/api-client")>,
+);
 
 vi.stubGlobal(
   "EventSource",

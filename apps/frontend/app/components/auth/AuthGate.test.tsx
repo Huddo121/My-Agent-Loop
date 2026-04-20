@@ -6,8 +6,8 @@ const { mutate } = vi.hoisted(() => ({
   mutate: vi.fn(),
 }));
 
-vi.mock("~/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/lib/auth")>();
+vi.mock(import("~/lib/auth"), async (importOriginal) => {
+  const actual = await importOriginal();
   return {
     ...actual,
     useMagicLinkSignIn: () => ({
@@ -15,7 +15,7 @@ vi.mock("~/lib/auth", async (importOriginal) => {
       isPending: false,
       isError: false,
     }),
-  };
+  } as unknown as Awaited<typeof import("~/lib/auth")>;
 });
 
 describe("AuthGate", () => {

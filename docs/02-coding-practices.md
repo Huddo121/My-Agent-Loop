@@ -85,6 +85,32 @@ Using Zod, schemas can be created for things (e.g. a `userSchema`), which is a p
 
 We use a `Result` type (basically `Either`) in order to properly capture the idea that a function might return a "failed" result that we want to handle.
 
+### Vitest module mocks
+
+When mocking dependencies with Vitest's `vi.mock`, pass a **dynamic `import()`** as the first argument instead of a string literal module specifier. TypeScript type-checks the path the same way as a normal import, and refactors (moving or renaming modules) are far less likely to leave a stale mock string behind.
+
+```typescript
+// Good — the specifier is checked like an import; tooling can follow renames
+vi.mock(import("../../some-module"), () => ({ ... }));
+
+// Avoid — unchecked strings; easy to drift from real imports
+vi.mock("../other-module", () => ({ ... }));
+```
+
+Use this for relative paths, package imports (for example `hono/streaming`, `react-router`), path aliases (for example `~/lib/auth`), and built-in modules (for example `node:child_process`). For partial mocks, use an async factory with `importOriginal` so the real module shape stays in sync:
+
+```typescript
+vi.mock(import("~/lib/auth"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useMagicLinkSignIn: () => ({ ... }),
+  } as unknown as Awaited<typeof import("~/lib/auth")>;
+});
+```
+
+Vitest types the mock factory as returning a `Partial` of the resolved module. When a stub deliberately uses narrower or looser shapes (for example `vi.fn()` stand-ins), assert the factory return as `unknown` then `Awaited<typeof import("...")>` so the **module specifier** stays fully type-checked while the stub body stays practical.
+
 ### DTO / transformation functions must be pure
 
 Functions that map a domain model to a DTO (or vice versa) must be pure: they take data in and

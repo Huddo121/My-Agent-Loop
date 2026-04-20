@@ -14,50 +14,81 @@ const {
   useCurrentWorkspace: vi.fn(),
 }));
 
-vi.mock("react-router", () => ({
-  Links: () => null,
-  Meta: () => null,
-  Outlet: () => <div>app-outlet</div>,
-  Scripts: () => null,
-  ScrollRestoration: () => null,
-  isRouteErrorResponse: () => false,
-}));
+vi.mock(
+  import("react-router"),
+  () =>
+    ({
+      Links: () => null,
+      Meta: () => null,
+      Outlet: () => <div>app-outlet</div>,
+      Scripts: () => null,
+      ScrollRestoration: () => null,
+      isRouteErrorResponse: () => false,
+    }) as unknown as Awaited<typeof import("react-router")>,
+);
 
-vi.mock("./components/auth", () => ({
-  AuthGate: () => <div>auth-gate</div>,
-}));
+vi.mock(
+  import("./components/auth"),
+  () =>
+    ({
+      AuthGate: () => <div>auth-gate</div>,
+    }) as unknown as Awaited<typeof import("./components/auth")>,
+);
 
-vi.mock("./components/workspaces", () => ({
-  WorkspaceSetup: () => <div>workspace-setup</div>,
-}));
+vi.mock(
+  import("./components/workspaces"),
+  () =>
+    ({
+      WorkspaceSetup: () => <div>workspace-setup</div>,
+    }) as unknown as Awaited<typeof import("./components/workspaces")>,
+);
 
-vi.mock("./lib/live-events", () => ({
-  LiveEventsProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+vi.mock(
+  import("./lib/live-events"),
+  () =>
+    ({
+      LiveEventsProvider: ({ children }: { children: React.ReactNode }) =>
+        children,
+    }) as unknown as Awaited<typeof import("./lib/live-events")>,
+);
 
-vi.mock("./components/ui/sidebar", () => ({
-  FloatingSidebarTrigger: () => <div>sidebar-trigger</div>,
-  SidebarProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+vi.mock(
+  import("./components/ui/sidebar"),
+  () =>
+    ({
+      FloatingSidebarTrigger: () => <div>sidebar-trigger</div>,
+      SidebarProvider: ({ children }: { children: React.ReactNode }) =>
+        children,
+    }) as unknown as Awaited<typeof import("./components/ui/sidebar")>,
+);
 
-vi.mock("./lib/auth", () => ({
-  authClient: {
-    useSession,
-  },
-  useAppSessionQuery,
-}));
+vi.mock(
+  import("./lib/auth"),
+  () =>
+    ({
+      authClient: {
+        useSession,
+      },
+      useAppSessionQuery,
+    }) as unknown as Awaited<typeof import("./lib/auth")>,
+);
 
-vi.mock("./lib/workspaces", () => ({
-  CurrentWorkspaceProvider: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    workspace: unknown;
-  }) => children,
-  WorkspaceProvider: ({ children }: { children: React.ReactNode }) => children,
-  useWorkspaceContext,
-  useCurrentWorkspace,
-}));
+vi.mock(
+  import("./lib/workspaces"),
+  () =>
+    ({
+      CurrentWorkspaceProvider: ({
+        children,
+      }: {
+        children: React.ReactNode;
+        workspace: unknown;
+      }) => children,
+      WorkspaceProvider: ({ children }: { children: React.ReactNode }) =>
+        children,
+      useWorkspaceContext,
+      useCurrentWorkspace,
+    }) as unknown as Awaited<typeof import("./lib/workspaces")>,
+);
 
 describe("App root auth gating", () => {
   beforeEach(() => {

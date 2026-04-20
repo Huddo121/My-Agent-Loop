@@ -5,13 +5,17 @@ const { getSession } = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
 
-vi.mock("./auth", () => ({
-  auth: {
-    api: {
-      getSession,
-    },
-  },
-}));
+vi.mock(
+  import("./auth"),
+  () =>
+    ({
+      auth: {
+        api: {
+          getSession,
+        },
+      },
+    }) as unknown as Awaited<typeof import("./auth")>,
+);
 
 describe("auth session helpers", () => {
   beforeEach(() => {

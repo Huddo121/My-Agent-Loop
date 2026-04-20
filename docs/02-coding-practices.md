@@ -22,6 +22,8 @@ This repository follows a domain-oriented approach to its folder structures with
 
 There should also be test files next to each of the relevant files here, keeping the tests with the code that they're testing helps keep the codebase easily navigable, and makes refactorings that move code around much easier.
 
+All test files must be stored in a `__tests__` directory located directly next to the file or module they are testing. Tests should never be placed in separate top-level test directories or in folders that don't contain the code they test.
+
 ### Circular dependencies
 
 These should be avoided. This applies to both imports from different folders, or even the packages and apps within this monorepo.

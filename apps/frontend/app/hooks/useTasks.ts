@@ -9,6 +9,28 @@ export const tasksQueryKey = (projectId: ProjectId | null) =>
   ["tasks", projectId] as const;
 
 /**
+ * Merges a task into the cached task list for create-mutation success handling.
+ * Upserts by id so we do not duplicate when a `task.updated` live event has
+ * already inserted the same task (race with mutation `onSuccess`).
+ */
+export function mergeTaskIntoTasksList(
+  old: TaskDto[] | undefined,
+  task: TaskDto,
+): TaskDto[] {
+  if (!old) return [task];
+  const idx = old.findIndex((t) => t.id === task.id);
+  if (idx >= 0) {
+    const next = [...old];
+    next[idx] = task;
+    next.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    return next;
+  }
+  const next = [...old, task];
+  next.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  return next;
+}
+
+/**
  * Hook to fetch tasks for a specific project. Must be used inside CurrentWorkspaceProvider.
  */
 export function useTasks(projectId: ProjectId | null) {
@@ -60,10 +82,9 @@ export function useCreateTask(projectId: ProjectId | null) {
     },
     onSuccess: (newTask) => {
       if (!projectId) return;
-      queryClient.setQueryData<TaskDto[]>(tasksQueryKey(projectId), (old) => {
-        if (!old) return [newTask];
-        return [...old, newTask];
-      });
+      queryClient.setQueryData<TaskDto[]>(tasksQueryKey(projectId), (old) =>
+        mergeTaskIntoTasksList(old, newTask),
+      );
     },
   });
 }

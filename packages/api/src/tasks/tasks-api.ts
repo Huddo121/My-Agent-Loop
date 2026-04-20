@@ -9,12 +9,17 @@ import {
 import { agentConfigSchema } from "../harnesses/harnesses-model";
 import { subtaskSchema, taskIdSchema } from "./tasks-model";
 
+export const TASK_ACTIVE_RUN_STATES = ["pending", "in_progress"] as const;
+export type TaskActiveRunState = (typeof TASK_ACTIVE_RUN_STATES)[number];
+
 export const taskDtoSchema = z.object({
   id: taskIdSchema,
   title: z.string(),
   description: z.string(),
   completedOn: isoDatetimeToDate.nullish(),
   position: z.number().nullish(),
+  /** Present when the task has a run that is not yet finished (see `runs` table). Null when completed or idle. */
+  activeRunState: z.enum(TASK_ACTIVE_RUN_STATES).nullable(),
   agentConfig: agentConfigSchema.nullable(),
   subtasks: z.array(subtaskSchema),
 });

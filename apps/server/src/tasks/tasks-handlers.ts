@@ -11,6 +11,7 @@ import {
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
 import { requireAuthSession } from "../auth/session";
+import type { Database } from "../db";
 import { validateAgentConfig } from "../harness";
 import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 import type { Services } from "../services";
@@ -20,9 +21,22 @@ import { withNewTransaction } from "../utils/transaction-context";
 type WorkspaceProjectsTasksApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"]["children"][":projectId"]["children"]["tasks"];
 
+export type ActiveRunFromDb = "pending" | "in_progress" | null;
+
+function resolveActiveRunState(
+  task: Task,
+  activeFromDb: ActiveRunFromDb,
+): ActiveRunFromDb {
+  if (task.completedOn != null) {
+    return null;
+  }
+  return activeFromDb;
+}
+
 export function toTaskDto(
   task: Task,
   config: ScopedHarnessConfig | null,
+  activeRunFromDb: ActiveRunFromDb = null,
 ): TaskDto {
   const agentConfig: AgentConfig | null = config
     ? { harnessId: config.harnessId, modelId: config.modelId }
@@ -33,9 +47,53 @@ export function toTaskDto(
     description: task.description,
     completedOn: task.completedOn,
     position: task.position ?? null,
+    activeRunState: resolveActiveRunState(task, activeRunFromDb),
     agentConfig,
     subtasks: task.subtasks,
   };
+}
+
+/**
+ * Loads task + harness config + active run row and publishes `task.updated`.
+ * Starts its own transaction (for callers outside an existing transaction).
+ */
+export async function publishTaskUpdatedForTask(
+  db: Database,
+  deps: Pick<
+    Services,
+    | "taskQueue"
+    | "agentHarnessConfigRepository"
+    | "runsService"
+    | "projectsService"
+    | "liveEventsService"
+  >,
+  taskId: TaskId,
+): Promise<void> {
+  await withNewTransaction(db, async () => {
+    const task = await deps.taskQueue.getTask(taskId);
+    if (task === undefined) {
+      return;
+    }
+    const projectId = await deps.taskQueue.getProjectIdForTask(taskId);
+    if (projectId === undefined) {
+      return;
+    }
+    const project = await deps.projectsService.getProject(projectId);
+    if (project === undefined) {
+      return;
+    }
+    const config =
+      await deps.agentHarnessConfigRepository.getTaskConfig(taskId);
+    const activeMap = await deps.runsService.getActiveRunStatesForTasks([
+      taskId,
+    ]);
+    const dto = toTaskDto(task, config, activeMap.get(taskId) ?? null);
+    await deps.liveEventsService.publish(project.workspaceId, {
+      type: "task.updated",
+      projectId,
+      task: dto,
+    });
+  });
 }
 
 export const tasksHandlers: HonoHandlersFor<
@@ -65,8 +123,14 @@ export const tasksHandlers: HonoHandlersFor<
       const taskIds = tasks.map((t) => t.id);
       const harnessConfigs =
         await ctx.services.agentHarnessConfigRepository.getTaskConfigs(taskIds);
+      const activeRuns =
+        await ctx.services.runsService.getActiveRunStatesForTasks(taskIds);
       const dtos = tasks.map((t) =>
-        toTaskDto(t, harnessConfigs.get(t.id) ?? null),
+        toTaskDto(
+          t,
+          harnessConfigs.get(t.id) ?? null,
+          activeRuns.get(t.id) ?? null,
+        ),
       );
       return ok(dtos);
     });
@@ -112,7 +176,7 @@ export const tasksHandlers: HonoHandlersFor<
           task.id,
           config,
         );
-        const dto = toTaskDto(task, config);
+        const dto = toTaskDto(task, config, null);
         await ctx.services.liveEventsService.publish(
           workspaceId as WorkspaceId,
           {
@@ -123,7 +187,7 @@ export const tasksHandlers: HonoHandlersFor<
         );
         return ok(dto);
       }
-      const dto = toTaskDto(task, null);
+      const dto = toTaskDto(task, null, null);
       await ctx.services.liveEventsService.publish(workspaceId as WorkspaceId, {
         type: "task.updated",
         projectId: projectId as ProjectId,
@@ -160,7 +224,11 @@ export const tasksHandlers: HonoHandlersFor<
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             task.id,
           );
-        return ok(toTaskDto(task, agentHarnessId));
+        const activeRuns =
+          await ctx.services.runsService.getActiveRunStatesForTasks([task.id]);
+        return ok(
+          toTaskDto(task, agentHarnessId, activeRuns.get(task.id) ?? null),
+        );
       });
     },
 
@@ -218,7 +286,9 @@ export const tasksHandlers: HonoHandlersFor<
             config,
           );
         }
-        const dto = toTaskDto(task, config);
+        const activeRuns =
+          await ctx.services.runsService.getActiveRunStatesForTasks([task.id]);
+        const dto = toTaskDto(task, config, activeRuns.get(task.id) ?? null);
         await ctx.services.liveEventsService.publish(
           workspaceId as WorkspaceId,
           {
@@ -259,7 +329,7 @@ export const tasksHandlers: HonoHandlersFor<
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             completedTask.id,
           );
-        const dto = toTaskDto(completedTask, config);
+        const dto = toTaskDto(completedTask, config, null);
         await ctx.services.liveEventsService.publish(
           workspaceId as WorkspaceId,
           {
@@ -305,7 +375,15 @@ export const tasksHandlers: HonoHandlersFor<
           await ctx.services.agentHarnessConfigRepository.getTaskConfig(
             movedTask.id,
           );
-        const dto = toTaskDto(movedTask, config);
+        const activeRuns =
+          await ctx.services.runsService.getActiveRunStatesForTasks([
+            movedTask.id,
+          ]);
+        const dto = toTaskDto(
+          movedTask,
+          config,
+          activeRuns.get(movedTask.id) ?? null,
+        );
         await ctx.services.liveEventsService.publish(
           workspaceId as WorkspaceId,
           {

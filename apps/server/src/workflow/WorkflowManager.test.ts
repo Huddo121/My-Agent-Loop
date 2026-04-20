@@ -7,6 +7,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 import type { Database } from "../db";
 import type { ForgeSecretRepository } from "../forge-secrets";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import { LiveEventsService } from "../live-events";
 import type { Project, ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
@@ -73,13 +74,14 @@ function createHarness(options: { queueState: Project["queueState"] }) {
 
   const workflowManager: WorkflowManager = new DatabaseWorkflowManager(
     new WorkflowMessengerService(),
-    createTaskQueue(task),
-    createRunsService(run),
+    createTaskQueue(task, project.id),
+    createRunsService(run, task),
     createProjectsService(project),
     { runQueue } as unknown as WorkflowQueues,
     db,
     new LiveEventsService(),
     createForgeSecretRepository(),
+    createAgentHarnessConfigRepository(),
   );
 
   return {
@@ -105,14 +107,14 @@ function createTransactionTrackingDb(state: { inTransaction: boolean }) {
   } as unknown as Database;
 }
 
-function createTaskQueue(task: Task): TaskQueue {
+function createTaskQueue(task: Task, projectId: ProjectId): TaskQueue {
   return {
     addTask: vi.fn(),
     completeTask: vi.fn(),
     getAllTasks: vi.fn(),
     getNextTask: vi.fn(async () => task),
-    getProjectIdForTask: vi.fn(),
-    getTask: vi.fn(),
+    getProjectIdForTask: vi.fn(async () => projectId),
+    getTask: vi.fn(async () => task),
     isEmpty: vi.fn(),
     moveTask: vi.fn(),
     taskCount: vi.fn(),
@@ -120,14 +122,27 @@ function createTaskQueue(task: Task): TaskQueue {
   };
 }
 
-function createRunsService(run: Run): RunsService {
+function createRunsService(run: Run, task: Task): RunsService {
   return {
     createRun: vi.fn(async () => run),
     getRun: vi.fn(),
     getRunLogs: vi.fn(),
     getRunsForProject: vi.fn(),
+    getActiveRunStatesForTasks: vi.fn(async (taskIds: TaskId[]) => {
+      const map = new Map<TaskId, "pending" | "in_progress">();
+      if (taskIds.includes(task.id)) {
+        map.set(task.id, "pending");
+      }
+      return map;
+    }),
     updateRunState: vi.fn(),
   };
+}
+
+function createAgentHarnessConfigRepository(): AgentHarnessConfigRepository {
+  return {
+    getTaskConfig: vi.fn(async () => null),
+  } as unknown as AgentHarnessConfigRepository;
 }
 
 function createProjectsService(project: Project): ProjectsService {

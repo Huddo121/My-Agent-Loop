@@ -7,6 +7,8 @@ import {
 } from "../forge";
 import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitService } from "../git/GitService";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import type { LiveEventsService } from "../live-events";
 import type { ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type {
@@ -15,6 +17,7 @@ import type {
   UpdateRunStateError,
 } from "../runs/RunsService";
 import type { TaskQueue } from "../task-queue";
+import { publishTaskUpdatedForTask } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import { realiseWorkflowConfiguration } from "./Workflow";
@@ -54,6 +57,8 @@ export class BackgroundWorkflowProcessor {
     /* Just passed through */ private readonly gitService: GitService,
     private readonly db: Database,
     private readonly forgeSecretRepository: ForgeSecretRepository,
+    private readonly liveEventsService: LiveEventsService,
+    private readonly agentHarnessConfigRepository: AgentHarnessConfigRepository,
   ) {
     this.runWorker = new Worker(RUN_QUEUE, (job) => this.processRun(job), {
       connection: workflowQueues.redisConnectionOptions,
@@ -126,6 +131,18 @@ export class BackgroundWorkflowProcessor {
         });
         return;
       }
+
+      await publishTaskUpdatedForTask(
+        this.db,
+        {
+          taskQueue: this.taskQueue,
+          agentHarnessConfigRepository: this.agentHarnessConfigRepository,
+          runsService: this.runsService,
+          projectsService: this.projectsService,
+          liveEventsService: this.liveEventsService,
+        },
+        taskId,
+      );
 
       try {
         const result = await withNewTransaction(
@@ -276,6 +293,20 @@ export class BackgroundWorkflowProcessor {
       this.runsService.updateRunState(runId, "failed"),
     );
     this.workflowMessengerService.triggerRunFailed(projectId, runId);
+
+    if (result.success === true) {
+      await publishTaskUpdatedForTask(
+        this.db,
+        {
+          taskQueue: this.taskQueue,
+          agentHarnessConfigRepository: this.agentHarnessConfigRepository,
+          runsService: this.runsService,
+          projectsService: this.projectsService,
+          liveEventsService: this.liveEventsService,
+        },
+        result.value.taskId,
+      );
+    }
 
     return result;
   }

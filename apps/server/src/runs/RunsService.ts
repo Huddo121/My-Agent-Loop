@@ -37,6 +37,13 @@ export interface RunsService {
    * Get all active runs (pending or in_progress) for a given project.
    */
   getRunsForProject(projectId: ProjectId): Promise<Run[]>;
+  /**
+   * Active run state per task (at most one of pending/in_progress per task in practice).
+   * If both existed, `in_progress` wins.
+   */
+  getActiveRunStatesForTasks(
+    taskIds: TaskId[],
+  ): Promise<Map<TaskId, "pending" | "in_progress">>;
 }
 
 const fromRunEntity = (entity: typeof runsTable.$inferSelect): Run => ({
@@ -127,5 +134,37 @@ export class DatabaseRunsService implements RunsService {
       );
 
     return runs.map(fromRunEntity);
+  }
+
+  async getActiveRunStatesForTasks(
+    taskIds: TaskId[],
+  ): Promise<Map<TaskId, "pending" | "in_progress">> {
+    if (taskIds.length === 0) {
+      return new Map();
+    }
+    const tx = getTransaction();
+    const rows = await tx
+      .select({
+        taskId: runsTable.taskId,
+        state: runsTable.state,
+      })
+      .from(runsTable)
+      .where(
+        and(
+          inArray(runsTable.taskId, taskIds),
+          inArray(runsTable.state, ["pending", "in_progress"]),
+        ),
+      );
+
+    const map = new Map<TaskId, "pending" | "in_progress">();
+    for (const row of rows) {
+      const tid = row.taskId as TaskId;
+      const state = row.state as "pending" | "in_progress";
+      const existing = map.get(tid);
+      if (existing === undefined || state === "in_progress") {
+        map.set(tid, state);
+      }
+    }
+    return map;
   }
 }

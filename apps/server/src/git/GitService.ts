@@ -49,7 +49,7 @@ export interface CheckoutOptions {
 export interface GitService {
   /**
    * Checks out a repository for a task, creating a new branch from the primary branch.
-   * The branch name will be in the format `task-${taskId}-${runId}`.
+   * The caller supplies the branch name (see `buildTaskBranchName` in the workflow layer).
    */
   checkoutRepository(options: CheckoutOptions): Promise<Result<GitRepository>>;
   detectMainBranch(repository: GitRepository): Promise<Result<GitBranch>>;
@@ -124,7 +124,6 @@ export class SimpleGitService implements GitService {
 
   /**
    * Checks out a repository for a task, creating a new branch from the primary branch.
-   * The branch name will be in the format `task-${taskId}-${runId}`.
    * If the repository doesn't exist, it will be cloned first.
    * If it exists, it will fetch the latest changes.
    * Returns the repository metadata on success.

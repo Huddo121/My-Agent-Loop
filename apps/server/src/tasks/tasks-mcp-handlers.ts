@@ -55,6 +55,7 @@ export const getTasksMcpHandler = {
 
       const response = tasks.map((task) => ({
         id: task.id,
+        taskNumber: task.taskNumber,
         description: task.description,
         title: task.title,
         completedOn: task.completedOn?.toISOString(),

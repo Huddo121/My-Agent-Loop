@@ -133,6 +133,7 @@ export const projectsTable = pg.pgTable(
       .$type<WorkspaceId>(),
     name: pg.text().notNull(),
     shortCode: pg.text().notNull(),
+    nextTaskNumber: pg.integer().notNull().default(1),
     repositoryUrl: pg.text().notNull(),
     workflowConfiguration: pg.jsonb().notNull().$type<WorkflowConfiguration>(),
     queueState: queueStateEnum().notNull().default("idle"),
@@ -143,6 +144,10 @@ export const projectsTable = pg.pgTable(
     workspaceShortCodeUnique: pg
       .unique()
       .on(table.workspaceId, table.shortCode),
+    nextTaskNumberPositive: check(
+      "projects_next_task_number_positive",
+      sql`${table.nextTaskNumber} > 0`,
+    ),
   }),
 );
 
@@ -157,21 +162,32 @@ export const projectForgeSecretsTable = pg.pgTable("project_forge_secrets", {
   encryptedToken: pg.text().notNull(),
 });
 
-export const tasksTable = pg.pgTable("tasks", {
-  id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<TaskId>(),
-  title: pg.text().notNull(),
-  projectId: pg
-    .uuid()
-    .references(() => projectsTable.id)
-    .notNull()
-    .$type<ProjectId>(),
-  description: pg.text().notNull(),
-  subtasks: pg.jsonb().notNull().default(sql`'[]'::jsonb`).$type<Subtask[]>(),
-  createdAt: pg.timestamp().notNull().defaultNow(),
-  completedOn: pg.timestamp(),
-  /** Where does this task appear in the queue? Only relevant for non-completed tasks. */
-  position: pg.doublePrecision(),
-});
+export const tasksTable = pg.pgTable(
+  "tasks",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`).$type<TaskId>(),
+    taskNumber: pg.integer().notNull(),
+    title: pg.text().notNull(),
+    projectId: pg
+      .uuid()
+      .references(() => projectsTable.id)
+      .notNull()
+      .$type<ProjectId>(),
+    description: pg.text().notNull(),
+    subtasks: pg.jsonb().notNull().default(sql`'[]'::jsonb`).$type<Subtask[]>(),
+    createdAt: pg.timestamp().notNull().defaultNow(),
+    completedOn: pg.timestamp(),
+    /** Where does this task appear in the queue? Only relevant for non-completed tasks. */
+    position: pg.doublePrecision(),
+  },
+  (table) => ({
+    projectTaskNumberUnique: pg.unique().on(table.projectId, table.taskNumber),
+    taskNumberPositive: check(
+      "tasks_task_number_positive",
+      sql`${table.taskNumber} > 0`,
+    ),
+  }),
+);
 
 /** One row per workspace, project, or task. Exactly one of the FKs is non-null. */
 export const agentHarnessConfigurationTable = pg.pgTable(

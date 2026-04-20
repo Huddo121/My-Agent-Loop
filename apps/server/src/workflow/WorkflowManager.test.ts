@@ -2,6 +2,7 @@ import type {
   ProjectId,
   ProjectShortCode,
   TaskId,
+  TaskNumber,
   WorkspaceId,
 } from "@mono/api";
 import { describe, expect, it, vi } from "vitest";
@@ -175,6 +176,7 @@ function createProject(queueState: Project["queueState"]): Project {
 function createTask(): Task {
   return {
     id: "task-1" as TaskId,
+    taskNumber: 1 as TaskNumber,
     title: "Task",
     description: "Do the thing",
     subtasks: [],

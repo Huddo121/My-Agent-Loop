@@ -29,6 +29,7 @@ export function toTaskDto(
     : null;
   return {
     id: task.id,
+    taskNumber: task.taskNumber,
     title: task.title,
     description: task.description,
     completedOn: task.completedOn,

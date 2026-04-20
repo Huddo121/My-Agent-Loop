@@ -3,6 +3,7 @@ import type {
   ProjectId,
   ProjectShortCode,
   TaskId,
+  TaskNumber,
   WorkspaceId,
 } from "@mono/api";
 import { describe, expect, it, vi } from "vitest";
@@ -53,6 +54,7 @@ function mkTaskUpdated(
     projectId,
     task: {
       id: "task-1" as TaskId,
+      taskNumber: 1 as TaskNumber,
       title: "t",
       description: "d",
       completedOn: null,

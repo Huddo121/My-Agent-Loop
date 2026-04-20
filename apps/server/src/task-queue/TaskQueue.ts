@@ -1,7 +1,8 @@
-import type { ProjectId, Subtask, TaskId } from "@mono/api";
+import type { ProjectId, Subtask, TaskId, TaskNumber } from "@mono/api";
 
 export interface Task {
   id: TaskId;
+  taskNumber: TaskNumber;
   title: string;
   description: string;
   completedOn?: Date;

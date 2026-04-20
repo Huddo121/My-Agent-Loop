@@ -6,8 +6,9 @@ import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
 import type { ForgeSecretRepository } from "../forge-secrets";
-import type { GitBranch, GitRepository } from "../git/GitRepository";
+import type { GitRepository } from "../git/GitRepository";
 import type { ForgeGitCredentials, GitService } from "../git/GitService";
+import { buildTaskBranchName } from "../git/task-branch-name";
 import type { AgentHarness } from "../harness";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../harness/HarnessAuthService";
@@ -142,7 +143,7 @@ export class WorkflowExecutionService {
     const checkoutResult = await this.gitService.checkoutRepository({
       repositoryUrl: project.repositoryUrl,
       targetDirectory: repositoryPath,
-      branch: `tasks/task-${task.id}-${runId}` as GitBranch,
+      branch: buildTaskBranchName(project.shortCode, task),
       credentials,
     });
 

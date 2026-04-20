@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { tasksHandlers } from "../tasks-handlers";
+import { tasksHandlers } from "./tasks-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
 }));
 
-vi.mock("../../auth/session", () => ({
+vi.mock("../auth/session", () => ({
   requireAuthSession,
 }));
 

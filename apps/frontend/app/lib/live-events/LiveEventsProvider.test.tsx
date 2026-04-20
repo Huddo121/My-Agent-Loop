@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LiveEventsProvider } from "../LiveEventsProvider";
+import { LiveEventsProvider } from "./LiveEventsProvider";
 
 const { mockSessionGet } = vi.hoisted(() => {
   const mockSessionGet = vi.fn();

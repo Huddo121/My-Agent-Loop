@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   handleSeaInjectionFailure,
   isSeaInjectionRequired,
-} from "../../build-sea-lib.mjs";
+} from "../build-sea-lib.mjs";
 
 describe("build-sea helpers", () => {
   it("requires injection only when explicitly configured", () => {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthGate } from "../AuthGate";
+import { AuthGate } from "./AuthGate";
 
 const { mutate } = vi.hoisted(() => ({
   mutate: vi.fn(),

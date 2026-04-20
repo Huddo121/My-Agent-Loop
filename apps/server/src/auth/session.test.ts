@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAuthSession, requireAuthSession } from "../session";
+import { getAuthSession, requireAuthSession } from "./session";
 
 const { getSession } = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
 
-vi.mock("../auth", () => ({
+vi.mock("./auth", () => ({
   auth: {
     api: {
       getSession,

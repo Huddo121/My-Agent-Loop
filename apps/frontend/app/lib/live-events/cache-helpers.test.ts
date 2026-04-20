@@ -9,7 +9,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { tasksQueryKey } from "~/hooks/useTasks";
 import { projectsQueryKey } from "~/lib/projects/useProjects";
-import { applyProjectUpdated, applyTaskUpdated } from "../cache-helpers";
+import { applyProjectUpdated, applyTaskUpdated } from "./cache-helpers";
 
 function mkProject(overrides?: Partial<ProjectDto>): ProjectDto {
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { driverInvocationSchema, parseDriverInvocation } from "../cli";
+import { driverInvocationSchema, parseDriverInvocation } from "./cli";
 
 describe("CLI argument parsing", () => {
   describe("parseDriverInvocation", () => {

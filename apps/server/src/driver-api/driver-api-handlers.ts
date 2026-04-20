@@ -32,11 +32,11 @@ export const driverApiHandlers: HonoHandlersFor<
 
           const { runId } = requestResult.value;
 
-          const logMessage = `[driver:${runId}] ${ctx.body.stream}: ${ctx.body.message}`;
+          const logData = { runId, stream: ctx.body.stream };
           if (ctx.body.stream === "stderr") {
-            ctx.services.logger.error(logMessage);
+            ctx.services.logger.error(ctx.body.message, logData);
           } else {
-            ctx.services.logger.info(logMessage);
+            ctx.services.logger.info(ctx.body.message, logData);
           }
 
           return ok({ ok: true });
@@ -54,13 +54,16 @@ export const driverApiHandlers: HonoHandlersFor<
           const { runId } = requestResult.value;
 
           if (ctx.body.kind === "harness-starting") {
-            ctx.services.logger.info(
-              `[driver:${runId}] Harness starting: ${ctx.body.harnessCommand}`,
-            );
+            ctx.services.logger.info("Driver harness starting", {
+              runId,
+              harnessCommand: ctx.body.harnessCommand,
+            });
           } else {
-            ctx.services.logger.info(
-              `[driver:${runId}] Harness exited with code ${ctx.body.exitCode}${ctx.body.signal === null ? "" : ` (${ctx.body.signal})`}`,
-            );
+            ctx.services.logger.info("Driver harness exited", {
+              runId,
+              exitCode: ctx.body.exitCode,
+              signal: ctx.body.signal,
+            });
           }
 
           return ok({ ok: true });

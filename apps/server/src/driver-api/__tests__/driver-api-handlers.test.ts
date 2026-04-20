@@ -172,6 +172,45 @@ describe("driver api handlers", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
       expect(services.db.transaction).toHaveBeenCalledTimes(1);
+      expect(services.logger.info).toHaveBeenCalledWith("test log message", {
+        runId: RUN_ID,
+        stream: "stdout",
+      });
+      expect(services.logger.error).not.toHaveBeenCalled();
+    });
+
+    it("logs stderr events as errors with structured run data", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: "task-1" as never,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/api/internal/driver/runs/${RUN_ID}/logs`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            message: "test error message",
+            stream: "stderr",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(services.logger.error).toHaveBeenCalledWith("test error message", {
+        runId: RUN_ID,
+        stream: "stderr",
+      });
+      expect(services.logger.info).not.toHaveBeenCalled();
     });
   });
 
@@ -228,6 +267,50 @@ describe("driver api handlers", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
       expect(services.db.transaction).toHaveBeenCalledTimes(1);
+      expect(services.logger.info).toHaveBeenCalledWith(
+        "Driver harness exited",
+        {
+          runId: RUN_ID,
+          exitCode: 0,
+          signal: null,
+        },
+      );
+    });
+
+    it("logs harness start events with structured run data", async () => {
+      const { app, services, driverRunTokenStore } = createApp();
+      driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
+      services.runsService.getRun.mockResolvedValueOnce({
+        id: RUN_ID,
+        taskId: "task-1" as never,
+        startedAt: new Date(),
+        state: "in_progress",
+      });
+
+      const response = await app.request(
+        `http://localhost/api/internal/driver/runs/${RUN_ID}/lifecycle`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "X-MAL-Driver-Token": DRIVER_TOKEN,
+          },
+          body: JSON.stringify({
+            kind: "harness-starting",
+            harnessCommand: "echo hello",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(services.logger.info).toHaveBeenCalledWith(
+        "Driver harness starting",
+        {
+          runId: RUN_ID,
+          harnessCommand: "echo hello",
+        },
+      );
     });
   });
 });

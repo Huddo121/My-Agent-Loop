@@ -3,6 +3,7 @@ import type {
   ProjectId,
   TaskDto,
   TaskId,
+  TaskNumber,
   WorkspaceId,
 } from "@mono/api";
 import { QueryClient } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ function mkProject(overrides?: Partial<ProjectDto>): ProjectDto {
 function mkTask(overrides?: Partial<TaskDto>): TaskDto {
   return {
     id: "task-1" as TaskId,
+    taskNumber: 1 as TaskNumber,
     title: "Task",
     description: "Desc",
     completedOn: null,

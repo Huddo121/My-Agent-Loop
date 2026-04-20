@@ -7,6 +7,7 @@ import {
   type SubtaskId,
   type SubtaskState,
   type TaskId,
+  type TaskNumber,
 } from "@mono/api";
 
 export { createSubtaskId, SUBTASK_STATES, SUBTASK_STATE_LABELS };
@@ -14,6 +15,7 @@ export type { Subtask, SubtaskId, SubtaskState };
 
 export type Task = {
   id: TaskId;
+  taskNumber: TaskNumber;
   title: string;
   description: string;
   completedOn?: Date | null | undefined;

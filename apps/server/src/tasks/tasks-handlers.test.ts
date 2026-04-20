@@ -104,6 +104,7 @@ describe("tasks handlers", () => {
     );
     ctx.services.taskQueue.addTask.mockResolvedValueOnce({
       id: "task-1",
+      taskNumber: 1,
       title: "New task",
       description: "Description",
       completedOn: undefined,
@@ -123,6 +124,7 @@ describe("tasks handlers", () => {
         projectId: "project-1",
         task: expect.objectContaining({
           id: "task-1",
+          taskNumber: 1,
           title: "New task",
           description: "Description",
         }),

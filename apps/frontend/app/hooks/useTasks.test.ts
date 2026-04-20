@@ -1,4 +1,4 @@
-import type { ProjectId, TaskDto, TaskId } from "@mono/api";
+import type { ProjectId, TaskDto, TaskId, TaskNumber } from "@mono/api";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { mergeTaskIntoTasksList, tasksQueryKey } from "./useTasks";
@@ -6,6 +6,7 @@ import { mergeTaskIntoTasksList, tasksQueryKey } from "./useTasks";
 function mkTask(overrides?: Partial<TaskDto>): TaskDto {
   return {
     id: "task-1" as TaskId,
+    taskNumber: 1 as TaskNumber,
     title: "Task",
     description: "Desc",
     completedOn: null,

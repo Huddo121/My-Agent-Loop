@@ -3,6 +3,13 @@ import z from "zod";
 export const taskIdSchema = z.string().brand<"TaskId">();
 export type TaskId = z.infer<typeof taskIdSchema>;
 
+export const taskNumberSchema = z
+  .number()
+  .int()
+  .positive()
+  .brand<"TaskNumber">();
+export type TaskNumber = z.infer<typeof taskNumberSchema>;
+
 export const subtaskIdSchema = z.string().brand<"SubtaskId">();
 export type SubtaskId = z.infer<typeof subtaskIdSchema>;
 

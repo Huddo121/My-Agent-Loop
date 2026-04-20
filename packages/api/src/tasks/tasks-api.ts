@@ -7,10 +7,11 @@ import {
   unauthenticatedSchema,
 } from "../common-schemas";
 import { agentConfigSchema } from "../harnesses/harnesses-model";
-import { subtaskSchema, taskIdSchema } from "./tasks-model";
+import { subtaskSchema, taskIdSchema, taskNumberSchema } from "./tasks-model";
 
 export const taskDtoSchema = z.object({
   id: taskIdSchema,
+  taskNumber: taskNumberSchema,
   title: z.string(),
   description: z.string(),
   completedOn: isoDatetimeToDate.nullish(),

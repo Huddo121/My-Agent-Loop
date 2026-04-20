@@ -7,6 +7,7 @@ import type {
   ProjectId,
   ProjectShortCode,
   TaskId,
+  TaskNumber,
   WorkspaceId,
 } from "@mono/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -297,6 +298,7 @@ function createService(options: {
 function createTask(taskId: string): Task {
   return {
     id: taskId as TaskId,
+    taskNumber: 1 as TaskNumber,
     title: `Task ${taskId}`,
     description: `Description for ${taskId}`,
     subtasks: [],

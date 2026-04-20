@@ -1,6 +1,16 @@
-import type { ProjectId, Subtask, TaskId } from "@mono/api";
-import { and, asc, count, eq, isNotNull, isNull, max, min } from "drizzle-orm";
-import { tasksTable } from "../db/schema";
+import type { ProjectId, Subtask, TaskId, TaskNumber } from "@mono/api";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  isNotNull,
+  isNull,
+  max,
+  min,
+  sql,
+} from "drizzle-orm";
+import { projectsTable, tasksTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
 import type {
   GetAllTasksOptions,
@@ -17,6 +27,7 @@ const POSITION_GAP = 128;
 const fromTaskEntity = (task: typeof tasksTable.$inferSelect): Task => {
   return {
     id: task.id,
+    taskNumber: task.taskNumber as TaskNumber,
     title: task.title,
     description: task.description,
     completedOn: task.completedOn ?? undefined,
@@ -65,6 +76,17 @@ export class DatabaseTaskQueue implements TaskQueue {
   async addTask(projectId: ProjectId, task: NewTask): Promise<Task> {
     const tx = getTransaction();
 
+    const [projectCounter] = await tx
+      .update(projectsTable)
+      .set({ nextTaskNumber: sql`${projectsTable.nextTaskNumber} + 1` })
+      .where(eq(projectsTable.id, projectId))
+      .returning({ nextTaskNumber: projectsTable.nextTaskNumber });
+
+    if (projectCounter === undefined) {
+      throw new Error(`Project not found while adding task: ${projectId}`);
+    }
+    const taskNumber = (projectCounter.nextTaskNumber - 1) as TaskNumber;
+
     // Find the maximum position for incomplete tasks in this project
     const [{ maxPosition }] = await tx
       .select({ maxPosition: max(tasksTable.position) })
@@ -82,6 +104,7 @@ export class DatabaseTaskQueue implements TaskQueue {
       .insert(tasksTable)
       .values({
         ...task,
+        taskNumber,
         projectId,
         position: newPosition,
         subtasks: task.subtasks ?? [],
@@ -89,6 +112,7 @@ export class DatabaseTaskQueue implements TaskQueue {
       .returning();
     console.info("Added to task to database backed queue", {
       taskId: newTask.id,
+      taskNumber: newTask.taskNumber,
     });
 
     return fromTaskEntity(newTask);

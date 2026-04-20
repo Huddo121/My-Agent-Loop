@@ -132,6 +132,7 @@ describe("live-events shared contract", () => {
         projectId: "proj-1",
         task: {
           id: "task-1",
+          taskNumber: 1,
           title: "Task",
           description: "Desc",
           completedOn: null,
@@ -154,6 +155,7 @@ describe("live-events shared contract", () => {
         projectId: "proj-1",
         task: {
           id: "task-1",
+          taskNumber: 1,
           title: "Done",
           description: "",
           completedOn: "2025-01-15T12:00:00.000Z",

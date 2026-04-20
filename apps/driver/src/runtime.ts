@@ -1,6 +1,18 @@
+import { once } from "node:events";
 import type { DriverInvocation } from "./cli";
 import { executeHarnessCommand } from "./harness-process";
 import { HostApiClient } from "./host-api";
+
+async function writeHarnessChunkToSandboxStream(
+  streamType: "stdout" | "stderr",
+  message: string,
+): Promise<void> {
+  const dest = streamType === "stdout" ? process.stdout : process.stderr;
+  const ok = dest.write(message);
+  if (!ok) {
+    await once(dest, "drain");
+  }
+}
 
 async function forwardStream(
   stream: NodeJS.ReadableStream,
@@ -11,6 +23,12 @@ async function forwardStream(
   for await (const chunk of stream) {
     const message = chunk.toString();
     if (message.length > 0) {
+      try {
+        await writeHarnessChunkToSandboxStream(streamType, message);
+      } catch (error) {
+        console.error("Failed to write harness log to sandbox stream:", error);
+      }
+
       const pendingSend = reportLog(hostApiClient, {
         message,
         stream: streamType,

@@ -49,6 +49,9 @@ describe("runDriver", () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
+    const stdoutWriteSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockReturnValue(true);
 
     sendLifecycleEventMock
       .mockRejectedValueOnce(new Error("starting failed"))
@@ -76,14 +79,19 @@ describe("runDriver", () => {
     expect(sendLifecycleEventMock).toHaveBeenCalledTimes(2);
     expect(sendLogMock).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBe(17);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith("hello from stdout\n");
     expect(consoleErrorSpy).toHaveBeenCalledTimes(3);
 
+    stdoutWriteSpy.mockRestore();
     consoleErrorSpy.mockRestore();
   });
 
   it("does not block stream consumption on earlier log sends", async () => {
     const firstLogSend = createDeferred<void>();
     const secondLogSend = createDeferred<void>();
+    const stdoutWriteSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockReturnValue(true);
 
     sendLogMock
       .mockReturnValueOnce(firstLogSend.promise)
@@ -119,5 +127,10 @@ describe("runDriver", () => {
     );
 
     await expect(runDriverPromise).resolves.toBeUndefined();
+
+    expect(stdoutWriteSpy).toHaveBeenCalledTimes(2);
+    expect(stdoutWriteSpy).toHaveBeenNthCalledWith(1, "first\n");
+    expect(stdoutWriteSpy).toHaveBeenNthCalledWith(2, "second\n");
+    stdoutWriteSpy.mockRestore();
   });
 });

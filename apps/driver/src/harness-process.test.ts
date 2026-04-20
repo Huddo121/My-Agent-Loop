@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   executeHarnessCommand,
   type HarnessExecutionResult,
-} from "../harness-process";
+} from "./harness-process";
 
 vi.mock("node:child_process", async () => {
   const actual = await vi.importActual("node:child_process");

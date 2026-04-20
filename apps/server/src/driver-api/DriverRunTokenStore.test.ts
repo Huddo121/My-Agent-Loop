@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { RunId } from "../../runs/RunId";
-import { InMemoryDriverRunTokenStore } from "../DriverRunTokenStore";
+import type { RunId } from "../runs/RunId";
+import { InMemoryDriverRunTokenStore } from "./DriverRunTokenStore";
 
 describe("InMemoryDriverRunTokenStore", () => {
   it("matches stored tokens using plain string equality", () => {

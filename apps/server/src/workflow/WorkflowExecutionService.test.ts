@@ -10,22 +10,22 @@ import type {
   WorkspaceId,
 } from "@mono/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DriverRunTokenStore } from "../../driver-api/DriverRunTokenStore";
-import type { AbsoluteFilePath } from "../../file-system/FilePath";
-import type { FileSystemService } from "../../file-system/FileSystemService";
-import type { ForgeSecretRepository } from "../../forge-secrets";
-import type { GitBranch, GitRepository } from "../../git/GitRepository";
-import type { GitService } from "../../git/GitService";
-import type { AgentHarness, AgentHarnessPreparation } from "../../harness";
-import type { AgentHarnessConfigRepository } from "../../harness/AgentHarnessConfigRepository";
-import type { HarnessAuthService } from "../../harness/HarnessAuthService";
+import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
+import type { AbsoluteFilePath } from "../file-system/FilePath";
+import type { FileSystemService } from "../file-system/FileSystemService";
+import type { ForgeSecretRepository } from "../forge-secrets";
+import type { GitBranch, GitRepository } from "../git/GitRepository";
+import type { GitService } from "../git/GitService";
+import type { AgentHarness, AgentHarnessPreparation } from "../harness";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import type { HarnessAuthService } from "../harness/HarnessAuthService";
 import {
   LiveEventsService,
   type RegisterOptions,
   type SendSSE,
-} from "../../live-events";
-import type { Project } from "../../projects/ProjectsService";
-import type { RunId } from "../../runs/RunId";
+} from "../live-events";
+import type { Project } from "../projects/ProjectsService";
+import type { RunId } from "../runs/RunId";
 import type {
   Sandbox,
   SandboxId,
@@ -34,15 +34,15 @@ import type {
   StartSandboxFailure,
   WaitForSandboxToFinishFailure,
   WaitForSandboxToFinishSuccess,
-} from "../../sandbox/SandboxService";
-import type { Task, TaskQueue } from "../../task-queue/TaskQueue";
-import { ProtectedString } from "../../utils/ProtectedString";
-import type { Result } from "../../utils/Result";
-import type { Workflow } from "../Workflow";
+} from "../sandbox/SandboxService";
+import type { Task, TaskQueue } from "../task-queue/TaskQueue";
+import { ProtectedString } from "../utils/ProtectedString";
+import type { Result } from "../utils/Result";
+import type { Workflow } from "./Workflow";
 import {
   WorkflowExecutionService,
   type WorkflowExecutionServiceOptions,
-} from "../WorkflowExecutionService";
+} from "./WorkflowExecutionService";
 
 const tempDirectories: string[] = [];
 

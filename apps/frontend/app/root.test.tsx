@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import App from "../root";
+import App from "./root";
 
 const {
   useSession,
@@ -23,31 +23,31 @@ vi.mock("react-router", () => ({
   isRouteErrorResponse: () => false,
 }));
 
-vi.mock("../components/auth", () => ({
+vi.mock("./components/auth", () => ({
   AuthGate: () => <div>auth-gate</div>,
 }));
 
-vi.mock("../components/workspaces", () => ({
+vi.mock("./components/workspaces", () => ({
   WorkspaceSetup: () => <div>workspace-setup</div>,
 }));
 
-vi.mock("../lib/live-events", () => ({
+vi.mock("./lib/live-events", () => ({
   LiveEventsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("../components/ui/sidebar", () => ({
+vi.mock("./components/ui/sidebar", () => ({
   FloatingSidebarTrigger: () => <div>sidebar-trigger</div>,
   SidebarProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("../lib/auth", () => ({
+vi.mock("./lib/auth", () => ({
   authClient: {
     useSession,
   },
   useAppSessionQuery,
 }));
 
-vi.mock("../lib/workspaces", () => ({
+vi.mock("./lib/workspaces", () => ({
   CurrentWorkspaceProvider: ({
     children,
   }: {

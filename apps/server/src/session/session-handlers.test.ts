@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sessionHandlers } from "../session-handlers";
+import { sessionHandlers } from "./session-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
 }));
 
-vi.mock("../../auth/session", () => ({
+vi.mock("../auth/session", () => ({
   requireAuthSession,
 }));
 

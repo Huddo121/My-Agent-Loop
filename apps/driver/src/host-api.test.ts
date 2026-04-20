@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HostApiClient } from "../host-api";
+import { HostApiClient } from "./host-api";
 
 describe("HostApiClient", () => {
   let fetchMock: ReturnType<typeof vi.fn>;

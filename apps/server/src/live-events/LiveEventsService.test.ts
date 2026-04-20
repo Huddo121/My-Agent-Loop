@@ -6,7 +6,7 @@ import type {
   WorkspaceId,
 } from "@mono/api";
 import { describe, expect, it, vi } from "vitest";
-import { LiveEventsService, type SendSSE } from "../LiveEventsService";
+import { LiveEventsService, type SendSSE } from "./LiveEventsService";
 
 const ws1 = "ws-1" as WorkspaceId;
 const ws2 = "ws-2" as WorkspaceId;

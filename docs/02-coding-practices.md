@@ -20,9 +20,7 @@ Because this codebase will be worked on by many autonomous agents, sometimes in 
 
 This repository follows a domain-oriented approach to its folder structures within each package or app. As an example, if there's some APIs related `User`s, then there will likely be a `users` folder with all of a web handler/controller, the Web API shapes for `User`s, the core model for `User`, a `UserService`, and possibly a `UserRepo` for the database operations.
 
-There should also be test files next to each of the relevant files here, keeping the tests with the code that they're testing helps keep the codebase easily navigable, and makes refactorings that move code around much easier.
-
-All test files must be stored in a `__tests__` directory located directly next to the file or module they are testing. Tests should never be placed in separate top-level test directories or in folders that don't contain the code they test.
+There should also be test files next to each of the relevant files here, keeping the tests with the code that they're testing helps keep the codebase easily navigable, and makes refactorings that move code around much easier. For example, `Foo.test.ts` should live in the same folder as `Foo.ts`, not in a separate `__tests__` directory.
 
 ### Circular dependencies
 

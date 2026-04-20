@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DriverInvocation } from "../cli";
+import type { DriverInvocation } from "./cli";
 
 const { executeHarnessCommandMock, sendLogMock, sendLifecycleEventMock } =
   vi.hoisted(() => ({
@@ -9,18 +9,18 @@ const { executeHarnessCommandMock, sendLogMock, sendLifecycleEventMock } =
     sendLifecycleEventMock: vi.fn(),
   }));
 
-vi.mock("../harness-process", () => ({
+vi.mock("./harness-process", () => ({
   executeHarnessCommand: executeHarnessCommandMock,
 }));
 
-vi.mock("../host-api", () => ({
+vi.mock("./host-api", () => ({
   HostApiClient: class {
     sendLog = sendLogMock;
     sendLifecycleEvent = sendLifecycleEventMock;
   },
 }));
 
-import { runDriver } from "../runtime";
+import { runDriver } from "./runtime";
 
 function createDeferred<T>() {
   let resolve: (value: T | PromiseLike<T>) => void = () => {};

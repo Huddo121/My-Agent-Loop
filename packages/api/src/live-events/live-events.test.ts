@@ -5,7 +5,7 @@ import {
   parseSubscriptionString,
   parseSubscriptionStrings,
   subscriptionToQueryValue,
-} from "../index";
+} from "./index";
 
 describe("live-events shared contract", () => {
   describe("parseSubscriptionString", () => {

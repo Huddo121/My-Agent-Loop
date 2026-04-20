@@ -5,20 +5,20 @@ import type {
   WorkspaceId,
 } from "@mono/api";
 import { describe, expect, it, vi } from "vitest";
-import type { Database } from "../../db";
-import type { ForgeSecretRepository } from "../../forge-secrets";
-import { LiveEventsService } from "../../live-events";
-import type { Project, ProjectsService } from "../../projects/ProjectsService";
-import type { RunId } from "../../runs/RunId";
-import type { Run, RunsService } from "../../runs/RunsService";
-import type { Task, TaskQueue } from "../../task-queue";
-import { ProtectedString } from "../../utils/ProtectedString";
+import type { Database } from "../db";
+import type { ForgeSecretRepository } from "../forge-secrets";
+import { LiveEventsService } from "../live-events";
+import type { Project, ProjectsService } from "../projects/ProjectsService";
+import type { RunId } from "../runs/RunId";
+import type { Run, RunsService } from "../runs/RunsService";
+import type { Task, TaskQueue } from "../task-queue";
+import { ProtectedString } from "../utils/ProtectedString";
 import {
   DatabaseWorkflowManager,
   type WorkflowManager,
-} from "../WorkflowManager";
-import { WorkflowMessengerService } from "../WorkflowMessengerService";
-import type { WorkflowQueues } from "../workflow-queues";
+} from "./WorkflowManager";
+import { WorkflowMessengerService } from "./WorkflowMessengerService";
+import type { WorkflowQueues } from "./workflow-queues";
 
 describe("DatabaseWorkflowManager", () => {
   it("adds the run job after the run creation transaction commits", async () => {

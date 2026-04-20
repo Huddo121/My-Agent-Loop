@@ -1,10 +1,10 @@
 import { driverApi } from "@mono/driver-api";
 import { createHonoServer } from "cerato";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RunId } from "../../runs/RunId";
-import type { Run } from "../../runs/RunsService";
-import { InMemoryDriverRunTokenStore } from "../DriverRunTokenStore";
-import { driverApiHandlers } from "../driver-api-handlers";
+import type { RunId } from "../runs/RunId";
+import type { Run } from "../runs/RunsService";
+import { InMemoryDriverRunTokenStore } from "./DriverRunTokenStore";
+import { driverApiHandlers } from "./driver-api-handlers";
 
 const RUN_ID = "run-1" as RunId;
 const DRIVER_TOKEN = "driver-secret-token";

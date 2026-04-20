@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateRunId } from "../RunId";
+import { generateRunId } from "./RunId";
 
 describe("RunId", () => {
   describe("generateRunId", () => {

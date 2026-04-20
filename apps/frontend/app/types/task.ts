@@ -6,6 +6,7 @@ import {
   type Subtask,
   type SubtaskId,
   type SubtaskState,
+  type TaskActiveRunState,
   type TaskId,
   type TaskNumber,
 } from "@mono/api";
@@ -20,6 +21,7 @@ export type Task = {
   description: string;
   completedOn?: Date | null | undefined;
   position?: number | null | undefined;
+  activeRunState: TaskActiveRunState | null;
   agentConfig: AgentConfig | null;
   subtasks: Subtask[];
 };

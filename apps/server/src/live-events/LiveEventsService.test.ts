@@ -59,6 +59,7 @@ function mkTaskUpdated(
       description: "d",
       completedOn: null,
       position: 0,
+      activeRunState: null,
       agentConfig: null,
       subtasks: [],
     },

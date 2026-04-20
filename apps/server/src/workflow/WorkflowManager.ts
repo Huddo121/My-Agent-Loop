@@ -2,12 +2,14 @@ import type { ProjectId, TaskId } from "@mono/api";
 import { match } from "ts-pattern";
 import type { Database } from "../db";
 import type { ForgeSecretRepository } from "../forge-secrets";
+import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { LiveEventsService } from "../live-events";
 import type { Project, ProjectsService } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Run, RunsService } from "../runs/RunsService";
 import type { RunMode } from "../runs/runs-model";
 import type { TaskQueue } from "../task-queue/TaskQueue";
+import { publishTaskUpdatedForTask } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
 import type { WorkflowMessengerService } from "./WorkflowMessengerService";
@@ -45,6 +47,7 @@ export class DatabaseWorkflowManager implements WorkflowManager {
     private readonly db: Database,
     private readonly liveEventsService: LiveEventsService,
     private readonly forgeSecretRepository: ForgeSecretRepository,
+    private readonly agentHarnessConfigRepository: AgentHarnessConfigRepository,
   ) {
     workflowMessengerService.onRunCompleted(this.handleRunCompleted.bind(this));
     workflowMessengerService.onRunFailed(this.handleRunFailed.bind(this));
@@ -152,6 +155,18 @@ export class DatabaseWorkflowManager implements WorkflowManager {
       runId: run.id,
       jobId: newJob.id,
     });
+
+    await publishTaskUpdatedForTask(
+      this.db,
+      {
+        taskQueue: this.taskQueue,
+        agentHarnessConfigRepository: this.agentHarnessConfigRepository,
+        runsService: this.runsService,
+        projectsService: this.projectsService,
+        liveEventsService: this.liveEventsService,
+      },
+      taskId,
+    );
   }
 
   /**

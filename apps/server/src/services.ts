@@ -137,6 +137,7 @@ const workflowManager = new DatabaseWorkflowManager(
   db,
   liveEventsService,
   forgeSecretRepository,
+  agentHarnessConfigRepository,
 );
 
 const workflowExecutionService = new WorkflowExecutionService(
@@ -166,6 +167,8 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   gitService,
   db,
   forgeSecretRepository,
+  liveEventsService,
+  agentHarnessConfigRepository,
 );
 
 const logger: Logger = ConsoleLogger;

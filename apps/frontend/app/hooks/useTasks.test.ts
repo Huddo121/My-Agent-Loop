@@ -10,6 +10,7 @@ function mkTask(overrides?: Partial<TaskDto>): TaskDto {
     title: "Task",
     description: "Desc",
     completedOn: null,
+    activeRunState: null,
     agentConfig: null,
     subtasks: [],
     position: 0,

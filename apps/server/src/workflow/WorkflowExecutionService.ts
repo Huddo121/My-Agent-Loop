@@ -340,7 +340,7 @@ export class WorkflowExecutionService {
           const config = await this.harnessConfig.getTaskConfig(
             completedTask.id,
           );
-          const dto = toTaskDto(completedTask, config);
+          const dto = toTaskDto(completedTask, config, null);
           await this.liveEventsService.publish(project.workspaceId, {
             type: "task.updated",
             projectId: project.id,

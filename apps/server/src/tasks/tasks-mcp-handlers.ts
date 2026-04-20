@@ -1,6 +1,5 @@
 import {
   createSubtaskId,
-  type ProjectId,
   projectIdSchema,
   type Subtask,
   subtaskSchema,
@@ -12,7 +11,7 @@ import { getMcpServices } from "../utils/mcp-service-context";
 import type { McpTool, McpTools } from "../utils/mcp-tool";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
-import { toTaskDto } from "./tasks-handlers";
+import { publishTaskUpdatedForTask, toTaskDto } from "./tasks-handlers";
 
 const getTasksSchema = z.object({
   projectId: projectIdSchema.describe("The ID of the project to get tasks for"),
@@ -109,20 +108,7 @@ export const markTaskCompletedHandler = {
 
     if (taskResult.success === true) {
       const task = taskResult.value;
-      const projectId = await services.taskQueue.getProjectIdForTask(task.id);
-      if (projectId) {
-        const project = await services.projectsService.getProject(projectId);
-        if (project) {
-          const config =
-            await services.agentHarnessConfigRepository.getTaskConfig(task.id);
-          const dto = toTaskDto(task, config);
-          await services.liveEventsService.publish(project.workspaceId, {
-            type: "task.updated",
-            projectId,
-            task: dto,
-          });
-        }
-      }
+      await publishTaskUpdatedForTask(services.db, services, task.id);
       console.info("Handled Update Task MCP", {
         params,
         task: taskResult.value,
@@ -169,20 +155,7 @@ export const addTaskMcpHandler = {
         await services.taskQueue.addTask(params.projectId, params.task),
     );
 
-    const project = await services.projectsService.getProject(
-      params.projectId as ProjectId,
-    );
-    if (project) {
-      const config = await services.agentHarnessConfigRepository.getTaskConfig(
-        task.id,
-      );
-      const dto = toTaskDto(task, config);
-      await services.liveEventsService.publish(project.workspaceId, {
-        type: "task.updated",
-        projectId: params.projectId as ProjectId,
-        task: dto,
-      });
-    }
+    await publishTaskUpdatedForTask(services.db, services, task.id);
 
     console.info("Handled Add Task MCP", { projectId: params.projectId, task });
 
@@ -234,11 +207,19 @@ export const createSubtaskMcpHandler = {
         if (projectId) {
           const project = await services.projectsService.getProject(projectId);
           if (project) {
+            const activeMap =
+              await services.runsService.getActiveRunStatesForTasks([
+                updatedTask.id,
+              ]);
             const config =
               await services.agentHarnessConfigRepository.getTaskConfig(
                 updatedTask.id,
               );
-            const dto = toTaskDto(updatedTask, config);
+            const dto = toTaskDto(
+              updatedTask,
+              config,
+              activeMap.get(updatedTask.id) ?? null,
+            );
             await services.liveEventsService.publish(project.workspaceId, {
               type: "task.updated",
               projectId,
@@ -300,11 +281,19 @@ export const updateSubtaskMcpHandler = {
         if (projectId) {
           const project = await services.projectsService.getProject(projectId);
           if (project) {
+            const activeMap =
+              await services.runsService.getActiveRunStatesForTasks([
+                updatedTask.id,
+              ]);
             const config =
               await services.agentHarnessConfigRepository.getTaskConfig(
                 updatedTask.id,
               );
-            const dto = toTaskDto(updatedTask, config);
+            const dto = toTaskDto(
+              updatedTask,
+              config,
+              activeMap.get(updatedTask.id) ?? null,
+            );
             await services.liveEventsService.publish(project.workspaceId, {
               type: "task.updated",
               projectId,

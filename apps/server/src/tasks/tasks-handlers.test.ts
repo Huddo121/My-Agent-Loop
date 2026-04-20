@@ -51,6 +51,9 @@ function createCtx(overrides?: { body?: unknown }) {
       liveEventsService: {
         publish: vi.fn().mockResolvedValue(undefined),
       },
+      runsService: {
+        getActiveRunStatesForTasks: vi.fn().mockResolvedValue(new Map()),
+      },
     },
   };
 
@@ -127,6 +130,7 @@ describe("tasks handlers", () => {
           taskNumber: 1,
           title: "New task",
           description: "Description",
+          activeRunState: null,
         }),
       }),
     );

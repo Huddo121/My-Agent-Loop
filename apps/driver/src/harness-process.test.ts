@@ -6,8 +6,8 @@ import {
   type HarnessExecutionResult,
 } from "./harness-process";
 
-vi.mock("node:child_process", async () => {
-  const actual = await vi.importActual("node:child_process");
+vi.mock(import("node:child_process"), async (importOriginal) => {
+  const actual = await importOriginal();
   return {
     ...actual,
     spawn: vi.fn(),

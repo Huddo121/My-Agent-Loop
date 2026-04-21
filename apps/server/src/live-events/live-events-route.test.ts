@@ -10,13 +10,17 @@ const { withNewTransaction } = vi.hoisted(() => ({
   withNewTransaction: vi.fn((_db: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
-vi.mock("../auth/session", () => ({
+vi.mock(import("../auth/session"), () => ({
   requireAuthSession,
 }));
 
-vi.mock("../utils/transaction-context", () => ({
-  withNewTransaction,
-}));
+vi.mock(
+  import("../utils/transaction-context"),
+  () =>
+    ({
+      withNewTransaction,
+    }) as unknown as Awaited<typeof import("../utils/transaction-context")>,
+);
 
 let abortCallbacks: (() => void)[] = [];
 let streamSSECallback:
@@ -26,24 +30,28 @@ let streamSSECallback:
     }) => Promise<void>)
   | null = null;
 
-vi.mock("hono/streaming", () => ({
-  streamSSE: vi.fn(
-    (
-      _c: unknown,
-      fn: (stream: {
-        writeSSE: (msg: unknown) => Promise<void>;
-        onAbort: (fn: () => void) => void;
-      }) => Promise<void>,
-    ) => {
-      abortCallbacks = [];
-      streamSSECallback = fn;
-      return new Response(null, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      });
-    },
-  ),
-}));
+vi.mock(
+  import("hono/streaming"),
+  () =>
+    ({
+      streamSSE: vi.fn(
+        (
+          _c: unknown,
+          fn: (stream: {
+            writeSSE: (msg: unknown) => Promise<void>;
+            onAbort: (fn: () => void) => void;
+          }) => Promise<void>,
+        ) => {
+          abortCallbacks = [];
+          streamSSECallback = fn;
+          return new Response(null, {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          });
+        },
+      ),
+    }) as unknown as Awaited<typeof import("hono/streaming")>,
+);
 
 function createCtx(
   url: string,

@@ -5,7 +5,7 @@ const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
 }));
 
-vi.mock("../auth/session", () => ({
+vi.mock(import("../auth/session"), () => ({
   requireAuthSession,
 }));
 

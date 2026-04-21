@@ -9,16 +9,20 @@ const { executeHarnessCommandMock, sendLogMock, sendLifecycleEventMock } =
     sendLifecycleEventMock: vi.fn(),
   }));
 
-vi.mock("./harness-process", () => ({
+vi.mock(import("./harness-process"), () => ({
   executeHarnessCommand: executeHarnessCommandMock,
 }));
 
-vi.mock("./host-api", () => ({
-  HostApiClient: class {
-    sendLog = sendLogMock;
-    sendLifecycleEvent = sendLifecycleEventMock;
-  },
-}));
+vi.mock(
+  import("./host-api"),
+  () =>
+    ({
+      HostApiClient: class {
+        sendLog = sendLogMock;
+        sendLifecycleEvent = sendLifecycleEventMock;
+      },
+    }) as unknown as Awaited<typeof import("./host-api")>,
+);
 
 import { runDriver } from "./runtime";
 

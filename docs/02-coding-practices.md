@@ -16,6 +16,17 @@ Because this codebase will be worked on by many autonomous agents, sometimes in 
   b. The aversion to throwing `Error`s for known business-logic failures is for the same reason
   c. Prefer to use explicit, exported type aliases over inlined type definitions
 
+## Code style
+
+### Naming
+
+Don't needlessly shorten names for variables. Using plain english names is preferred.
+
+Bad: `taskCfg`
+Good: `taskConfig`
+
+Exception: Functions that work over generic arguments. If we implemented a function `map`, it's acceptable for it to be defined like `<A,B>map(f: (a:A) => B): B`
+
 ## Where to place code
 
 This repository follows a domain-oriented approach to its folder structures within each package or app. As an example, if there's some APIs related `User`s, then there will likely be a `users` folder with all of a web handler/controller, the Web API shapes for `User`s, the core model for `User`, a `UserService`, and possibly a `UserRepo` for the database operations.

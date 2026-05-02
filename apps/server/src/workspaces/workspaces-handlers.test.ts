@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  FakeDatabase,
+  FakeWorkspaceMembershipsService,
+  FakeWorkspacesService,
+} from "../test-fakes";
 import { workspacesHandlers } from "./workspaces-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
@@ -16,6 +21,10 @@ type WorkspaceRouteGetContext = Parameters<
 >[0];
 
 function createCtx() {
+  const db = new FakeDatabase();
+  const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
+  const workspacesService = new FakeWorkspacesService();
+
   const ctx = {
     hono: {
       req: {
@@ -25,20 +34,11 @@ function createCtx() {
     },
     body: {},
     services: {
-      db: {
-        transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-          fn({}),
-        ),
-      },
+      db: db.asDatabase(),
       harnessAuthService: {},
       harnesses: [],
-      workspaceMembershipsService: {
-        isWorkspaceMember: vi.fn(),
-      },
-      workspacesService: {
-        getAllWorkspacesForUser: vi.fn(),
-        getWorkspace: vi.fn(),
-      },
+      workspaceMembershipsService,
+      workspacesService,
     },
   };
 
@@ -65,9 +65,6 @@ describe("workspaces handlers", () => {
       user: { id: "user-1" },
     });
     const ctx = createCtx();
-    ctx.services.workspaceMembershipsService.isWorkspaceMember.mockResolvedValueOnce(
-      false,
-    );
 
     const response = await workspacesHandlers[":workspaceId"].GET(
       ctx as unknown as WorkspaceRouteGetContext,

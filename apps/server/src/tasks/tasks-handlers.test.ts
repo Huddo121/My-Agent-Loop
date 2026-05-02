@@ -1,4 +1,14 @@
+import type { ProjectId, WorkspaceId } from "@mono/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { UserId } from "../auth/UserId";
+import {
+  FakeAgentHarnessConfigRepository,
+  FakeDatabase,
+  FakeRunsService,
+  FakeTaskQueue,
+  FakeWorkspaceMembershipsService,
+  RecordingLiveEventsService,
+} from "../test-fakes";
 import { tasksHandlers } from "./tasks-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
@@ -13,6 +23,13 @@ const taskRouteHandlers = tasksHandlers[":taskId"];
 type TaskGetContext = Parameters<typeof taskRouteHandlers.GET>[0];
 
 function createCtx(overrides?: { body?: unknown }) {
+  const db = new FakeDatabase();
+  const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
+  const taskQueue = new FakeTaskQueue();
+  const agentHarnessConfigRepository = new FakeAgentHarnessConfigRepository();
+  const liveEventsService = new RecordingLiveEventsService();
+  const runsService = new FakeRunsService();
+
   const ctx = {
     hono: {
       req: {
@@ -28,32 +45,12 @@ function createCtx(overrides?: { body?: unknown }) {
     },
     body: overrides?.body,
     services: {
-      db: {
-        transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-          fn({}),
-        ),
-      },
-      workspaceMembershipsService: {
-        canAccessTask: vi.fn(),
-        canAccessProject: vi.fn(),
-      },
-      taskQueue: {
-        getTask: vi.fn(),
-        addTask: vi.fn(),
-        updateTask: vi.fn(),
-        completeTask: vi.fn(),
-        moveTask: vi.fn(),
-      },
-      agentHarnessConfigRepository: {
-        getTaskConfig: vi.fn(),
-        setTaskConfig: vi.fn(),
-      },
-      liveEventsService: {
-        publish: vi.fn().mockResolvedValue(undefined),
-      },
-      runsService: {
-        getActiveRunStatesForTasks: vi.fn().mockResolvedValue(new Map()),
-      },
+      db: db.asDatabase(),
+      workspaceMembershipsService,
+      taskQueue,
+      agentHarnessConfigRepository,
+      liveEventsService,
+      runsService,
     },
   };
 
@@ -79,13 +76,9 @@ describe("tasks handlers", () => {
     requireAuthSession.mockResolvedValueOnce({
       user: { id: "user-1" },
     });
-    const ctx = createCtx();
-    ctx.services.workspaceMembershipsService.canAccessTask.mockResolvedValueOnce(
-      false,
-    );
 
     const response = await tasksHandlers[":taskId"].GET(
-      ctx as unknown as TaskGetContext,
+      createCtx() as unknown as TaskGetContext,
     );
 
     expect(response[0]).toBe(404);
@@ -102,37 +95,38 @@ describe("tasks handlers", () => {
         subtasks: [],
       },
     });
-    ctx.services.workspaceMembershipsService.canAccessProject.mockResolvedValueOnce(
-      true,
+    const memberships = ctx.services
+      .workspaceMembershipsService as FakeWorkspaceMembershipsService;
+    memberships.grantWorkspaceMember(
+      "user-1" as UserId,
+      "workspace-1" as WorkspaceId,
     );
-    ctx.services.taskQueue.addTask.mockResolvedValueOnce({
-      id: "task-1",
-      taskNumber: 1,
-      title: "New task",
-      description: "Description",
-      completedOn: undefined,
-      position: 0,
-      subtasks: [],
-    });
+    memberships.setProjectWorkspace(
+      "project-1" as ProjectId,
+      "workspace-1" as WorkspaceId,
+    );
 
     const response = await tasksHandlers.POST(
       ctx as unknown as Parameters<typeof tasksHandlers.POST>[0],
     );
 
     expect(response[0]).toBe(200);
-    expect(ctx.services.liveEventsService.publish).toHaveBeenCalledWith(
-      "workspace-1",
+    const live = ctx.services.liveEventsService as RecordingLiveEventsService;
+    expect(live.publishes).toEqual([
       expect.objectContaining({
-        type: "task.updated",
-        projectId: "project-1",
-        task: expect.objectContaining({
-          id: "task-1",
-          taskNumber: 1,
-          title: "New task",
-          description: "Description",
-          activeRunState: null,
+        workspaceId: "workspace-1",
+        event: expect.objectContaining({
+          type: "task.updated",
+          projectId: "project-1",
+          task: expect.objectContaining({
+            id: "task-1",
+            taskNumber: 1,
+            title: "New task",
+            description: "Description",
+            activeRunState: null,
+          }),
         }),
       }),
-    );
+    ]);
   });
 });

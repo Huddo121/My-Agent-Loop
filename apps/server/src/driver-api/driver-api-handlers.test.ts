@@ -1,8 +1,8 @@
 import { driverApi } from "@mono/driver-api";
 import { createHonoServer } from "cerato";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { RunId } from "../runs/RunId";
-import type { Run } from "../runs/RunsService";
+import { CapturingLogger, FakeDatabase, FakeRunsService } from "../test-fakes";
 import { InMemoryDriverRunTokenStore } from "./DriverRunTokenStore";
 import { driverApiHandlers } from "./driver-api-handlers";
 
@@ -11,23 +11,14 @@ const DRIVER_TOKEN = "driver-secret-token";
 
 function createApp() {
   const driverRunTokenStore = new InMemoryDriverRunTokenStore();
+  const db = new FakeDatabase();
+  const runsService = new FakeRunsService();
+  const logger = new CapturingLogger();
   const services = {
-    db: {
-      transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn({}),
-      ),
-    },
+    db: db.asDatabase(),
     driverRunTokenStore,
-    runsService: {
-      getRun: vi.fn<() => Promise<Run | undefined>>(),
-      updateRunState: vi.fn(),
-    },
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    },
+    runsService,
+    logger,
   };
 
   const app = createHonoServer(
@@ -38,14 +29,10 @@ function createApp() {
     services as never,
   );
 
-  return { app, services, driverRunTokenStore };
+  return { app, services, driverRunTokenStore, db, runsService, logger };
 }
 
 describe("driver api handlers", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe("authentication", () => {
     it("rejects log requests without a driver token", async () => {
       const { app } = createApp();
@@ -87,9 +74,9 @@ describe("driver api handlers", () => {
     });
 
     it("rejects requests with an invalid driver token", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore, runsService } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce({
+      runsService.seedRun({
         id: RUN_ID,
         taskId: "task-1" as never,
         startedAt: new Date(),
@@ -116,15 +103,14 @@ describe("driver api handlers", () => {
         code: "unauthenticated",
         message: "Driver token is invalid.",
       });
-      expect(services.runsService.getRun).not.toHaveBeenCalled();
+      expect(runsService.getRunCallCount).toBe(0);
     });
   });
 
   describe("logs endpoint", () => {
     it("returns 404 when run does not exist", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce(undefined);
 
       const response = await app.request(
         `http://localhost/api/internal/driver/runs/${RUN_ID}/logs`,
@@ -145,9 +131,9 @@ describe("driver api handlers", () => {
     });
 
     it("accepts valid log events", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore, runsService, db, logger } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce({
+      runsService.seedRun({
         id: RUN_ID,
         taskId: "task-1" as never,
         startedAt: new Date(),
@@ -171,18 +157,18 @@ describe("driver api handlers", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
-      expect(services.db.transaction).toHaveBeenCalledTimes(1);
-      expect(services.logger.info).toHaveBeenCalledWith("test log message", {
-        runId: RUN_ID,
-        stream: "stdout",
-      });
-      expect(services.logger.error).not.toHaveBeenCalled();
+      expect(db.transactionCount).toBe(1);
+      expect(logger.infos).toContainEqual([
+        "test log message",
+        { runId: RUN_ID, stream: "stdout" },
+      ]);
+      expect(logger.errors).toHaveLength(0);
     });
 
     it("logs stderr events as errors with structured run data", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore, runsService, logger } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce({
+      runsService.seedRun({
         id: RUN_ID,
         taskId: "task-1" as never,
         startedAt: new Date(),
@@ -206,19 +192,18 @@ describe("driver api handlers", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
-      expect(services.logger.error).toHaveBeenCalledWith("test error message", {
-        runId: RUN_ID,
-        stream: "stderr",
-      });
-      expect(services.logger.info).not.toHaveBeenCalled();
+      expect(logger.errors).toContainEqual([
+        "test error message",
+        { runId: RUN_ID, stream: "stderr" },
+      ]);
+      expect(logger.infos).toHaveLength(0);
     });
   });
 
   describe("lifecycle endpoint", () => {
     it("returns 404 when run does not exist", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce(undefined);
 
       const response = await app.request(
         `http://localhost/api/internal/driver/runs/${RUN_ID}/lifecycle`,
@@ -239,9 +224,9 @@ describe("driver api handlers", () => {
     });
 
     it("accepts lifecycle events", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore, runsService, db, logger } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce({
+      runsService.seedRun({
         id: RUN_ID,
         taskId: "task-1" as never,
         startedAt: new Date(),
@@ -266,21 +251,21 @@ describe("driver api handlers", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
-      expect(services.db.transaction).toHaveBeenCalledTimes(1);
-      expect(services.logger.info).toHaveBeenCalledWith(
+      expect(db.transactionCount).toBe(1);
+      expect(logger.infos).toContainEqual([
         "Driver harness exited",
         {
           runId: RUN_ID,
           exitCode: 0,
           signal: null,
         },
-      );
+      ]);
     });
 
     it("logs harness start events with structured run data", async () => {
-      const { app, services, driverRunTokenStore } = createApp();
+      const { app, driverRunTokenStore, runsService, logger } = createApp();
       driverRunTokenStore.setToken(RUN_ID, DRIVER_TOKEN);
-      services.runsService.getRun.mockResolvedValueOnce({
+      runsService.seedRun({
         id: RUN_ID,
         taskId: "task-1" as never,
         startedAt: new Date(),
@@ -304,13 +289,13 @@ describe("driver api handlers", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ ok: true });
-      expect(services.logger.info).toHaveBeenCalledWith(
+      expect(logger.infos).toContainEqual([
         "Driver harness starting",
         {
           runId: RUN_ID,
           harnessCommand: "echo hello",
         },
-      );
+      ]);
     });
   });
 });

@@ -5,16 +5,21 @@ import type {
   TaskNumber,
   WorkspaceId,
 } from "@mono/api";
-import { describe, expect, it, vi } from "vitest";
-import type { Database } from "../db";
-import type { ForgeSecretRepository } from "../forge-secrets";
-import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
+import { describe, expect, it } from "vitest";
 import { LiveEventsService } from "../live-events";
-import type { Project, ProjectsService } from "../projects/ProjectsService";
+import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
-import type { Run, RunsService } from "../runs/RunsService";
-import type { Task, TaskQueue } from "../task-queue";
-import { ProtectedString } from "../utils/ProtectedString";
+import type { Run } from "../runs/RunsService";
+import type { Task } from "../task-queue";
+import {
+  createFakeWorkflowRunQueue,
+  createTransactionTrackingDatabase,
+  FakeAgentHarnessConfigRepository,
+  FakeForgeSecretRepository,
+  FakeProjectsService,
+  FakeRunsService,
+  FakeTaskQueue,
+} from "../test-fakes";
 import {
   DatabaseWorkflowManager,
   type WorkflowManager,
@@ -34,11 +39,16 @@ describe("DatabaseWorkflowManager", () => {
 
     expect(result).toEqual({ success: true, value: harness.run.id });
     expect(harness.queueAddTransactionStates).toEqual([false]);
-    expect(harness.runQueue.add).toHaveBeenCalledWith(`run-${harness.run.id}`, {
-      projectId: harness.project.id,
-      taskId: harness.task.id,
-      runId: harness.run.id,
-    });
+    expect(harness.runQueueAdds).toEqual([
+      {
+        key: `run-${harness.run.id}`,
+        payload: {
+          projectId: harness.project.id,
+          taskId: harness.task.id,
+          runId: harness.run.id,
+        },
+      },
+    ]);
   });
 
   it("adds loop continuation jobs after the run creation transaction commits", async () => {
@@ -51,122 +61,66 @@ describe("DatabaseWorkflowManager", () => {
     ).handleRunCompleted(harness.project.id, "completed-run" as RunId);
 
     expect(harness.queueAddTransactionStates).toEqual([false]);
-    expect(harness.runQueue.add).toHaveBeenCalledWith(`run-${harness.run.id}`, {
-      projectId: harness.project.id,
-      taskId: harness.task.id,
-      runId: harness.run.id,
-    });
+    expect(harness.runQueueAdds).toEqual([
+      {
+        key: `run-${harness.run.id}`,
+        payload: {
+          projectId: harness.project.id,
+          taskId: harness.task.id,
+          runId: harness.run.id,
+        },
+      },
+    ]);
   });
 });
 
 function createHarness(options: { queueState: Project["queueState"] }) {
   const transactionState = { inTransaction: false };
-  const db = createTransactionTrackingDb(transactionState);
+  const { db } = createTransactionTrackingDatabase(transactionState);
   const project = createProject(options.queueState);
   const task = createTask();
   const run = createRun(task.id);
-  const queueAddTransactionStates: boolean[] = [];
-  const runQueue = {
-    add: vi.fn(async () => {
-      queueAddTransactionStates.push(transactionState.inTransaction);
-      return { id: "job-1" };
-    }),
-  };
+  const {
+    runQueue,
+    queueAddTransactionStates,
+    adds: runQueueAdds,
+  } = createFakeWorkflowRunQueue(transactionState);
+
+  const taskQueue = new FakeTaskQueue();
+  taskQueue.seedTask(task, project.id);
+
+  const runsService = new FakeRunsService();
+  runsService.createRunImpl = async (taskId) => ({
+    ...run,
+    taskId,
+  });
+  runsService.activeStatesForTasks.set(task.id, "pending");
+
+  const projectsService = new FakeProjectsService();
+  projectsService.seed(project);
+
+  const forgeRepo = new FakeForgeSecretRepository();
+  forgeRepo.setPlainSecret(project.id, "token");
 
   const workflowManager: WorkflowManager = new DatabaseWorkflowManager(
     new WorkflowMessengerService(),
-    createTaskQueue(task, project.id),
-    createRunsService(run, task),
-    createProjectsService(project),
+    taskQueue,
+    runsService,
+    projectsService,
     { runQueue } as unknown as WorkflowQueues,
     db,
     new LiveEventsService(),
-    createForgeSecretRepository(),
-    createAgentHarnessConfigRepository(),
+    forgeRepo,
+    new FakeAgentHarnessConfigRepository(),
   );
 
   return {
     project,
     queueAddTransactionStates,
     run,
-    runQueue,
+    runQueueAdds,
     task,
     workflowManager,
-  };
-}
-
-function createTransactionTrackingDb(state: { inTransaction: boolean }) {
-  return {
-    transaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
-      state.inTransaction = true;
-      try {
-        return await fn({});
-      } finally {
-        state.inTransaction = false;
-      }
-    },
-  } as unknown as Database;
-}
-
-function createTaskQueue(task: Task, projectId: ProjectId): TaskQueue {
-  return {
-    addTask: vi.fn(),
-    completeTask: vi.fn(),
-    getAllTasks: vi.fn(),
-    getNextTask: vi.fn(async () => task),
-    getProjectIdForTask: vi.fn(async () => projectId),
-    getTask: vi.fn(async () => task),
-    isEmpty: vi.fn(),
-    moveTask: vi.fn(),
-    taskCount: vi.fn(),
-    updateTask: vi.fn(),
-  };
-}
-
-function createRunsService(run: Run, task: Task): RunsService {
-  return {
-    createRun: vi.fn(async () => run),
-    getRun: vi.fn(),
-    getRunLogs: vi.fn(),
-    getRunsForProject: vi.fn(),
-    getActiveRunStatesForTasks: vi.fn(async (taskIds: TaskId[]) => {
-      const map = new Map<TaskId, "pending" | "in_progress">();
-      if (taskIds.includes(task.id)) {
-        map.set(task.id, "pending");
-      }
-      return map;
-    }),
-    updateRunState: vi.fn(),
-  };
-}
-
-function createAgentHarnessConfigRepository(): AgentHarnessConfigRepository {
-  return {
-    getTaskConfig: vi.fn(async () => null),
-  } as unknown as AgentHarnessConfigRepository;
-}
-
-function createProjectsService(project: Project): ProjectsService {
-  return {
-    createProject: vi.fn(),
-    deleteProject: vi.fn(),
-    getAllProjects: vi.fn(),
-    getProject: vi.fn(async () => project),
-    getProjectByShortCode: vi.fn(),
-    updateProject: vi.fn(),
-    updateProjectQueueState: vi.fn(async (_projectId, queueState) => ({
-      ...project,
-      queueState,
-    })),
-  };
-}
-
-function createForgeSecretRepository(): ForgeSecretRepository {
-  return {
-    deleteForgeSecret: vi.fn(),
-    getForgeSecret: vi.fn(async () => new ProtectedString("token")),
-    hasForgeSecret: vi.fn(async () => false),
-    upsertForgeSecret: vi.fn(),
   };
 }
 

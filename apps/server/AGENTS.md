@@ -14,6 +14,10 @@ All services are instantiated and wired together in `src/services.ts`. This file
 
 Services are accessed in HTTP handlers via `ctx.services` and in MCP handlers via `getMcpServices()`.
 
+## Test doubles
+
+In-memory **fakes** for application services live in `src/test-fakes/`. Prefer these over ad hoc `vi.fn()` service objects when testing handlers or workflow code; reserve `vi.mock` and stubs for platform/framework boundaries (see `docs/04-test-fakes.md`). Vitest loads `vitest.setup.ts` so tests can import modules that depend on `src/env.ts` without a local `.env`.
+
 ## Transaction context
 
 All database reads and writes must be wrapped in `withNewTransaction(db, async () => { ... })` (from `src/utils/transaction-context.ts`). This ensures proper transaction boundaries and consistent reads within a request.

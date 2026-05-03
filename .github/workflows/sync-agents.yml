@@ -1,0 +1,39 @@
+name: Sync agents
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    name: Check generated agent files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm sync-agents
+
+      - name: Verify generated files are up to date
+        run: |
+          if ! git diff --quiet --exit-code; then
+            echo "::error::Generated agent files are out of sync with .ai/agents/."
+            echo ""
+            echo "To fix this, run the following locally and commit the result:"
+            echo ""
+            echo "  pnpm sync-agents"
+            echo ""
+            echo "Files with drift:"
+            git diff --name-only | sed 's/^/  - /'
+            echo ""
+            echo "Full diff:"
+            git --no-pager diff
+            exit 1
+          fi

@@ -28,7 +28,7 @@ todos:
     status: completed
   - id: me-api-endpoints
     content: Add Cerato API in `packages/api/src/me/me-api.ts` for `GET /api/me/harness-credentials`, `PUT /api/me/harness-credentials/:providerId`, and `DELETE /api/me/harness-credentials/:providerId`. Register on `myAgentLoopApi` in [packages/api/src/index.ts](packages/api/src/index.ts). New `apps/server/src/me/me-handlers.ts` using `requireOAuthBearer`. PUT validates body via the provider schema and parses `accountId` from the access-token JWT. Add handler tests following [apps/server/src/projects/projects-handlers.test.ts](apps/server/src/projects/projects-handlers.test.ts).
-    status: pending
+    status: completed
   - id: harness-auth-refactor
     content: Refactor `HarnessAuthService` to a `HarnessAuthArtifacts` discriminated union (`api-key` | `files-and-env` | `none`). Update [apps/server/src/harness/AgentHarness.ts](apps/server/src/harness/AgentHarness.ts), [apps/server/src/harness/HarnessAuthService.ts](apps/server/src/harness/HarnessAuthService.ts), and all harness implementations. Add `CompositeHarnessAuthService` that prefers OAuth (with lazy refresh > 7 days) and falls back to env-var API key for `codex-cli`.
     status: pending

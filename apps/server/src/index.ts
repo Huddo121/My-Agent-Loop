@@ -13,6 +13,7 @@ import { driverApiHandlers } from "./driver-api/driver-api-handlers";
 import { env } from "./env";
 import { handleLiveEvents } from "./live-events/live-events-route";
 import { startMcp } from "./mcp";
+import { meHandlers } from "./me/me-handlers";
 import { services } from "./services";
 import { sessionHandlers } from "./session/session-handlers";
 import { workspacesHandlers } from "./workspaces/workspaces-handlers";
@@ -53,6 +54,7 @@ const app = createHonoServer(
   {
     session: sessionHandlers,
     admin: adminHandlers,
+    me: meHandlers,
     workspaces: workspacesHandlers,
     internal: driverApiHandlers,
   },

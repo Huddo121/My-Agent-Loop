@@ -3,8 +3,11 @@ name: Codex OAuth via mal-cli
 overview: Introduce a new `apps/mal-cli` CLI app that brokers OAuth logins on behalf of users, and turn the MAL server into an OAuth 2.1 issuer (via Better Auth's `oauth-provider` plugin) so the CLI can authenticate when uploading provider tokens. v1 ships Codex CLI subscription auth end-to-end, with a generic provider abstraction so adding Anthropic/etc. later is purely additive.
 todos:
   - id: server-oauth-issuer
-    content: Install `@better-auth/oauth-provider` and configure Better Auth in [apps/server/src/auth/auth.ts](apps/server/src/auth/auth.ts) with the `jwt()` and `oauthProvider({...})` plugins (issuer, scopes, validAudiences, cachedTrustedClients=['mal-cli'], login/consent pages). Add a minimal `/oauth/consent` static HTML route. Run `better-auth generate`/`migrate` and surface the schema diff for human review (do NOT author migration SQL).
-    status: completed
+    content: Install `@better-auth/oauth-provider` and configure Better Auth in [apps/server/src/auth/auth.ts](apps/server/src/auth/auth.ts) with the `jwt()` and `oauthProvider({...})` plugins (issuer, scopes, validAudiences, cachedTrustedClients=['mal-cli'], loginPage, consentPage). Point `consentPage` at a real frontend route; do not serve HTML/JS/CSS from backend string literals. Run `better-auth generate`/`migrate` and surface the schema diff for human review (do NOT author migration SQL).
+    status: pending
+  - id: frontend-oauth-consent-route
+    content: Add `@better-auth/oauth-provider` to `@mono/frontend` and create a dedicated OAuth consent route in [apps/frontend/app/routes.ts](apps/frontend/app/routes.ts) and [apps/frontend/app/routes/](apps/frontend/app/routes/) using the Better Auth oauth-provider client plugin. The route must require a Better Auth user session, preserve the full consent URL through sign-in, and be reachable without requiring workspace bootstrap or the workspace app shell. It must preserve Better Auth's consent query parameters and call the provider client's consent API instead of hand-rolling protocol requests. Keep it minimal but real React UI with tests; never implement this as backend-served HTML/JS strings.
+    status: pending
   - id: well-known-routes
     content: Mount `.well-known/oauth-authorization-server` and `.well-known/openid-configuration` from [apps/server/src/index.ts](apps/server/src/index.ts) per the Better Auth oauth-provider docs.
     status: pending
@@ -12,7 +15,7 @@ todos:
     content: New `apps/server/src/auth/oauth-client-seed.ts` exporting an idempotent `ensureMalCliClient()` that registers `client_id='mal-cli'`, `token_endpoint_auth_method='none'`, `redirect_uris=['http://localhost:53682/auth/callback']`, scope `openid profile email offline_access`. Call from [apps/server/src/index.ts](apps/server/src/index.ts) at startup.
     status: pending
   - id: oauth-bearer-helper
-    content: "New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` using `verifyAccessToken` from `better-auth/oauth2` to resolve `Authorization: Bearer <jwt>` to a `UserId`. Add unit tests."
+    content: "New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` to resolve `Authorization: Bearer <jwt>` to a `UserId`. Verify the current Better Auth oauth-provider API before implementing; docs currently show verification through the oauth-provider resource client (`oauthProviderResourceClient(auth)` / `verifyAccessToken`) rather than a guessed `better-auth/oauth2` import. Validate issuer, audience, expiry, and required scopes. Add unit tests."
     status: pending
   - id: salted-encryption-service
     content: New `apps/server/src/utils/SaltedEncryptionService.ts` that derives a per-record AES-256-GCM key from a master key plus a per-record salt via HKDF-SHA256. API exposes `encrypt(plaintext) -> { keySalt, payload }` and `decrypt({ keySalt, payload }) -> plaintext`, where `payload` is the existing `iv:ciphertext:authTag` triple-base64 format. Add a new env var `OAUTH_CREDENTIALS_ENCRYPTION_KEY` (32-byte hex or base64) to [apps/server/src/env.ts](apps/server/src/env.ts), distinct from `FORGE_ENCRYPTION_KEY`. Add unit tests covering encrypt/decrypt round-trip, salt uniqueness, and tamper-detection.
@@ -24,7 +27,7 @@ todos:
     content: Build `apps/server/src/oauth-providers/{types.ts, OpenAiCodexProvider.ts, parseChatGptJwt.ts, index.ts}`. Implement `refreshTokens` (POST to `https://auth.openai.com/oauth/token`) and `materializeForSandbox` (build the Codex `auth.json` `HarnessFile`). Unit-test the JWT claim parser and the materialized `auth.json` shape.
     status: pending
   - id: me-api-endpoints
-    content: Add Cerato API in `packages/api/src/me/me-api.ts` for `GET/PUT/DELETE /api/me/harness-credentials/:providerId`. Register on `myAgentLoopApi` in [packages/api/src/index.ts](packages/api/src/index.ts). New `apps/server/src/me/me-handlers.ts` using `requireOAuthBearer`. PUT validates body via the provider schema and parses `accountId` from the access-token JWT. Add handler tests following [apps/server/src/projects/projects-handlers.test.ts](apps/server/src/projects/projects-handlers.test.ts).
+    content: Add Cerato API in `packages/api/src/me/me-api.ts` for `GET /api/me/harness-credentials`, `PUT /api/me/harness-credentials/:providerId`, and `DELETE /api/me/harness-credentials/:providerId`. Register on `myAgentLoopApi` in [packages/api/src/index.ts](packages/api/src/index.ts). New `apps/server/src/me/me-handlers.ts` using `requireOAuthBearer`. PUT validates body via the provider schema and parses `accountId` from the access-token JWT. Add handler tests following [apps/server/src/projects/projects-handlers.test.ts](apps/server/src/projects/projects-handlers.test.ts).
     status: pending
   - id: harness-auth-refactor
     content: Refactor `HarnessAuthService` to a `HarnessAuthArtifacts` discriminated union (`api-key` | `files-and-env` | `none`). Update [apps/server/src/harness/AgentHarness.ts](apps/server/src/harness/AgentHarness.ts), [apps/server/src/harness/HarnessAuthService.ts](apps/server/src/harness/HarnessAuthService.ts), and all harness implementations. Add `CompositeHarnessAuthService` that prefers OAuth (with lazy refresh > 7 days) and falls back to env-var API key for `codex-cli`.
@@ -45,7 +48,7 @@ todos:
     content: Add `docs/decisions/codex-oauth-via-mal-cli.md`. Update [docs/00-index.md](docs/00-index.md). Annotate [docs/ideas/oauth-for-providers.md](docs/ideas/oauth-for-providers.md). New `apps/mal-cli/AGENTS.md`. Append 'User OAuth credentials' section to [apps/server/AGENTS.md](apps/server/AGENTS.md).
     status: pending
   - id: manual-e2e-verification
-    content: "Manual smoke test (document in `apps/mal-cli/AGENTS.md`): start postgres+redis+server, build mal-cli, run `mal-cli login`, then `mal-cli providers login codex`. Confirm `user_harness_oauth_credentials` row exists. Trigger a Codex run on a test task; `docker exec` to inspect `/root/.codex/auth.json`; confirm no `OPENAI_API_KEY` env was set; confirm Codex completed inference under the subscription. Run `pnpm typecheck` and `pnpm check` repo-wide."
+    content: "Manual smoke test (document in `apps/mal-cli/AGENTS.md`): start postgres+redis+server+frontend dev server, build mal-cli, run `mal-cli login`, then `mal-cli providers login codex`. Confirm `user_harness_oauth_credentials` row exists. Trigger a Codex run on a test task; `docker exec` to inspect `/root/.codex/auth.json`; confirm no `OPENAI_API_KEY` env was set; confirm Codex completed inference under the subscription. Run `pnpm typecheck` and `pnpm check` repo-wide."
     status: pending
 isProject: false
 ---
@@ -102,7 +105,8 @@ flowchart LR
 - **CLI command shape**: nested noun, `mal-cli providers login codex` / `mal-cli providers logout codex`, plus top-level `mal-cli login` / `mal-cli logout` / `mal-cli status`.
 - **Browser handling**: `open(url)` AND print URL to stdout for SSH/headless fallback.
 - **Logout = delete only**, no provider revocation calls in v1.
-- **No frontend UI** in v1 (deferred).
+- **No credential-management UI** in v1 (deferred). The OAuth consent screen is still a real frontend route because it is required for the OAuth protocol flow.
+- **CLI talks to the public app origin** (`APP_BASE_URL`, `http://localhost:5173` in dev), not directly to the raw server port, so auth redirects, consent UI, and `/api` proxying stay on one origin.
 
 ## Codex OAuth specifics (verified from `codex-rs/login/src/server.rs`)
 
@@ -116,11 +120,18 @@ flowchart LR
 
 - Install: `pnpm --filter @mono/server add @better-auth/oauth-provider` (and bump `better-auth` if required by the plugin).
 - Edit [apps/server/src/auth/auth.ts](apps/server/src/auth/auth.ts) to add the `jwt()` plugin and `oauthProvider({ issuer, scopes, validAudiences, cachedTrustedClients: new Set(["mal-cli"]), loginPage, consentPage })`. Use `env.APP_BASE_URL + "/api/auth"` as the issuer.
-- Add a minimal consent route (Hono static HTML at `/oauth/consent`) and login route already covered by magic-link flow.
+- Configure `consentPage` to point at the frontend OAuth consent route. Do not add Hono handlers that return ad-hoc HTML/JS/CSS strings; browser UI belongs in the frontend app.
 - Mount `.well-known/oauth-authorization-server` and `.well-known/openid-configuration` per the plugin docs from [apps/server/src/index.ts](apps/server/src/index.ts).
 - New `apps/server/src/auth/oauth-client-seed.ts` exporting `ensureMalCliClient()` that idempotently calls `auth.api.createOAuthClient({ ... })` with `client_id="mal-cli"`, `token_endpoint_auth_method="none"`, `redirect_uris=["http://localhost:53682/auth/callback"]`, scope `openid profile email offline_access`. Call once from [apps/server/src/index.ts](apps/server/src/index.ts) before `serve(...)`.
-- New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` that uses `verifyAccessToken` from `better-auth/oauth2` to resolve `Authorization: Bearer <jwt>` to a `UserId`. Distinct from existing cookie-based `requireAuthSession`.
+- New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` that verifies the access token with Better Auth's current oauth-provider resource-server API, validates issuer/audience/expiry/scope, and resolves the token subject to a `UserId`. Distinct from existing cookie-based `requireAuthSession`. Do not invent an import path; check the installed package/docs before implementing.
 - Schema: do NOT author migration SQL. Run `pnpm --filter @mono/server better-auth migrate` (or `generate`) and surface the schema diff for human review per [apps/server/AGENTS.md](apps/server/AGENTS.md).
+
+### Frontend OAuth consent route
+
+- Add `@better-auth/oauth-provider` to `@mono/frontend` via pnpm so [apps/frontend/app/lib/auth/auth-client.ts](apps/frontend/app/lib/auth/auth-client.ts) can register the oauth-provider client plugin alongside `magicLinkClient()`.
+- Add an OAuth consent route that requires a Better Auth user session but bypasses the normal workspace-gated application shell. The current root renders `AuthGate`, `WorkspaceSetup`, then the authenticated workspace app for every route; the consent route must preserve the full consent URL through sign-in and still be available to a signed-in user who has not bootstrapped a workspace.
+- The consent UI should read Better Auth's `client_id` and `scope` query parameters, render the requested scopes, and call the oauth-provider client's consent API. Do not manually POST to internal protocol endpoints unless the current package docs require it.
+- Add focused route/component tests for accepting consent, rejecting/cancelling if supported by the client API, preserving query params, and not requiring workspace context.
 
 ### Storage and provider abstraction
 
@@ -198,7 +209,7 @@ export type HarnessAuthArtifacts =
 - Scaffold mirroring [apps/driver/](apps/driver/): `package.json` (name `@mono/mal-cli`, `bin: { "mal-cli": "./dist-sea/mal-cli" }`), `tsconfig.json`, `moon.yml`, `build.mjs`, `build-sea.mjs`, `build-linux.mjs`, `src/index.ts`.
 - Deps via pnpm: `pnpm --filter @mono/mal-cli add @robingenz/zli zod hono @hono/node-server open` plus dev deps matching driver.
 - Modules:
-  - `src/config.ts` reads `MAL_BASE_URL` (default `http://localhost:3000`).
+  - `src/config.ts` reads `MAL_BASE_URL` (default `http://localhost:5173`, the public app origin in dev). The CLI should call `${MAL_BASE_URL}/api/...` rather than assuming direct server-port access.
   - `src/storage.ts` XDG-aware read/write of `auth.json` with `0600`/`0700` perms.
   - `src/pkce.ts` generates `code_verifier`, `code_challenge` (S256), `state`.
   - `src/oauthFlow.ts` shared helper that binds a Hono server on a chosen port, opens the browser via `open(url)` + prints URL, awaits the callback, returns `{ code, state }` or times out (5 min).
@@ -243,4 +254,3 @@ export type HarnessAuthArtifacts =
 - Codex device-flow login.
 - Reading `auth.json` back from the sandbox to capture mid-run rotations.
 - Authoring database migration SQL (humans review the generated diff per [apps/server/AGENTS.md](apps/server/AGENTS.md)).
-

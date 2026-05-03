@@ -68,6 +68,12 @@ Typescript has limited facilities for marking code as "private". Classes can hav
 
 In this codebase, if a folder has a barrel file (an index.ts{x}), then you should assume that anything *not* exported from that file is expected to be private. In these cases only other bits of code inside that folder should import the values.
 
+### User-facing HTML belongs in frontend code
+
+Do not serve user-facing HTML, JavaScript, or CSS from backend handlers as string literals or hand-built template strings. If a flow needs a human-facing page, build it as a real route in the frontend app using the existing React Router, component, styling, and test patterns. Backend handlers should serve APIs, protocol endpoints, redirects, or static assets that are intentionally static.
+
+Small plaintext operational responses are fine for APIs, health checks, CLI callbacks, and machine-oriented protocol endpoints, but interactive browser UI should not be hidden inside server strings. This keeps UI testable, maintainable, and consistent with the rest of the application.
+
 ## Techniques
 
 **NB:** Not all these techniques are set up in the repo yet

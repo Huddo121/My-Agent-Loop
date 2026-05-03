@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: salted-encryption-service
     content: New `apps/server/src/utils/SaltedEncryptionService.ts` that derives a per-record AES-256-GCM key from a master key plus a per-record salt via HKDF-SHA256. API exposes `encrypt(plaintext) -> { keySalt, payload }` and `decrypt({ keySalt, payload }) -> plaintext`, where `payload` is the existing `iv:ciphertext:authTag` triple-base64 format. Add a new env var `OAUTH_CREDENTIALS_ENCRYPTION_KEY` (32-byte hex or base64) to [apps/server/src/env.ts](apps/server/src/env.ts), distinct from `FORGE_ENCRYPTION_KEY`. Add unit tests covering encrypt/decrypt round-trip, salt uniqueness, and tamper-detection.
-    status: pending
+    status: completed
   - id: user-oauth-credentials-storage
     content: Add `userHarnessOAuthCredentialsTable` schema to [apps/server/src/db/schema.ts](apps/server/src/db/schema.ts) with separate `keySalt` and `encryptedTokens` columns. New `apps/server/src/user-oauth-credentials/UserOAuthCredentialRepository.ts` modeled on [apps/server/src/forge-secrets/ForgeSecretRepository.ts](apps/server/src/forge-secrets/ForgeSecretRepository.ts) but using the new `SaltedEncryptionService` (writes both columns on upsert; reads both on get). Wire the repo and salted-encryption service into [apps/server/src/services.ts](apps/server/src/services.ts). Surface generated migration diff.
     status: pending

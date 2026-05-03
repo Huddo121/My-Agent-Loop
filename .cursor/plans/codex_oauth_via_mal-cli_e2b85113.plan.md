@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: oauth-provider-abstraction
     content: Build `apps/server/src/oauth-providers/{types.ts, OpenAiCodexProvider.ts, parseChatGptJwt.ts, index.ts}`. Implement `refreshTokens` (POST to `https://auth.openai.com/oauth/token`) and `materializeForSandbox` (build the Codex `auth.json` `HarnessFile`). Unit-test the JWT claim parser and the materialized `auth.json` shape.
-    status: pending
+    status: completed
   - id: me-api-endpoints
     content: Add Cerato API in `packages/api/src/me/me-api.ts` for `GET /api/me/harness-credentials`, `PUT /api/me/harness-credentials/:providerId`, and `DELETE /api/me/harness-credentials/:providerId`. Register on `myAgentLoopApi` in [packages/api/src/index.ts](packages/api/src/index.ts). New `apps/server/src/me/me-handlers.ts` using `requireOAuthBearer`. PUT validates body via the provider schema and parses `accountId` from the access-token JWT. Add handler tests following [apps/server/src/projects/projects-handlers.test.ts](apps/server/src/projects/projects-handlers.test.ts).
     status: pending

@@ -43,7 +43,7 @@ todos:
     status: completed
   - id: implement-cli-commands
     content: "Implement CLI in `apps/mal-cli/src/`: `config.ts`, `storage.ts` (XDG, 0600), `pkce.ts`, `oauthFlow.ts` (Hono local server, `open(url)` + URL print, 5-min timeout), and commands `login` (port 53682, MAL PKCE), `providers/login/codex` (port 1455, OpenAI PKCE, POST to `/api/me/harness-credentials/openai-codex` with Bearer), `providers/logout/codex`, `logout`, `status`. Wire via `@robingenz/zli`. Auto-refresh MAL token on expiry."
-    status: pending
+    status: completed
   - id: documentation
     content: Add `docs/decisions/codex-oauth-via-mal-cli.md`. Update [docs/00-index.md](docs/00-index.md). Annotate [docs/ideas/oauth-for-providers.md](docs/ideas/oauth-for-providers.md). New `apps/mal-cli/AGENTS.md`. Append 'User OAuth credentials' section to [apps/server/AGENTS.md](apps/server/AGENTS.md).
     status: pending

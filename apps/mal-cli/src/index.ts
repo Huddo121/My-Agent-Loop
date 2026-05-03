@@ -1,78 +1,49 @@
-import { serve } from "@hono/node-server";
 import {
   defineCommand,
   defineConfig,
-  defineOptions,
   processConfig,
   ZliError,
 } from "@robingenz/zli";
-import { Hono } from "hono";
-import openBrowser from "open";
 import { z } from "zod";
+import { login } from "./commands/login";
+import { logout } from "./commands/logout";
+import { providersLoginCodex } from "./commands/providers-login-codex";
+import { providersLogoutCodex } from "./commands/providers-logout-codex";
+import { status } from "./commands/status";
 
-const smokeSchema = z.object({
-  message: z.string().default("mal-cli is scaffolded"),
+const noOptionsSchema = z.object({});
+
+const loginCommand = defineCommand({
+  description: "Log in to My Agent Loop using OAuth.",
+  action: login,
 });
 
-const app = new Hono().get("/health", (context) => {
-  return context.json({ ok: true });
+const logoutCommand = defineCommand({
+  description: "Delete local My Agent Loop OAuth tokens.",
+  action: logout,
 });
 
-const smokeCommand = defineCommand({
-  description: "Run a minimal scaffold smoke command.",
-  options: defineOptions(
-    z.object({
-      message: z
-        .string()
-        .default("mal-cli is scaffolded")
-        .describe("Message to print."),
-    }),
-    { m: "message" },
-  ),
-  action: (options) => {
-    const result = smokeSchema.parse(options);
-    console.log(result.message);
-  },
+const statusCommand = defineCommand({
+  description: "Show My Agent Loop and provider login status.",
+  action: status,
 });
 
-const serveCommand = defineCommand({
-  description: "Start a minimal local callback server.",
-  options: defineOptions(
-    z.object({
-      port: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(65535)
-        .default(0)
-        .describe("Port to listen on."),
-      open: z
-        .boolean()
-        .default(false)
-        .describe("Open the local health endpoint in a browser."),
-    }),
-    { p: "port", o: "open" },
-  ),
-  action: async (options) => {
-    const server = serve(
-      {
-        fetch: app.fetch,
-        port: options.port,
-      },
-      async (address) => {
-        const url = `http://localhost:${address.port}/health`;
-        console.log(`Local callback server listening at ${url}`);
+const providersCommand = defineCommand({
+  description:
+    "Manage provider credentials. Usage: mal-cli providers login codex | mal-cli providers logout codex",
+  args: z.tuple([
+    z.enum(["login", "logout"]).describe("Provider action."),
+    z.literal("codex").describe("Provider name."),
+  ]),
+  action: async (_options, args) => {
+    const [action] = args;
 
-        if (options.open) {
-          await openBrowser(url);
-        }
-      },
-    );
+    if (action === "login") {
+      await providersLoginCodex();
+      return;
+    }
 
-    process.on("SIGINT", () => {
-      server.close();
-      process.exit(0);
-    });
+    await providersLogoutCodex();
   },
 });
 
@@ -83,9 +54,17 @@ export const cliConfig = defineConfig({
     version: "0.0.0",
   },
   commands: {
-    smoke: smokeCommand,
-    serve: serveCommand,
+    login: loginCommand,
+    logout: logoutCommand,
+    status: statusCommand,
+    providers: providersCommand,
   },
+  defaultCommand: defineCommand({
+    options: { schema: noOptionsSchema },
+    action: () => {
+      console.log("Run `mal-cli --help` to see available commands.");
+    },
+  }),
 });
 
 async function main(): Promise<void> {

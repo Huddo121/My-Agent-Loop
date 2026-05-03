@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -22,6 +23,10 @@ import {
   useWorkspaceContext,
   WorkspaceProvider,
 } from "./lib/workspaces";
+
+// Public routes bypass the workspace app shell entirely. They render their
+// own layout and decide for themselves whether a session is required.
+const PUBLIC_ROUTE_PATHS = new Set<string>(["/oauth/consent"]);
 
 // Create a client
 const queryClient = new QueryClient();
@@ -66,6 +71,14 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  if (PUBLIC_ROUTE_PATHS.has(location.pathname)) {
+    return <Outlet />;
+  }
+  return <WorkspaceShell />;
+}
+
+function WorkspaceShell() {
   const authSession = authClient.useSession();
   const isLoadingAuthSession = authSession.isPending;
   const appSessionQuery = useAppSessionQuery(authSession.data !== null);

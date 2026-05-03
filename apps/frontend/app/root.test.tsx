@@ -14,6 +14,10 @@ const {
   useCurrentWorkspace: vi.fn(),
 }));
 
+const { useLocation } = vi.hoisted(() => ({
+  useLocation: vi.fn(() => ({ pathname: "/", search: "", hash: "" })),
+}));
+
 vi.mock(
   import("react-router"),
   () =>
@@ -24,6 +28,7 @@ vi.mock(
       Scripts: () => null,
       ScrollRestoration: () => null,
       isRouteErrorResponse: () => false,
+      useLocation,
     }) as unknown as Awaited<typeof import("react-router")>,
 );
 
@@ -96,6 +101,7 @@ describe("App root auth gating", () => {
     useSession.mockReset();
     useWorkspaceContext.mockReset();
     useCurrentWorkspace.mockReset();
+    useLocation.mockReturnValue({ pathname: "/", search: "", hash: "" });
   });
 
   afterEach(() => {
@@ -132,6 +138,48 @@ describe("App root auth gating", () => {
     render(<App />);
 
     expect(screen.getByText("workspace-setup")).toBeTruthy();
+  });
+
+  it("renders the consent route through Outlet without invoking the workspace shell", () => {
+    useLocation.mockReturnValue({
+      pathname: "/oauth/consent",
+      search: "?client_id=mal-cli&scope=openid",
+      hash: "",
+    });
+    // Even with an authenticated session, the public consent route must
+    // bypass the workspace shell entirely and not query the app session.
+    useSession.mockReturnValue({
+      data: { user: { id: "user-1" } },
+      isPending: false,
+    });
+
+    render(<App />);
+
+    expect(screen.getByText("app-outlet")).toBeTruthy();
+    expect(screen.queryByText("workspace-setup")).toBeNull();
+    expect(screen.queryByText("auth-gate")).toBeNull();
+    // The consent route must never enter the workspace-gating hook chain.
+    expect(useAppSessionQuery).not.toHaveBeenCalled();
+    expect(useSession).not.toHaveBeenCalled();
+  });
+
+  it("renders the consent route through Outlet for an unauthenticated session (the route forwards to the AuthGate)", () => {
+    useLocation.mockReturnValue({
+      pathname: "/oauth/consent",
+      search: "?client_id=mal-cli",
+      hash: "",
+    });
+    useSession.mockReturnValue({
+      data: null,
+      isPending: false,
+    });
+
+    render(<App />);
+
+    expect(screen.getByText("app-outlet")).toBeTruthy();
+    expect(screen.queryByText("auth-gate")).toBeNull();
+    expect(useAppSessionQuery).not.toHaveBeenCalled();
+    expect(useSession).not.toHaveBeenCalled();
   });
 
   it("renders the app shell when the user is authenticated and bootstrapped", () => {

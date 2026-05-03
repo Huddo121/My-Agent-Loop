@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "type": "module",
+  "packageManager": "pnpm@10.8.0",
   "scripts": {
     "check": "biome check .",
     "check:fix": "biome check . --write",

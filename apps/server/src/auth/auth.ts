@@ -5,17 +5,24 @@ import { jwt, magicLink } from "better-auth/plugins";
 import { db } from "../db";
 import {
   accountTable,
+  jwksTable,
+  oauthAccessTokenTable,
+  oauthClientTable,
+  oauthConsentTable,
+  oauthRefreshTokenTable,
   sessionTable,
   userTable,
   verificationTable,
 } from "../db/schema";
 import { env } from "../env";
 
+/** Where Better Auth is mounted (`/oauth2/*`, session, magic link, …). */
 const authBaseURL = new URL("/api/auth", env.APP_BASE_URL).toString();
 
-// The OAuth issuer identifier. This is the base URL the access tokens'
-// `iss` claim will reference and the URL bearer-token verifiers consult.
-const issuer = authBaseURL;
+// OAuth/JWT issuer is the public app origin so discovery stays at
+// `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
+// Endpoints in AS metadata still use `authBaseURL` (see oauth-provider).
+const issuer = new URL(env.APP_BASE_URL).origin;
 
 // The frontend sign-in surface today is the `AuthGate` component rendered at
 // the root path when the user has no session, so the OAuth login prompt
@@ -42,6 +49,11 @@ export const auth = betterAuth({
       session: sessionTable,
       account: accountTable,
       verification: verificationTable,
+      jwks: jwksTable,
+      oauthClient: oauthClientTable,
+      oauthRefreshToken: oauthRefreshTokenTable,
+      oauthAccessToken: oauthAccessTokenTable,
+      oauthConsent: oauthConsentTable,
     },
   }),
   plugins: [
@@ -64,6 +76,10 @@ export const auth = betterAuth({
     }),
     oauthProvider({
       scopes: ["openid", "profile", "email", "offline_access"],
+      silenceWarnings: {
+        oauthAuthServerConfig: true,
+        openidConfig: true,
+      },
       // Tokens issued for the `mal-cli` client are audienced at the issuer
       // itself. Additional audiences (e.g. resource servers) can be added
       // here as the surface grows.

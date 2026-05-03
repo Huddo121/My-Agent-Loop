@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: well-known-routes
     content: Mount `.well-known/oauth-authorization-server` and `.well-known/openid-configuration` from [apps/server/src/index.ts](apps/server/src/index.ts) per the Better Auth oauth-provider docs.
-    status: pending
+    status: completed
   - id: seed-mal-cli-client
     content: New `apps/server/src/auth/oauth-client-seed.ts` exporting an idempotent `ensureMalCliClient()` that registers `client_id='mal-cli'`, `token_endpoint_auth_method='none'`, `redirect_uris=['http://localhost:53682/auth/callback']`, scope `openid profile email offline_access`. Call from [apps/server/src/index.ts](apps/server/src/index.ts) at startup.
-    status: pending
+    status: completed
   - id: oauth-bearer-helper
     content: "New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` to resolve `Authorization: Bearer <jwt>` to a `UserId`. Verify the current Better Auth oauth-provider API before implementing; docs currently show verification through the oauth-provider resource client (`oauthProviderResourceClient(auth)` / `verifyAccessToken`) rather than a guessed `better-auth/oauth2` import. Validate issuer, audience, expiry, and required scopes. Add unit tests."
     status: pending

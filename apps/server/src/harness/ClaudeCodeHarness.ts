@@ -34,8 +34,8 @@ export class ClaudeCodeHarness implements AgentHarness {
       [ENV_VAR_TASK_ID]: context.taskId,
       [ENV_VAR_MCP_SERVER_URL]: context.mcpServerUrl,
     };
-    if (context.credentials !== undefined) {
-      env.ANTHROPIC_API_KEY = context.credentials.getSecretValue();
+    if (context.auth.kind === "api-key") {
+      env[context.auth.envName] = context.auth.value.getSecretValue();
     }
 
     const setupCommands = [

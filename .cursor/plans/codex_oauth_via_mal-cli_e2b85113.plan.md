@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: harness-auth-refactor
     content: Refactor `HarnessAuthService` to a `HarnessAuthArtifacts` discriminated union (`api-key` | `files-and-env` | `none`). Update [apps/server/src/harness/AgentHarness.ts](apps/server/src/harness/AgentHarness.ts), [apps/server/src/harness/HarnessAuthService.ts](apps/server/src/harness/HarnessAuthService.ts), and all harness implementations. Add `CompositeHarnessAuthService` that prefers OAuth (with lazy refresh > 7 days) and falls back to env-var API key for `codex-cli`.
-    status: pending
+    status: completed
   - id: codex-harness-update
     content: Update [apps/server/src/harness/CodexCliHarness.ts](apps/server/src/harness/CodexCliHarness.ts) `prepare(...)` to merge `files` and `env` from `kind='files-and-env'` (writing `/root/.codex/auth.json`) and keep the existing `OPENAI_API_KEY` path for `kind='api-key'`.
     status: pending

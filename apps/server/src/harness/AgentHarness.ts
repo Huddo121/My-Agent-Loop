@@ -1,6 +1,11 @@
 import type { AgentHarnessId, ProjectId, TaskId } from "@mono/api";
 import type { ProtectedString } from "../utils/ProtectedString";
 
+export type HarnessAuthArtifacts =
+  | { kind: "api-key"; envName: string; value: ProtectedString }
+  | { kind: "files-and-env"; files: HarnessFile[]; env: Record<string, string> }
+  | { kind: "none" };
+
 /**
  * Context passed to harness.prepare() containing all information needed to
  * prepare a harness for execution in the sandbox.
@@ -9,7 +14,7 @@ export interface HarnessPreparationContext {
   projectId: ProjectId;
   taskId: TaskId;
   mcpServerUrl: string;
-  credentials: ProtectedString | undefined;
+  auth: HarnessAuthArtifacts;
   modelId: string | null;
 }
 

@@ -186,12 +186,11 @@ export class WorkflowExecutionService {
       };
     }
 
-    const credential = this.harnessAuthService.getCredential(harnessId);
     const preparation = harness.prepare({
       projectId: project.id,
       taskId: task.id,
       mcpServerUrl: this.options.mcpServerUrl,
-      credentials: credential,
+      auth: this.harnessAuthService.getFallbackAuthArtifacts(harnessId),
       modelId,
     });
 

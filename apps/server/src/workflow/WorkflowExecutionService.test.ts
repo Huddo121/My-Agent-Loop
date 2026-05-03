@@ -462,11 +462,14 @@ function createHarnessConfigRepository(): AgentHarnessConfigRepository {
 
 function createHarnessAuthService(): HarnessAuthService {
   return {
+    async getAuthArtifacts() {
+      return { kind: "none" };
+    },
+    getFallbackAuthArtifacts() {
+      return { kind: "none" };
+    },
     isAvailable() {
       return true;
-    },
-    getCredential() {
-      return undefined;
     },
   };
 }

@@ -38,17 +38,22 @@ export class CodexCliHarness implements AgentHarness {
       [ENV_VAR_PROJECT_ID]: context.projectId,
       [ENV_VAR_TASK_ID]: context.taskId,
     };
-    if (context.credentials !== undefined) {
-      env.OPENAI_API_KEY = context.credentials.getSecretValue();
+    const files = [
+      {
+        containerPath: CODEX_CONFIG_PATH,
+        contents: configToml,
+      },
+    ];
+
+    if (context.auth.kind === "api-key") {
+      env[context.auth.envName] = context.auth.value.getSecretValue();
+    } else if (context.auth.kind === "files-and-env") {
+      files.push(...context.auth.files);
+      Object.assign(env, context.auth.env);
     }
 
     return {
-      files: [
-        {
-          containerPath: CODEX_CONFIG_PATH,
-          contents: configToml,
-        },
-      ],
+      files,
       setupCommands: [],
       runCommand: this.getRunCommand(context.modelId),
       env,

@@ -25,12 +25,14 @@ import { ClaudeCodeHarness } from "./harness/ClaudeCodeHarness";
 import { CodexCliHarness } from "./harness/CodexCliHarness";
 import { CursorCliHarness } from "./harness/CursorCliHarness";
 import {
+  CompositeHarnessAuthService,
   EnvHarnessAuthService,
   type HarnessAuthService,
 } from "./harness/HarnessAuthService";
 import { OpenCodeHarness } from "./harness/OpenCodeHarness";
 import { LiveEventsService } from "./live-events";
 import { ConsoleLogger, type Logger } from "./logger/Logger";
+import { OpenAiCodexProvider } from "./oauth-providers";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
 import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
@@ -108,12 +110,18 @@ const taskQueue = new DatabaseTaskQueue();
 const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
-const harnessAuthService = new EnvHarnessAuthService({
+const envHarnessAuthService = new EnvHarnessAuthService({
   OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
   CURSOR_API_KEY: env.CURSOR_API_KEY,
   OPENAI_API_KEY: env.OPENAI_API_KEY,
 });
+const openAiCodexProvider = new OpenAiCodexProvider();
+const harnessAuthService = new CompositeHarnessAuthService(
+  envHarnessAuthService,
+  userOAuthCredentialRepository,
+  openAiCodexProvider,
+);
 const workspacesService = new DatabaseWorkspacesService(
   agentHarnessConfigRepository,
   workspaceMembershipsService,

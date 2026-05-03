@@ -43,8 +43,8 @@ export class CursorCliHarness implements AgentHarness {
       context.taskId,
     );
     const env: Record<string, string> = {};
-    if (context.credentials !== undefined) {
-      env.CURSOR_API_KEY = context.credentials.getSecretValue();
+    if (context.auth.kind === "api-key") {
+      env[context.auth.envName] = context.auth.value.getSecretValue();
     }
 
     const modelFlag =

@@ -57,7 +57,7 @@ export class OpenCodeHarness implements AgentHarness {
       context.mcpServerUrl,
       context.modelId,
     );
-    const authConfig = this.buildAuthConfig(context.credentials);
+    const authConfig = this.buildAuthConfig(context.auth);
 
     return {
       files: [
@@ -101,13 +101,13 @@ export class OpenCodeHarness implements AgentHarness {
   }
 
   private buildAuthConfig(
-    credentials: HarnessPreparationContext["credentials"],
+    auth: HarnessPreparationContext["auth"],
   ): Record<string, Auth> {
-    if (credentials === undefined) {
+    if (auth.kind !== "api-key") {
       return {};
     }
     return {
-      openrouter: { type: "api", key: credentials.getSecretValue() },
+      openrouter: { type: "api", key: auth.value.getSecretValue() },
     };
   }
 

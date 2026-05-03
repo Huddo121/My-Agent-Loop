@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: oauth-bearer-helper
     content: "New `apps/server/src/auth/oauth-bearer.ts` exporting `requireOAuthBearer(request)` to resolve `Authorization: Bearer <jwt>` to a `UserId`. Verify the current Better Auth oauth-provider API before implementing; docs currently show verification through the oauth-provider resource client (`oauthProviderResourceClient(auth)` / `verifyAccessToken`) rather than a guessed `better-auth/oauth2` import. Validate issuer, audience, expiry, and required scopes. Add unit tests."
-    status: pending
+    status: completed
   - id: salted-encryption-service
     content: New `apps/server/src/utils/SaltedEncryptionService.ts` that derives a per-record AES-256-GCM key from a master key plus a per-record salt via HKDF-SHA256. API exposes `encrypt(plaintext) -> { keySalt, payload }` and `decrypt({ keySalt, payload }) -> plaintext`, where `payload` is the existing `iv:ciphertext:authTag` triple-base64 format. Add a new env var `OAUTH_CREDENTIALS_ENCRYPTION_KEY` (32-byte hex or base64) to [apps/server/src/env.ts](apps/server/src/env.ts), distinct from `FORGE_ENCRYPTION_KEY`. Add unit tests covering encrypt/decrypt round-trip, salt uniqueness, and tamper-detection.
     status: pending

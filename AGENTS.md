@@ -16,3 +16,4 @@ Review the `docs` directory to understand some of the specifics of this project.
 - Leverage the `webfetch` tool to get the latest information on things, or to review the documentation of libraries and tools you're using.
   - Repeat the important parts of what you find when you do so
 - When the user is planning work with you, or gives you a set of instructions for work to complete, you are strongly encouraged to ask clarifying questions. Focus especially on missed states and edge cases. If the user suggests a technology to use, and you think there's a better one, surface it as a suggestion before continuing.
+- When the user asks you a question, do not immediately go off and change the code. Present answers to questions, and ask the user if you should execute on the option.

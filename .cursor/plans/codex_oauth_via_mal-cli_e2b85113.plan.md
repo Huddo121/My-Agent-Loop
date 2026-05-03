@@ -34,7 +34,7 @@ todos:
     status: completed
   - id: codex-harness-update
     content: Update [apps/server/src/harness/CodexCliHarness.ts](apps/server/src/harness/CodexCliHarness.ts) `prepare(...)` to merge `files` and `env` from `kind='files-and-env'` (writing `/root/.codex/auth.json`) and keep the existing `OPENAI_API_KEY` path for `kind='api-key'`.
-    status: pending
+    status: completed
   - id: workflow-owner-resolution
     content: Add `getWorkspaceCreatorUserId(workspaceId)` to [apps/server/src/auth/WorkspaceMembershipsService.ts](apps/server/src/auth/WorkspaceMembershipsService.ts) (earliest `createdAt`, `userId` tiebreaker). Update [apps/server/src/workflow/WorkflowExecutionService.ts](apps/server/src/workflow/WorkflowExecutionService.ts) around lines 167-196 to thread the workspace owner into the new auth-resolution path and fail with a clear error when no Codex credentials are configured.
     status: pending

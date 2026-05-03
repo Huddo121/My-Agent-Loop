@@ -183,6 +183,37 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.0.9)(@vitest/ui@4.0.18)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)(msw@2.12.7(@types/node@25.0.9)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.8.2)
 
+  apps/mal-cli:
+    dependencies:
+      '@hono/node-server':
+        specifier: 1.19.9
+        version: 1.19.9(hono@4.11.4)
+      '@robingenz/zli':
+        specifier: 0.2.0
+        version: 0.2.0(zod@4.3.5)
+      hono:
+        specifier: 4.11.4
+        version: 4.11.4
+      open:
+        specifier: 11.0.0
+        version: 11.0.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: 24.12.2
+        version: 24.12.2
+      esbuild:
+        specifier: 0.25.1
+        version: 0.25.1
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   apps/server:
     dependencies:
       '@better-auth/drizzle-adapter':
@@ -2379,6 +2410,13 @@ packages:
 
   '@remix-run/node-fetch-server@0.9.0':
     resolution: {integrity: sha512-SoLMv7dbH+njWzXnOY6fI08dFMI5+/dQ+vY3n8RnnbdG7MdJEgiP28Xj/xWlnRnED/aB6SFw56Zop+LbmaaKqA==}
+
+  '@robingenz/zli@0.2.0':
+    resolution: {integrity: sha512-LME7G4xkEFuqyVg/MYTB3xoJnvWb955aEfZ7J7yRstzyULs3HBdxz0l5QiP8gmMMMZ434cb8Wn/DdHqeNTT2fA==}
+    engines: {node: '>=16.0.0'}
+    hasBin: true
+    peerDependencies:
+      zod: ^4.0.0
 
   '@rollup/rollup-android-arm-eabi@4.55.1':
     resolution: {integrity: sha512-9R0DM/ykwfGIlNu6+2U09ga0WXeZ9MRC2Ter8jnz8415VbuIykVuc6bhdrbORFZANDmTDvq26mJrEVTl8TdnDg==}
@@ -7532,6 +7570,10 @@ snapshots:
 
   '@remix-run/node-fetch-server@0.9.0': {}
 
+  '@robingenz/zli@0.2.0(zod@4.3.5)':
+    dependencies:
+      zod: 4.3.5
+
   '@rollup/rollup-android-arm-eabi@4.55.1':
     optional: true
 
@@ -7735,13 +7777,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 25.0.9
+      '@types/node': 25.6.0
       '@types/ssh2': 1.15.5
 
   '@types/dockerode@4.0.0':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 25.0.9
+      '@types/node': 25.6.0
       '@types/ssh2': 1.15.5
 
   '@types/estree@1.0.8': {}
@@ -7764,7 +7806,7 @@ snapshots:
 
   '@types/pg@8.16.0':
     dependencies:
-      '@types/node': 25.0.9
+      '@types/node': 25.6.0
       pg-protocol: 1.11.0
       pg-types: 2.2.0
 
@@ -7852,7 +7894,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vitest: 4.0.18(@types/node@25.0.9)(@vitest/ui@4.0.18)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)(msw@2.12.7(@types/node@25.0.9)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 4.0.18(@types/node@25.6.0)(@vitest/ui@4.0.18)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)(msw@2.12.7(@types/node@25.6.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/utils@4.0.18':
     dependencies:
@@ -9625,7 +9667,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 25.0.9
+      '@types/node': 25.6.0
       long: 5.3.2
 
   proxy-addr@2.0.7:

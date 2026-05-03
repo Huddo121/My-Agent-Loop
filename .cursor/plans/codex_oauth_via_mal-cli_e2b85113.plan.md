@@ -40,7 +40,7 @@ todos:
     status: completed
   - id: scaffold-mal-cli
     content: Scaffold `apps/mal-cli` mirroring [apps/driver/](apps/driver/) (`package.json` with `name='@mono/mal-cli'` and `bin`, `tsconfig.json`, `moon.yml`, `build.mjs`, `build-sea.mjs`, `build-linux.mjs`, `src/index.ts`). Add deps via `pnpm --filter @mono/mal-cli add @robingenz/zli zod hono @hono/node-server open`. Verify SEA build produces a working `--help` smoke test.
-    status: pending
+    status: completed
   - id: implement-cli-commands
     content: "Implement CLI in `apps/mal-cli/src/`: `config.ts`, `storage.ts` (XDG, 0600), `pkce.ts`, `oauthFlow.ts` (Hono local server, `open(url)` + URL print, 5-min timeout), and commands `login` (port 53682, MAL PKCE), `providers/login/codex` (port 1455, OpenAI PKCE, POST to `/api/me/harness-credentials/openai-codex` with Bearer), `providers/logout/codex`, `logout`, `status`. Wire via `@robingenz/zli`. Auto-refresh MAL token on expiry."
     status: pending

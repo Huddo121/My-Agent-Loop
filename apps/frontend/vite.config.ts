@@ -7,6 +7,12 @@ export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   server: {
     proxy: {
+      // OAuth AS metadata (RFC 8414) lives outside `/api/*`; forward to the
+      // server so `APP_BASE_URL` can stay on the Vite origin in dev.
+      "/.well-known": {
+        target: "http://localhost:3000/",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://localhost:3000/",
         changeOrigin: true,

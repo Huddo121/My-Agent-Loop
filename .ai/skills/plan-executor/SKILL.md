@@ -1,13 +1,13 @@
 ---
 name: plan-executor
 description: >
-  Orchestrates execution of Cursor Plans with multiple TODOs by spawning one todo-completer subagent per TODO in serial order, managing plan state, git commits, and human escalation.
+  Orchestrates execution of Cursor Plans with multiple TODOs by spawning one plan-todo-executor subagent per TODO in serial order, managing plan state, git commits, and human escalation.
   TRIGGER WHEN: User asks to execute a plan that has more than 3 TODOs in it
 ---
 
 # Plan Executor
 
-Orchestrate execution of plans from `.cursor/plans/*.plan.md` by delegating each TODO to a todo-completer subagent, maintaining plan state, and handling git commits between completed todos.
+Orchestrate execution of plans from `.cursor/plans/*.plan.md` by delegating each TODO to a plan-todo-executor subagent, maintaining plan state, and handling git commits between completed todos.
 
 ## When to Apply
 
@@ -33,7 +33,7 @@ Set the TODO's `status` to `in-progress` in the plan file's frontmatter.
 
 ### 2. Spawn subagent
 
-**You must spawn the "Plan TODO executor" subagent** (defined at `.cursor/agents/todo-completer.md`). Use whatever invocation mechanism your harness provides, but ensure you target this specific subagent – do not use a generic agent type.
+**You must spawn the "plan-todo-executor" subagent** (defined at `.cursor/agents/plan-todo-executor.md`). Use whatever invocation mechanism your harness provides, but ensure you target this specific subagent – do not use a generic agent type.
 
 Include in the task:
 - **Plan file path** (so it can read the whole plan for context)
@@ -46,7 +46,7 @@ When using Cursor's Task tool (`mcp_task`):
 
 | Parameter | Required | Value |
 |-----------|----------|-------|
-| `subagent_type` | Yes | `"Plan TODO executor"` – matches the `name` in the todo-completer frontmatter |
+| `subagent_type` | Yes | `"plan-todo-executor"` – matches the `name` in the plan-todo-executor frontmatter |
 | `description` | Yes | Short 3–5 word description of the task (e.g. "Complete driver-app todo") |
 | `prompt` | Yes | Full instructions: plan file path, TODO id, TODO content, and any extra context |
 

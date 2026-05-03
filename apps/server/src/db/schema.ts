@@ -359,3 +359,24 @@ export const oauthConsentTable = pg.pgTable("oauth_consent", {
   createdAt: pg.timestamp(),
   updatedAt: pg.timestamp(),
 });
+
+export const userHarnessOAuthCredentialsTable = pg.pgTable(
+  "user_harness_oauth_credentials",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+    userId: pg
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull()
+      .$type<UserId>(),
+    providerId: pg.text().notNull(),
+    keySalt: pg.text().notNull(),
+    encryptedTokens: pg.text().notNull(),
+    lastRefresh: pg.timestamp().notNull(),
+    createdAt: pg.timestamp().notNull().defaultNow(),
+    updatedAt: pg.timestamp().notNull().defaultNow(),
+  },
+  (table) => ({
+    userProviderUnique: pg.unique().on(table.userId, table.providerId),
+  }),
+);

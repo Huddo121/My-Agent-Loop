@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: user-oauth-credentials-storage
     content: Add `userHarnessOAuthCredentialsTable` schema to [apps/server/src/db/schema.ts](apps/server/src/db/schema.ts) with separate `keySalt` and `encryptedTokens` columns. New `apps/server/src/user-oauth-credentials/UserOAuthCredentialRepository.ts` modeled on [apps/server/src/forge-secrets/ForgeSecretRepository.ts](apps/server/src/forge-secrets/ForgeSecretRepository.ts) but using the new `SaltedEncryptionService` (writes both columns on upsert; reads both on get). Wire the repo and salted-encryption service into [apps/server/src/services.ts](apps/server/src/services.ts). Surface generated migration diff.
-    status: pending
+    status: completed
   - id: oauth-provider-abstraction
     content: Build `apps/server/src/oauth-providers/{types.ts, OpenAiCodexProvider.ts, parseChatGptJwt.ts, index.ts}`. Implement `refreshTokens` (POST to `https://auth.openai.com/oauth/token`) and `materializeForSandbox` (build the Codex `auth.json` `HarnessFile`). Unit-test the JWT claim parser and the materialized `auth.json` shape.
     status: pending

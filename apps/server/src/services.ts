@@ -41,9 +41,14 @@ import {
 } from "./sandbox/SandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
+  DefaultUserOAuthCredentialRepository,
+  type UserOAuthCredentialRepository,
+} from "./user-oauth-credentials";
+import {
   DefaultEncryptionService,
   type EncryptionService,
 } from "./utils/EncryptionService";
+import { SaltedEncryptionService } from "./utils/SaltedEncryptionService";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
 import {
@@ -70,7 +75,9 @@ export interface Services {
   workspaceMembershipsService: WorkspaceMembershipsService;
   runsService: RunsService;
   encryptionService: EncryptionService;
+  saltedEncryptionService: SaltedEncryptionService;
   forgeSecretRepository: ForgeSecretRepository;
+  userOAuthCredentialRepository: UserOAuthCredentialRepository;
   agentHarnessConfigRepository: AgentHarnessConfigRepository;
   harnessAuthService: HarnessAuthService;
   harnesses: readonly AgentHarness[];
@@ -81,8 +88,14 @@ export interface Services {
 const encryptionService = new DefaultEncryptionService(
   env.FORGE_ENCRYPTION_KEY,
 );
+const saltedEncryptionService = new SaltedEncryptionService(
+  env.OAUTH_CREDENTIALS_ENCRYPTION_KEY,
+);
 const forgeSecretRepository = new DefaultForgeSecretRepository(
   encryptionService,
+);
+const userOAuthCredentialRepository = new DefaultUserOAuthCredentialRepository(
+  saltedEncryptionService,
 );
 
 const gitService = new SimpleGitService();
@@ -186,7 +199,9 @@ export const services: Services = {
   workspaceMembershipsService,
   runsService,
   encryptionService,
+  saltedEncryptionService,
   forgeSecretRepository,
+  userOAuthCredentialRepository,
   agentHarnessConfigRepository,
   harnessAuthService,
   harnesses,

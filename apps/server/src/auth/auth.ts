@@ -1,6 +1,6 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { type Auth, betterAuth } from "better-auth";
+import { betterAuth } from "better-auth";
 import { jwt, magicLink } from "better-auth/plugins";
 import { db } from "../db";
 import {
@@ -21,7 +21,6 @@ const appOrigin = new URL(env.APP_BASE_URL).origin;
 const loginPageURL = new URL("/", env.APP_BASE_URL).toString();
 const consentPageURL = new URL("/oauth/consent", appOrigin).toString();
 
-/** Cast avoids TS2742 when `composite` emits `.d.ts` (better-auth's inferred API references zod internals). */
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: authBaseURL,
@@ -65,4 +64,4 @@ export const auth = betterAuth({
       },
     }),
   ],
-}) as unknown as Auth;
+});

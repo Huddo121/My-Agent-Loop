@@ -9,9 +9,6 @@
       "path": "apps/frontend"
     },
     {
-      "path": "apps/server"
-    },
-    {
       "path": "packages/driver-api"
     },
     {

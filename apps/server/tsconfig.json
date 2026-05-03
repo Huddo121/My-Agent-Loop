@@ -2,8 +2,11 @@
   "include": ["./src"],
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
+    "noEmit": true,
     "outDir": "./dist",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "paths": {
       "@mono/api": ["../../packages/api/src/index.ts"],
       "@mono/driver-api": ["../../packages/driver-api/src/index.ts"]

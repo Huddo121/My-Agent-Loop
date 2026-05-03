@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: frontend-oauth-consent-route
     content: Add `@better-auth/oauth-provider` to `@mono/frontend` and create a dedicated OAuth consent route in [apps/frontend/app/routes.ts](apps/frontend/app/routes.ts) and [apps/frontend/app/routes/](apps/frontend/app/routes/) using the Better Auth oauth-provider client plugin. The route must require a Better Auth user session, preserve the full consent URL through sign-in, and be reachable without requiring workspace bootstrap or the workspace app shell. It must preserve Better Auth's consent query parameters and call the provider client's consent API instead of hand-rolling protocol requests. Keep it minimal but real React UI with tests; never implement this as backend-served HTML/JS strings.
-    status: in-progress
+    status: completed
   - id: well-known-routes
     content: Mount `.well-known/oauth-authorization-server` and `.well-known/openid-configuration` from [apps/server/src/index.ts](apps/server/src/index.ts) per the Better Auth oauth-provider docs.
     status: pending

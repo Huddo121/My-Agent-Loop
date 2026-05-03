@@ -1,5 +1,5 @@
 import type { ProjectId, TaskId, WorkspaceId } from "@mono/api";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import {
   projectsTable,
   tasksTable,
@@ -11,6 +11,9 @@ import type { UserId } from "./UserId";
 export interface WorkspaceMembershipsService {
   userHasAnyWorkspace(userId: UserId): Promise<boolean>;
   addMembership(userId: UserId, workspaceId: WorkspaceId): Promise<void>;
+  getWorkspaceCreatorUserId(
+    workspaceId: WorkspaceId,
+  ): Promise<UserId | undefined>;
   isWorkspaceMember(userId: UserId, workspaceId: WorkspaceId): Promise<boolean>;
   canAccessProject(
     userId: UserId,
@@ -42,6 +45,21 @@ export class DatabaseWorkspaceMembershipsService
       userId,
       workspaceId,
     });
+  }
+
+  async getWorkspaceCreatorUserId(
+    workspaceId: WorkspaceId,
+  ): Promise<UserId | undefined> {
+    const tx = getTransaction();
+    const membership = await tx.query.workspaceMembershipsTable.findFirst({
+      columns: { userId: true },
+      where: eq(workspaceMembershipsTable.workspaceId, workspaceId),
+      orderBy: [
+        asc(workspaceMembershipsTable.createdAt),
+        asc(workspaceMembershipsTable.userId),
+      ],
+    });
+    return membership?.userId;
   }
 
   async isWorkspaceMember(

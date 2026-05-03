@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type {
+  AgentHarnessId,
   LiveEventDto,
   LiveSubscription,
   ProjectId,
@@ -11,6 +12,8 @@ import type {
   WorkspaceId,
 } from "@mono/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { UserId } from "../auth/UserId";
+import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
 import type { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
@@ -37,6 +40,7 @@ import type {
   WaitForSandboxToFinishSuccess,
 } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
+import { FakeWorkspaceMembershipsService } from "../test-fakes/FakeWorkspaceMembershipsService";
 import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
 import type { Workflow } from "./Workflow";
@@ -273,11 +277,132 @@ describe("WorkflowExecutionService", () => {
       ),
     ).toBe(false);
   });
+
+  it("resolves Codex auth artifacts using the workspace creator", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
+    workspaceMembershipsService.grantWorkspaceMember(
+      "later-owner" as UserId,
+      "workspace-1" as WorkspaceId,
+      new Date("2024-01-02T00:00:00.000Z"),
+    );
+    workspaceMembershipsService.grantWorkspaceMember(
+      "workspace-owner" as UserId,
+      "workspace-1" as WorkspaceId,
+      new Date("2024-01-01T00:00:00.000Z"),
+    );
+    const harnessAuthService = createHarnessAuthService({
+      authArtifacts: {
+        kind: "api-key",
+        envName: "OPENAI_API_KEY",
+        value: new ProtectedString("codex-token"),
+      },
+    });
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService,
+      harness: createHarness("codex-cli"),
+      harnessConfigRepository: createHarnessConfigRepository("codex-cli"),
+      harnessAuthService,
+      workspaceMembershipsService,
+    });
+    const result = await service.executeWorkflow(
+      createRunId("run-codex-auth"),
+      createTask("task-codex-auth"),
+      createProject("project-codex-auth"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(harnessAuthService.lastContext).toEqual({
+      workspaceOwnerUserId: "workspace-owner",
+    });
+  });
+
+  it("fails clearly when Codex has no configured credentials", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
+    workspaceMembershipsService.grantWorkspaceMember(
+      "workspace-owner" as UserId,
+      "workspace-1" as WorkspaceId,
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService,
+      harness: createHarness("codex-cli"),
+      harnessConfigRepository: createHarnessConfigRepository("codex-cli"),
+      harnessAuthService: createHarnessAuthService({
+        authArtifacts: { kind: "none" },
+      }),
+      workspaceMembershipsService,
+    });
+    const result = await service.executeWorkflow(
+      createRunId("run-codex-no-auth"),
+      createTask("task-codex-no-auth"),
+      createProject("project-codex-no-auth"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success === false) {
+      expect(result.error.message).toContain(
+        "No Codex credentials are configured",
+      );
+    }
+    expect(driverRunTokenStore.lastIssuedToken).toBeUndefined();
+  });
+
+  it("allows Codex to use env fallback auth when no workspace creator is recorded", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const harnessAuthService = createHarnessAuthService({
+      authArtifacts: {
+        kind: "api-key",
+        envName: "OPENAI_API_KEY",
+        value: new ProtectedString("codex-token"),
+      },
+    });
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService,
+      harness: createHarness("codex-cli"),
+      harnessConfigRepository: createHarnessConfigRepository("codex-cli"),
+      harnessAuthService,
+      workspaceMembershipsService: new FakeWorkspaceMembershipsService(),
+    });
+    const result = await service.executeWorkflow(
+      createRunId("run-codex-env-fallback"),
+      createTask("task-codex-env-fallback"),
+      createProject("project-codex-env-fallback"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(harnessAuthService.lastContext).toBeUndefined();
+  });
 });
 
 function createService(options: {
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  harness?: AgentHarness;
+  harnessConfigRepository?: AgentHarnessConfigRepository;
+  harnessAuthService?: RecordingHarnessAuthService;
+  workspaceMembershipsService?: WorkspaceMembershipsService;
   workflowExecutionOptions?: WorkflowExecutionServiceOptions;
 }): WorkflowExecutionService {
   return new WorkflowExecutionService(
@@ -285,9 +410,10 @@ function createService(options: {
     createGitService(),
     options.sandboxService,
     createFileSystemService(),
-    [createHarness()],
-    createHarnessConfigRepository(),
-    createHarnessAuthService(),
+    [options.harness ?? createHarness()],
+    options.harnessConfigRepository ?? createHarnessConfigRepository(),
+    options.harnessAuthService ?? createHarnessAuthService(),
+    options.workspaceMembershipsService ?? createWorkspaceMembershipsService(),
     createForgeSecretRepository(),
     options.driverRunTokenStore,
     createLiveEventsService(),
@@ -418,10 +544,10 @@ function createFileSystemService(): FileSystemService {
   };
 }
 
-function createHarness(): AgentHarness {
+function createHarness(id: AgentHarnessId = "opencode"): AgentHarness {
   return {
-    id: "opencode",
-    displayName: "OpenCode",
+    id,
+    displayName: id,
     models: [],
     prepare(): AgentHarnessPreparation {
       return {
@@ -434,7 +560,9 @@ function createHarness(): AgentHarness {
   };
 }
 
-function createHarnessConfigRepository(): AgentHarnessConfigRepository {
+function createHarnessConfigRepository(
+  harnessId: AgentHarnessId = "opencode",
+): AgentHarnessConfigRepository {
   return {
     async getWorkspaceConfig() {
       return null;
@@ -455,23 +583,56 @@ function createHarnessConfigRepository(): AgentHarnessConfigRepository {
     async setProjectConfig() {},
     async setTaskConfig() {},
     async resolveHarnessConfig() {
-      return { harnessId: "opencode", modelId: null };
+      return { harnessId, modelId: null };
     },
   };
 }
 
-function createHarnessAuthService(): HarnessAuthService {
-  return {
-    async getAuthArtifacts() {
-      return { kind: "none" };
+function createHarnessAuthService(
+  options: {
+    authArtifacts?: Awaited<ReturnType<HarnessAuthService["getAuthArtifacts"]>>;
+  } = {},
+): RecordingHarnessAuthService {
+  return new RecordingHarnessAuthService(
+    options.authArtifacts ?? {
+      kind: "none",
     },
-    getFallbackAuthArtifacts() {
-      return { kind: "none" };
-    },
-    isAvailable() {
-      return true;
-    },
-  };
+  );
+}
+
+function createWorkspaceMembershipsService(): WorkspaceMembershipsService {
+  const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
+  workspaceMembershipsService.grantWorkspaceMember(
+    "workspace-owner" as UserId,
+    "workspace-1" as WorkspaceId,
+  );
+  return workspaceMembershipsService;
+}
+
+class RecordingHarnessAuthService implements HarnessAuthService {
+  lastContext: { workspaceOwnerUserId: UserId } | undefined;
+
+  constructor(
+    private readonly authArtifacts: Awaited<
+      ReturnType<HarnessAuthService["getAuthArtifacts"]>
+    >,
+  ) {}
+
+  async getAuthArtifacts(
+    _harnessId: AgentHarnessId,
+    context: { workspaceOwnerUserId: UserId },
+  ) {
+    this.lastContext = context;
+    return this.authArtifacts;
+  }
+
+  getFallbackAuthArtifacts() {
+    return this.authArtifacts;
+  }
+
+  isAvailable() {
+    return true;
+  }
 }
 
 function createForgeSecretRepository(): ForgeSecretRepository {

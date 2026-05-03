@@ -169,6 +169,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   harnesses,
   agentHarnessConfigRepository,
   harnessAuthService,
+  workspaceMembershipsService,
   forgeSecretRepository,
   driverRunTokenStore,
   liveEventsService,

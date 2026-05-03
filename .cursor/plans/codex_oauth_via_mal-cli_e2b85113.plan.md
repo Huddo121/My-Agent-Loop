@@ -37,7 +37,7 @@ todos:
     status: completed
   - id: workflow-owner-resolution
     content: Add `getWorkspaceCreatorUserId(workspaceId)` to [apps/server/src/auth/WorkspaceMembershipsService.ts](apps/server/src/auth/WorkspaceMembershipsService.ts) (earliest `createdAt`, `userId` tiebreaker). Update [apps/server/src/workflow/WorkflowExecutionService.ts](apps/server/src/workflow/WorkflowExecutionService.ts) around lines 167-196 to thread the workspace owner into the new auth-resolution path and fail with a clear error when no Codex credentials are configured.
-    status: pending
+    status: completed
   - id: scaffold-mal-cli
     content: Scaffold `apps/mal-cli` mirroring [apps/driver/](apps/driver/) (`package.json` with `name='@mono/mal-cli'` and `bin`, `tsconfig.json`, `moon.yml`, `build.mjs`, `build-sea.mjs`, `build-linux.mjs`, `src/index.ts`). Add deps via `pnpm --filter @mono/mal-cli add @robingenz/zli zod hono @hono/node-server open`. Verify SEA build produces a working `--help` smoke test.
     status: pending

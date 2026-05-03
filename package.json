@@ -16,6 +16,7 @@
     "drizzle": "pnpm run --filter @mono/server drizzle",
     "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
     "sync": "moon sync",
+    "sync-agents": "pnpm --filter=@mono/scripts sync-agents",
     "typecheck": "tsc --build"
   },
   "keywords": [],

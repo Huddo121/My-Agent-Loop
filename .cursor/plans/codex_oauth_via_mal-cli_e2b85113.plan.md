@@ -4,7 +4,7 @@ overview: Introduce a new `apps/mal-cli` CLI app that brokers OAuth logins on be
 todos:
   - id: server-oauth-issuer
     content: Install `@better-auth/oauth-provider` and configure Better Auth in [apps/server/src/auth/auth.ts](apps/server/src/auth/auth.ts) with the `jwt()` and `oauthProvider({...})` plugins (issuer, scopes, validAudiences, cachedTrustedClients=['mal-cli'], loginPage, consentPage). Point `consentPage` at a real frontend route; do not serve HTML/JS/CSS from backend string literals. Run `better-auth generate`/`migrate` and surface the schema diff for human review (do NOT author migration SQL).
-    status: pending
+    status: completed
   - id: frontend-oauth-consent-route
     content: Add `@better-auth/oauth-provider` to `@mono/frontend` and create a dedicated OAuth consent route in [apps/frontend/app/routes.ts](apps/frontend/app/routes.ts) and [apps/frontend/app/routes/](apps/frontend/app/routes/) using the Better Auth oauth-provider client plugin. The route must require a Better Auth user session, preserve the full consent URL through sign-in, and be reachable without requiring workspace bootstrap or the workspace app shell. It must preserve Better Auth's consent query parameters and call the provider client's consent API instead of hand-rolling protocol requests. Keep it minimal but real React UI with tests; never implement this as backend-served HTML/JS strings.
     status: pending

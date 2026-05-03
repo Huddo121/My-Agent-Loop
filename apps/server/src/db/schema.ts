@@ -95,6 +95,114 @@ export const verificationTable = pg.pgTable(
   }),
 );
 
+/** JWKS rows for the Better Auth `jwt()` plugin (OAuth provider mode). */
+export const jwksTable = pg.pgTable("jwks", {
+  id: pg.text().primaryKey(),
+  publicKey: pg.text().notNull(),
+  privateKey: pg.text().notNull(),
+  createdAt: pg.timestamp().notNull(),
+  expiresAt: pg.timestamp(),
+});
+
+/** Registered OAuth/OIDC clients (`@better-auth/oauth-provider`). */
+export const oauthClientTable = pg.pgTable("oauth_client", {
+  id: pg.text().primaryKey(),
+  clientId: pg.text().notNull().unique(),
+  clientSecret: pg.text(),
+  disabled: pg.boolean().default(false),
+  skipConsent: pg.boolean(),
+  enableEndSession: pg.boolean(),
+  subjectType: pg.text(),
+  scopes: pg.text().array(),
+  userId: pg
+    .text()
+    .references(() => userTable.id, { onDelete: "cascade" })
+    .$type<UserId>(),
+  createdAt: pg.timestamp(),
+  updatedAt: pg.timestamp(),
+  name: pg.text(),
+  uri: pg.text(),
+  icon: pg.text(),
+  contacts: pg.text().array(),
+  tos: pg.text(),
+  policy: pg.text(),
+  softwareId: pg.text(),
+  softwareVersion: pg.text(),
+  softwareStatement: pg.text(),
+  redirectUris: pg.text().array().notNull(),
+  postLogoutRedirectUris: pg.text().array(),
+  tokenEndpointAuthMethod: pg.text(),
+  grantTypes: pg.text().array(),
+  responseTypes: pg.text().array(),
+  public: pg.boolean(),
+  type: pg.text(),
+  requirePKCE: pg.boolean(),
+  referenceId: pg.text(),
+  metadata: pg.jsonb(),
+});
+
+export const oauthRefreshTokenTable = pg.pgTable("oauth_refresh_token", {
+  id: pg.text().primaryKey(),
+  token: pg.text().notNull(),
+  clientId: pg
+    .text()
+    .notNull()
+    .references(() => oauthClientTable.clientId, { onDelete: "cascade" }),
+  sessionId: pg.text().references(() => sessionTable.id, {
+    onDelete: "set null",
+  }),
+  userId: pg
+    .text()
+    .references(() => userTable.id, { onDelete: "cascade" })
+    .notNull()
+    .$type<UserId>(),
+  referenceId: pg.text(),
+  expiresAt: pg.timestamp().notNull(),
+  createdAt: pg.timestamp().notNull(),
+  revoked: pg.timestamp(),
+  authTime: pg.timestamp(),
+  scopes: pg.text().array().notNull(),
+});
+
+export const oauthAccessTokenTable = pg.pgTable("oauth_access_token", {
+  id: pg.text().primaryKey(),
+  token: pg.text().notNull().unique(),
+  clientId: pg
+    .text()
+    .notNull()
+    .references(() => oauthClientTable.clientId, { onDelete: "cascade" }),
+  sessionId: pg.text().references(() => sessionTable.id, {
+    onDelete: "set null",
+  }),
+  userId: pg
+    .text()
+    .references(() => userTable.id, { onDelete: "cascade" })
+    .$type<UserId>(),
+  referenceId: pg.text(),
+  refreshId: pg.text().references(() => oauthRefreshTokenTable.id, {
+    onDelete: "cascade",
+  }),
+  expiresAt: pg.timestamp().notNull(),
+  createdAt: pg.timestamp().notNull(),
+  scopes: pg.text().array().notNull(),
+});
+
+export const oauthConsentTable = pg.pgTable("oauth_consent", {
+  id: pg.text().primaryKey(),
+  clientId: pg
+    .text()
+    .notNull()
+    .references(() => oauthClientTable.clientId, { onDelete: "cascade" }),
+  userId: pg
+    .text()
+    .references(() => userTable.id, { onDelete: "cascade" })
+    .$type<UserId>(),
+  referenceId: pg.text(),
+  scopes: pg.text().array().notNull(),
+  createdAt: pg.timestamp().notNull(),
+  updatedAt: pg.timestamp().notNull(),
+});
+
 export const workspacesTable = pg.pgTable("workspaces", {
   id: pg.uuid().primaryKey().defaultRandom().$type<WorkspaceId>(),
   name: pg.text().notNull(),

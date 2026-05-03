@@ -1,5 +1,5 @@
 ---
-name: Plan TODO executor
+name: plan-todo-executor
 description: >
   This sub-agent is responsible for completing individual to-do steps within a plan and then reporting progress back to the parent agent
 

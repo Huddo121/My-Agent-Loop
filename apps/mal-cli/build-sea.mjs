@@ -6,7 +6,7 @@ const outdir = "dist-sea";
 const bundleFile = path.join(outdir, "index.cjs");
 const seaBlobFile = path.join(outdir, "sea-blob.blob");
 const seaExeFile =
-  process.env.MAL_CLI_SEA_OUTPUT_FILE ?? path.join(outdir, "mal-cli");
+  process.env.MAL_CLI_SEA_OUTPUT_FILE ?? path.join(outdir, "mal");
 const nodeBinaryPath = process.env.MAL_CLI_SEA_NODE_BINARY ?? process.execPath;
 const sentinelFuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
 const injectionRequired = process.env.MAL_CLI_SEA_INJECTION_REQUIRED === "1";

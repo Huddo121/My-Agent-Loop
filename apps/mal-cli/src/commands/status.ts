@@ -9,7 +9,7 @@ export async function status(): Promise<void> {
 
   if (!authFile.mal) {
     console.log(`MAL (${config.malBaseUrl}): not logged in`);
-    console.log("Codex provider: unknown (run `mal-cli login` first)");
+    console.log("Codex provider: unknown (run `mal login` first)");
     return;
   }
 

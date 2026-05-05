@@ -30,7 +30,7 @@ const statusCommand = defineCommand({
 
 const providersCommand = defineCommand({
   description:
-    "Manage provider credentials. Usage: mal-cli providers login codex | mal-cli providers logout codex",
+    "Manage provider credentials. Usage: mal providers login codex | mal providers logout codex",
   args: z.tuple([
     z.enum(["login", "logout"]).describe("Provider action."),
     z.literal("codex").describe("Provider name."),
@@ -49,7 +49,7 @@ const providersCommand = defineCommand({
 
 export const cliConfig = defineConfig({
   meta: {
-    name: "mal-cli",
+    name: "mal",
     description: "My Agent Loop OAuth helper CLI.",
     version: "0.0.0",
   },
@@ -62,7 +62,7 @@ export const cliConfig = defineConfig({
   defaultCommand: defineCommand({
     options: { schema: noOptionsSchema },
     action: () => {
-      console.log("Run `mal-cli --help` to see available commands.");
+      console.log("Run `mal --help` to see available commands.");
     },
   }),
 });
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
       console.error(error.message);
       process.exitCode = 1;
     } else {
-      console.error("mal-cli failed with an unknown error.");
+      console.error("mal failed with an unknown error.");
       process.exitCode = 1;
     }
   }

@@ -1,4 +1,4 @@
-# Codex OAuth via mal-cli
+# Codex OAuth via mal
 
 ## Context
 
@@ -13,18 +13,18 @@ The OAuth callback for Codex is a local-machine flow on `http://localhost:1455/a
 - Store provider OAuth credentials per user on the server, encrypted at rest, and never return token material from APIs.
 - Implement OpenAI Codex OAuth as the first provider, with provider abstractions left in place for later additions.
 - Prefer a workspace creator's stored OpenAI Codex OAuth credential when preparing Codex runs; fall back to `OPENAI_API_KEY` only when no OAuth credential is available.
-- Keep credential-management UI out of v1. Users manage credentials with `mal-cli`.
+- Keep credential-management UI out of v1. Users manage credentials with `mal`.
 
 ## CLI OAuth Flow
 
-`mal-cli login` authenticates the CLI to MAL using PKCE against the MAL Better Auth OAuth issuer:
+`mal login` authenticates the CLI to MAL using PKCE against the MAL Better Auth OAuth issuer:
 
 - client id: `mal-cli`
 - redirect URI: `http://localhost:53682/auth/callback`
 - scope: `openid profile email offline_access`
 - default MAL origin: `http://localhost:5173`, overridable with `MAL_BASE_URL`
 
-`mal-cli providers login codex` then runs the OpenAI Codex OAuth flow locally:
+`mal providers login codex` then runs the OpenAI Codex OAuth flow locally:
 
 - authorization URL: `https://auth.openai.com/oauth/authorize`
 - token URL: `https://auth.openai.com/oauth/token`
@@ -34,7 +34,7 @@ The OAuth callback for Codex is a local-machine flow on `http://localhost:1455/a
 
 The CLI opens the browser and prints the authorization URL so headless or SSH users can complete the flow manually. Local OAuth listeners time out after five minutes. Port `1455` is fixed by the Codex OAuth client registration, so only one Codex provider login can run at a time.
 
-CLI storage lives at `${XDG_CONFIG_HOME:-~/.config}/mal-cli/auth.json`. The config directory is created with mode `0700`, and the auth file is written with mode `0600`.
+CLI storage lives at `${XDG_CONFIG_HOME:-~/.config}/mal/auth.json`. The config directory is created with mode `0700`, and the auth file is written with mode `0600`. The CLI still reads and clears the legacy `${XDG_CONFIG_HOME:-~/.config}/mal-cli/auth.json` path during upgrades.
 
 ## Server Credential Storage
 

@@ -22,7 +22,7 @@ export type CredentialSummary = z.infer<typeof credentialSummarySchema>;
 export async function getMalAccessToken(): Promise<string> {
   const authFile = await readAuthFile();
   if (!authFile.mal) {
-    throw new Error("Run `mal-cli login` first.");
+    throw new Error("Run `mal login` first.");
   }
 
   const config = getConfig();
@@ -40,9 +40,7 @@ export async function getMalAccessToken(): Promise<string> {
     return refreshed.accessToken;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `MAL login expired. Run \`mal-cli login\` again. ${message}`,
-    );
+    throw new Error(`MAL login expired. Run \`mal login\` again. ${message}`);
   }
 }
 

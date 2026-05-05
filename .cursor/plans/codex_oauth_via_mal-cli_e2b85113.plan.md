@@ -1,6 +1,6 @@
 ---
-name: Codex OAuth via mal-cli
-overview: Introduce a new `apps/mal-cli` CLI app that brokers OAuth logins on behalf of users, and turn the MAL server into an OAuth 2.1 issuer (via Better Auth's `oauth-provider` plugin) so the CLI can authenticate when uploading provider tokens. v1 ships Codex CLI subscription auth end-to-end, with a generic provider abstraction so adding Anthropic/etc. later is purely additive.
+name: Codex OAuth via mal
+overview: Introduce a new `apps/mal-cli` CLI app with the user-facing `mal` command that brokers OAuth logins on behalf of users, and turn the MAL server into an OAuth 2.1 issuer (via Better Auth's `oauth-provider` plugin) so the CLI can authenticate when uploading provider tokens. v1 ships Codex CLI subscription auth end-to-end, with a generic provider abstraction so adding Anthropic/etc. later is purely additive.
 todos:
   - id: server-oauth-issuer
     content: Install `@better-auth/oauth-provider` and configure Better Auth in [apps/server/src/auth/auth.ts](apps/server/src/auth/auth.ts) with the `jwt()` and `oauthProvider({...})` plugins (issuer, scopes, validAudiences, loginPage, consentPage). Point `consentPage` at a real frontend route; do not serve HTML/JS/CSS from backend string literals. Do not trust or skip consent for `mal-cli`; it is a public client ID. Run `better-auth generate`/`migrate` and surface the schema diff for human review (do NOT author migration SQL).
@@ -48,14 +48,14 @@ todos:
     content: Add `docs/decisions/codex-oauth-via-mal-cli.md`. Update [docs/00-index.md](docs/00-index.md). Annotate [docs/ideas/oauth-for-providers.md](docs/ideas/oauth-for-providers.md). New `apps/mal-cli/AGENTS.md`. Append 'User OAuth credentials' section to [apps/server/AGENTS.md](apps/server/AGENTS.md).
     status: completed
   - id: manual-e2e-verification
-    content: "Manual smoke test (document in `apps/mal-cli/AGENTS.md`): start postgres+redis+server+frontend dev server, build mal-cli, run `mal-cli login`, then `mal-cli providers login codex`. Confirm `user_harness_oauth_credentials` row exists. Trigger a Codex run on a test task; `docker exec` to inspect `/root/.codex/auth.json`; confirm no `OPENAI_API_KEY` env was set; confirm Codex completed inference under the subscription. Run `pnpm typecheck` and `pnpm check` repo-wide."
+    content: "Manual smoke test (document in `apps/mal-cli/AGENTS.md`): start postgres+redis+server+frontend dev server, build the `mal` CLI, run `mal login`, then `mal providers login codex`. Confirm `user_harness_oauth_credentials` row exists. Trigger a Codex run on a test task; `docker exec` to inspect `/root/.codex/auth.json`; confirm no `OPENAI_API_KEY` env was set; confirm Codex completed inference under the subscription. Run `pnpm typecheck` and `pnpm check` repo-wide."
     status: completed
 isProject: false
 ---
 
-# Codex OAuth via mal-cli
+# Codex OAuth via mal
 
-Execution note, 2026-05-05: repo-wide `pnpm typecheck`, `pnpm check`, `pnpm --filter @mono/mal-cli build:sea`, `apps/mal-cli/dist-sea/mal-cli --help`, and logged-out CLI preflight smoke checks passed. The live browser/OpenAI subscription OAuth E2E was not run in this non-interactive agent environment.
+Execution note, 2026-05-05: repo-wide `pnpm typecheck`, `pnpm check`, `pnpm mal:build:sea`, `apps/mal-cli/dist-sea/mal --help`, and logged-out CLI preflight smoke checks passed. The live browser/OpenAI subscription OAuth E2E was not run in this non-interactive agent environment.
 
 ## Context
 
@@ -76,15 +76,15 @@ We will not bind port 1455 on the server (where it's a poor fit and a multi-user
 ```mermaid
 flowchart LR
     user[User]
-    cli[mal-cli<br/>local Hono on demand]
+    cli[mal<br/>local Hono on demand]
     server[MAL server<br/>Hono + BetterAuth]
     openai[auth.openai.com]
     sandbox[Codex sandbox<br/>~/.codex/auth.json mounted]
 
-    user -->|"mal-cli login"| cli
+    user -->|"mal login"| cli
     cli -->|"PKCE on localhost:53682"| server
     server -->|"access+refresh tokens (mal-cli client)"| cli
-    user -->|"mal-cli providers login codex"| cli
+    user -->|"mal providers login codex"| cli
     cli -->|"PKCE on localhost:1455"| openai
     openai -->|"access+id+refresh tokens"| cli
     cli -->|"PUT /api/me/harness-credentials/openai-codex<br/>Bearer mal access token"| server
@@ -103,8 +103,8 @@ flowchart LR
 - **Workspace-creator-only resolution (v1)**: the workflow uses the OAuth credential of the user with the earliest `workspace_memberships.createdAt` for the workspace. Multi-user-credential semantics deferred.
 - **Lazy refresh only**: server refreshes tokens at run-prep time if `last_refresh > 7 days`. No background job. No write-back from the running container.
 - **CLI distribution**: SEA binary mirroring `apps/driver`. Local dev via `pnpm tsx`.
-- **CLI local storage**: `${XDG_CONFIG_HOME:-~/.config}/mal-cli/auth.json`, mode `0600`.
-- **CLI command shape**: nested noun, `mal-cli providers login codex` / `mal-cli providers logout codex`, plus top-level `mal-cli login` / `mal-cli logout` / `mal-cli status`.
+- **CLI local storage**: `${XDG_CONFIG_HOME:-~/.config}/mal/auth.json`, mode `0600`, with a legacy read/delete fallback for `${XDG_CONFIG_HOME:-~/.config}/mal-cli/auth.json`.
+- **CLI command shape**: nested noun, `mal providers login codex` / `mal providers logout codex`, plus top-level `mal login` / `mal logout` / `mal status`.
 - **Browser handling**: `open(url)` AND print URL to stdout for SSH/headless fallback.
 - **Logout = delete only**, no provider revocation calls in v1.
 - **No credential-management UI** in v1 (deferred). The OAuth consent screen is still a real frontend route because it is required for the OAuth protocol flow.
@@ -208,7 +208,7 @@ export type HarnessAuthArtifacts =
 
 ### `apps/mal-cli` (new app)
 
-- Scaffold mirroring [apps/driver/](apps/driver/): `package.json` (name `@mono/mal-cli`, `bin: { "mal-cli": "./dist-sea/mal-cli" }`), `tsconfig.json`, `moon.yml`, `build.mjs`, `build-sea.mjs`, `build-linux.mjs`, `src/index.ts`.
+- Scaffold mirroring [apps/driver/](apps/driver/): `package.json` (name `@mono/mal-cli`, `bin: { "mal": "./dist-sea/mal" }`), `tsconfig.json`, `moon.yml`, `build.mjs`, `build-sea.mjs`, `build-linux.mjs`, `src/index.ts`.
 - Deps via pnpm: `pnpm --filter @mono/mal-cli add @robingenz/zli zod hono @hono/node-server open` plus dev deps matching driver.
 - Modules:
   - `src/config.ts` reads `MAL_BASE_URL` (default `http://localhost:5173`, the public app origin in dev). The CLI should call `${MAL_BASE_URL}/api/...` rather than assuming direct server-port access.
@@ -233,17 +233,17 @@ export type HarnessAuthArtifacts =
 
 ## Edge Cases and Error Handling
 
-- No MAL login when running `mal-cli providers login codex` -> CLI prints "Run `mal-cli login` first" and exits 1.
+- No MAL login when running `mal providers login codex` -> CLI prints "Run `mal login` first" and exits 1.
 - MAL access token expired -> CLI silently refreshes; on refresh failure prompts re-login.
 - Codex callback never received -> CLI's local server times out after 5 minutes.
 - OAuth `state` mismatch -> CLI exits with explicit error (Better Auth handles its side).
 - Port 1455 already in use -> CLI exits with "Port 1455 in use; close the other process and retry" (cannot use a different port).
-- Workspace owner has not run `mal-cli providers login codex` -> workflow fails fast with a clear error.
+- Workspace owner has not run `mal providers login codex` -> workflow fails fast with a clear error.
 - OpenAI returns 401 on refresh -> server deletes the row; subsequent runs fail with the "credentials not configured" error.
 - Both env-var `OPENAI_API_KEY` and OAuth credential present -> OAuth wins; log at info level which path was chosen.
 - Tied `workspace_memberships.createdAt` -> `userId asc` tiebreaker for determinism.
 - CLI on a remote SSH machine -> document in `apps/mal-cli/AGENTS.md` that the CLI must run on a machine with browser access (or via SSH `LocalForward 1455 -> localhost:1455`).
-- Concurrent `mal-cli providers login codex` invocations -> second one fails to bind 1455; document as "one OAuth flow at a time".
+- Concurrent `mal providers login codex` invocations -> second one fails to bind 1455; document as "one OAuth flow at a time".
 
 ## Out of Scope
 

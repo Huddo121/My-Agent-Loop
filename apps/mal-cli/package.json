@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "mal-cli": "./dist-sea/mal-cli"
+    "mal": "./dist-sea/mal"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

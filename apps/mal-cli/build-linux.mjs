@@ -23,7 +23,7 @@ const archiveName = `${archiveBaseName}.tar.gz`;
 const archivePath = path.join(archiveDir, archiveName);
 const extractedDir = path.join(archiveDir, archiveBaseName);
 const linuxNodeBinary = path.join(extractedDir, "bin", "node");
-const outputFile = path.join(outdir, "linux", "mal-cli");
+const outputFile = path.join(outdir, "linux", "mal");
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const buildSeaScript = path.join(scriptDir, "build-sea.mjs");
 

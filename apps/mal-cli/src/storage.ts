@@ -27,23 +27,32 @@ const authFileSchema = z.object({
 export type StoredToken = z.infer<typeof storedTokenSchema>;
 export type AuthFile = z.infer<typeof authFileSchema>;
 
+function getBaseConfigDir(): string {
+  return process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+}
+
 export function getConfigDir(): string {
-  return join(
-    process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-    "mal-cli",
-  );
+  return join(getBaseConfigDir(), "mal");
 }
 
 export function getAuthFilePath(): string {
   return join(getConfigDir(), "auth.json");
 }
 
+function getLegacyAuthFilePath(): string {
+  return join(getBaseConfigDir(), "mal-cli", "auth.json");
+}
+
+async function readStoredAuthFile(authFilePath: string): Promise<AuthFile> {
+  const raw = await readFile(authFilePath, "utf8");
+  return authFileSchema.parse(JSON.parse(raw));
+}
+
 export async function readAuthFile(): Promise<AuthFile> {
   const authFilePath = getAuthFilePath();
 
   try {
-    const raw = await readFile(authFilePath, "utf8");
-    return authFileSchema.parse(JSON.parse(raw));
+    return await readStoredAuthFile(authFilePath);
   } catch (error: unknown) {
     if (
       typeof error === "object" &&
@@ -51,7 +60,19 @@ export async function readAuthFile(): Promise<AuthFile> {
       "code" in error &&
       error.code === "ENOENT"
     ) {
-      return {};
+      try {
+        return await readStoredAuthFile(getLegacyAuthFilePath());
+      } catch (legacyError: unknown) {
+        if (
+          typeof legacyError === "object" &&
+          legacyError !== null &&
+          "code" in legacyError &&
+          legacyError.code === "ENOENT"
+        ) {
+          return {};
+        }
+        throw legacyError;
+      }
     }
     throw error;
   }
@@ -70,7 +91,10 @@ export async function writeAuthFile(authFile: AuthFile): Promise<void> {
 }
 
 export async function clearAuthFile(): Promise<void> {
-  await rm(getAuthFilePath(), { force: true });
+  await Promise.all([
+    rm(getAuthFilePath(), { force: true }),
+    rm(getLegacyAuthFilePath(), { force: true }),
+  ]);
 }
 
 export async function authFileExists(): Promise<boolean> {
@@ -78,6 +102,11 @@ export async function authFileExists(): Promise<boolean> {
     await access(getAuthFilePath(), constants.F_OK);
     return true;
   } catch {
-    return false;
+    try {
+      await access(getLegacyAuthFilePath(), constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

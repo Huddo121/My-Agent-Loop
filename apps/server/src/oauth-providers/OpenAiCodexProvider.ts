@@ -86,7 +86,7 @@ export class OpenAiCodexProvider implements OAuthProvider {
       };
     }
 
-    const accountId = parseChatGptJwt(parsedResponse.data.access_token);
+    const accountId = await parseChatGptJwt(parsedResponse.data.access_token);
     if (!accountId.success) {
       return {
         success: false,

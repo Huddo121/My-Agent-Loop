@@ -8,27 +8,43 @@ import type { UserOAuthCredentialRepository } from "../user-oauth-credentials";
 import type { ProtectedString } from "../utils/ProtectedString";
 import type { HarnessAuthArtifacts } from "./AgentHarness";
 
-export type HarnessAuthContext = {
-  workspaceOwnerUserId: UserId;
-};
+export type HarnessAuthContext =
+  | {
+      kind: "workspace-owner";
+      workspaceOwnerUserId: UserId;
+    }
+  | {
+      kind: "no-workspace-owner";
+    };
+
+type WorkspaceOwnerAuthContext = Extract<
+  HarnessAuthContext,
+  { kind: "workspace-owner" }
+>;
 
 export interface HarnessAuthService {
+  /**
+   * Resolve the auth material that should be mounted into a harness run.
+   * Implementations may use workspace-scoped context, such as the workspace
+   * owner, to prefer user OAuth credentials before falling back to static
+   * environment credentials.
+   */
   getAuthArtifacts(
     harnessId: AgentHarnessId,
     context: HarnessAuthContext,
   ): Promise<HarnessAuthArtifacts>;
-  getFallbackAuthArtifacts(harnessId: AgentHarnessId): HarnessAuthArtifacts;
+  /**
+   * Report whether a harness can be selected before a concrete run exists.
+   * This only reflects static availability, not per-workspace OAuth state.
+   */
   isAvailable(harnessId: AgentHarnessId): boolean;
 }
 
-const HARNESS_ENV_KEYS: Record<
-  AgentHarnessId,
-  { envName: string; key: keyof EnvForHarnessAuth }
-> = {
-  opencode: { envName: "OPENROUTER_API_KEY", key: "OPENROUTER_API_KEY" },
-  "claude-code": { envName: "ANTHROPIC_API_KEY", key: "ANTHROPIC_API_KEY" },
-  "cursor-cli": { envName: "CURSOR_API_KEY", key: "CURSOR_API_KEY" },
-  "codex-cli": { envName: "OPENAI_API_KEY", key: "OPENAI_API_KEY" },
+const HARNESS_ENV_KEYS: Record<AgentHarnessId, keyof EnvForHarnessAuth> = {
+  opencode: "OPENROUTER_API_KEY",
+  "claude-code": "ANTHROPIC_API_KEY",
+  "cursor-cli": "CURSOR_API_KEY",
+  "codex-cli": "OPENAI_API_KEY",
 };
 
 export type EnvForHarnessAuth = {
@@ -45,12 +61,8 @@ export class EnvHarnessAuthService implements HarnessAuthService {
     harnessId: AgentHarnessId,
     _context: HarnessAuthContext,
   ): Promise<HarnessAuthArtifacts> {
-    return this.getFallbackAuthArtifacts(harnessId);
-  }
-
-  getFallbackAuthArtifacts(harnessId: AgentHarnessId): HarnessAuthArtifacts {
-    const { envName, key } = HARNESS_ENV_KEYS[harnessId];
-    const value = this.env[key];
+    const envName = HARNESS_ENV_KEYS[harnessId];
+    const value = this.env[envName];
     if (value === undefined) {
       return { kind: "none" };
     }
@@ -61,7 +73,7 @@ export class EnvHarnessAuthService implements HarnessAuthService {
     if (harnessId === "opencode") {
       return true;
     }
-    return this.getFallbackAuthArtifacts(harnessId).kind !== "none";
+    return this.env[HARNESS_ENV_KEYS[harnessId]] !== undefined;
   }
 }
 
@@ -84,16 +96,14 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
       return this.fallbackAuthService.getAuthArtifacts(harnessId, context);
     }
 
-    const oauthArtifacts = await this.getCodexOAuthArtifacts(context);
-    if (oauthArtifacts.kind !== "none") {
-      return oauthArtifacts;
+    if (context.kind === "workspace-owner") {
+      const oauthArtifacts = await this.getCodexOAuthArtifacts(context);
+      if (oauthArtifacts.kind !== "none") {
+        return oauthArtifacts;
+      }
     }
 
-    return this.fallbackAuthService.getFallbackAuthArtifacts(harnessId);
-  }
-
-  getFallbackAuthArtifacts(harnessId: AgentHarnessId): HarnessAuthArtifacts {
-    return this.fallbackAuthService.getFallbackAuthArtifacts(harnessId);
+    return this.fallbackAuthService.getAuthArtifacts(harnessId, context);
   }
 
   isAvailable(harnessId: AgentHarnessId): boolean {
@@ -101,7 +111,7 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
   }
 
   private async getCodexOAuthArtifacts(
-    context: HarnessAuthContext,
+    context: WorkspaceOwnerAuthContext,
   ): Promise<HarnessAuthArtifacts> {
     const credential = await this.userOAuthCredentialRepository.getCredential(
       context.workspaceOwnerUserId,

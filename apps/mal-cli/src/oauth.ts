@@ -13,30 +13,9 @@ const tokenResponseSchema = z.object({
 
 export type TokenResponse = z.infer<typeof tokenResponseSchema>;
 
-function decodeJwtPayload(token: string): unknown {
-  const payload = token.split(".")[1];
-  if (!payload) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-}
-
-function expiryFromJwt(token: string): string | undefined {
-  const payload = decodeJwtPayload(token);
-  const exp =
-    typeof payload === "object" &&
-    payload !== null &&
-    "exp" in payload &&
-    typeof payload.exp === "number"
-      ? payload.exp
-      : undefined;
-
-  return exp === undefined ? undefined : new Date(exp * 1000).toISOString();
+function hasJwtShape(token: string): boolean {
+  const parts = token.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 0);
 }
 
 export function isExpired(token: StoredToken, clock = new Date()): boolean {
@@ -51,9 +30,7 @@ export function needsMalTokenRefresh(
   token: StoredToken,
   clock = new Date(),
 ): boolean {
-  return (
-    isExpired(token, clock) || decodeJwtPayload(token.accessToken) === null
-  );
+  return isExpired(token, clock) || !hasJwtShape(token.accessToken);
 }
 
 export function tokenResponseToStoredToken(
@@ -63,7 +40,7 @@ export function tokenResponseToStoredToken(
   const expiresAt =
     response.expires_in !== undefined
       ? new Date(Date.now() + response.expires_in * 1000).toISOString()
-      : expiryFromJwt(response.access_token);
+      : previous?.expiresAt;
 
   const refreshToken = response.refresh_token ?? previous?.refreshToken;
   if (!refreshToken) {

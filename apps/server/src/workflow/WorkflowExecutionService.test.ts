@@ -320,6 +320,7 @@ describe("WorkflowExecutionService", () => {
 
     expect(result.success).toBe(true);
     expect(harnessAuthService.lastContext).toEqual({
+      kind: "workspace-owner",
       workspaceOwnerUserId: "workspace-owner",
     });
   });
@@ -392,7 +393,9 @@ describe("WorkflowExecutionService", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(harnessAuthService.lastContext).toBeUndefined();
+    expect(harnessAuthService.lastContext).toEqual({
+      kind: "no-workspace-owner",
+    });
   });
 });
 
@@ -610,7 +613,10 @@ function createWorkspaceMembershipsService(): WorkspaceMembershipsService {
 }
 
 class RecordingHarnessAuthService implements HarnessAuthService {
-  lastContext: { workspaceOwnerUserId: UserId } | undefined;
+  lastContext:
+    | { kind: "workspace-owner"; workspaceOwnerUserId: UserId }
+    | { kind: "no-workspace-owner" }
+    | undefined;
 
   constructor(
     private readonly authArtifacts: Awaited<
@@ -620,13 +626,11 @@ class RecordingHarnessAuthService implements HarnessAuthService {
 
   async getAuthArtifacts(
     _harnessId: AgentHarnessId,
-    context: { workspaceOwnerUserId: UserId },
+    context:
+      | { kind: "workspace-owner"; workspaceOwnerUserId: UserId }
+      | { kind: "no-workspace-owner" },
   ) {
     this.lastContext = context;
-    return this.authArtifacts;
-  }
-
-  getFallbackAuthArtifacts() {
     return this.authArtifacts;
   }
 

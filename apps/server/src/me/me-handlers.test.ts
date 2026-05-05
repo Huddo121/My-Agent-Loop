@@ -11,9 +11,21 @@ const { requireOAuthBearer } = vi.hoisted(() => ({
   requireOAuthBearer: vi.fn(),
 }));
 
+const { parseChatGptJwt } = vi.hoisted(() => ({
+  parseChatGptJwt: vi.fn(),
+}));
+
 vi.mock(import("../auth/oauth-bearer"), () => ({
   requireOAuthBearer,
 }));
+
+vi.mock(import("../oauth-providers"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    parseChatGptJwt,
+  };
+});
 
 type HarnessCredentialsHandlers = (typeof meHandlers)["harness-credentials"];
 type HarnessCredentialsGetContext = Parameters<
@@ -118,6 +130,11 @@ function createCtx(overrides?: {
 describe("me handlers", () => {
   beforeEach(() => {
     requireOAuthBearer.mockReset();
+    parseChatGptJwt.mockReset();
+    parseChatGptJwt.mockResolvedValue({
+      success: true,
+      value: "account-123",
+    });
   });
 
   it("returns 401 when harness credentials are requested without an OAuth bearer", async () => {
@@ -203,6 +220,13 @@ describe("me handlers", () => {
 
   it("returns 400 when the access token cannot provide an account ID", async () => {
     requireOAuthBearer.mockResolvedValueOnce("user-1" as UserId);
+    parseChatGptJwt.mockResolvedValueOnce({
+      success: false,
+      error: {
+        reason: "invalid-jwt",
+        issues: ["Access token could not be verified."],
+      },
+    });
     const repository = new FakeUserOAuthCredentialRepository();
 
     const response = await meHandlers["harness-credentials"][":providerId"].PUT(

@@ -62,4 +62,3 @@ OAuth token refresh is lazy: the server refreshes Codex tokens during run prepar
 - The CLI must be run on a machine that can receive the local OAuth callback, or through suitable SSH port forwarding.
 - Provider logout deletes local/server state only; v1 does not call provider revocation endpoints.
 - Multi-user workspace credential policy is deliberately simple in v1: use the workspace creator's credential.
-- Database migration SQL is still human-owned. Agents can surface generated schema diffs, but should not author migration files.

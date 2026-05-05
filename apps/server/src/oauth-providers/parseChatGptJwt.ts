@@ -1,6 +1,11 @@
+import { createRemoteJWKSet, type JWTPayload, jwtVerify } from "jose";
 import z from "zod";
 
 import type { Result } from "../utils/Result";
+
+export const OPENAI_AUTH_ISSUER = "https://auth0.openai.com/";
+export const OPENAI_CHATGPT_AUDIENCE = "https://api.openai.com/auth";
+const OPENAI_AUTH_JWKS_URL = "https://auth.openai.com/.well-known/jwks.json";
 
 const chatGptJwtPayloadSchema = z.object({
   "https://api.openai.com/auth": z.object({
@@ -9,35 +14,37 @@ const chatGptJwtPayloadSchema = z.object({
 });
 
 export type ParseChatGptJwtError =
-  | { reason: "malformed-jwt"; issues: string[] }
+  | { reason: "invalid-jwt"; issues: string[] }
   | { reason: "invalid-payload"; issues: string[] };
 
-export function parseChatGptJwt(
-  jwt: string,
-): Result<string, ParseChatGptJwtError> {
-  const parts = jwt.split(".");
-  if (parts.length !== 3 || parts[1] === undefined || parts[1] === "") {
-    return {
-      success: false,
-      error: {
-        reason: "malformed-jwt",
-        issues: ["Expected a JWT with three dot-separated parts."],
-      },
-    };
-  }
+export type ChatGptJwtVerifier = (jwt: string) => Promise<JWTPayload>;
 
-  let payload: unknown;
+const openAiAuthJwks = createRemoteJWKSet(new URL(OPENAI_AUTH_JWKS_URL));
+
+const verifyOpenAiChatGptJwt: ChatGptJwtVerifier = async (jwt) => {
+  const { payload } = await jwtVerify(jwt, openAiAuthJwks, {
+    issuer: OPENAI_AUTH_ISSUER,
+    audience: OPENAI_CHATGPT_AUDIENCE,
+  });
+  return payload;
+};
+
+export async function parseChatGptJwt(
+  jwt: string,
+  verifyJwt: ChatGptJwtVerifier = verifyOpenAiChatGptJwt,
+): Promise<Result<string, ParseChatGptJwtError>> {
+  let payload: JWTPayload;
   try {
-    payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    payload = await verifyJwt(jwt);
   } catch (cause) {
     return {
       success: false,
       error: {
-        reason: "malformed-jwt",
+        reason: "invalid-jwt",
         issues: [
           cause instanceof Error
             ? cause.message
-            : "JWT payload could not be decoded.",
+            : "JWT signature or claims could not be verified.",
         ],
       },
     };

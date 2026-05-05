@@ -11,6 +11,12 @@ export function getRelativeCallbackUrl(): string {
   return `${pathname}${search}${hash}`;
 }
 
+declare const validRedirectBrand: unique symbol;
+
+export type ValidRedirect = string & {
+  readonly [validRedirectBrand]: "ValidRedirect";
+};
+
 /**
  * Validate a `redirectTo` value for same-origin path safety.
  *
@@ -20,10 +26,9 @@ export function getRelativeCallbackUrl(): string {
  * fragments. Same-origin enforcement is deliberately conservative — anything
  * we cannot prove is safe is rejected.
  */
-// TODO: Return a branded type for this
 export function sanitizeSameOriginRedirect(
   redirectTo: string | null | undefined,
-): string | null {
+): ValidRedirect | null {
   if (typeof redirectTo !== "string" || redirectTo.length === 0) {
     return null;
   }
@@ -38,7 +43,7 @@ export function sanitizeSameOriginRedirect(
   if (redirectTo.startsWith("/\\")) {
     return null;
   }
-  return redirectTo;
+  return redirectTo as ValidRedirect;
 }
 
 export function handleUnauthenticated(): never {

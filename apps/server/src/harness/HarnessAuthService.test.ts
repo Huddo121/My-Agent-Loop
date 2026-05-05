@@ -32,6 +32,7 @@ describe("EnvHarnessAuthService", () => {
     });
 
     const artifacts = await service.getAuthArtifacts("codex-cli", {
+      kind: "workspace-owner",
       workspaceOwnerUserId: userId,
     });
 
@@ -42,13 +43,13 @@ describe("EnvHarnessAuthService", () => {
     }
   });
 
-  it("keeps opencode available without an API key", () => {
+  it("keeps opencode available without an API key", async () => {
     const service = new EnvHarnessAuthService({});
 
     expect(service.isAvailable("opencode")).toBe(true);
-    expect(service.getFallbackAuthArtifacts("opencode")).toEqual({
-      kind: "none",
-    });
+    await expect(
+      service.getAuthArtifacts("opencode", { kind: "no-workspace-owner" }),
+    ).resolves.toEqual({ kind: "none" });
   });
 });
 
@@ -62,6 +63,7 @@ describe("CompositeHarnessAuthService", () => {
     const service = createCompositeService(repo, provider);
 
     const artifacts = await service.getAuthArtifacts("codex-cli", {
+      kind: "workspace-owner",
       workspaceOwnerUserId: userId,
     });
 
@@ -93,6 +95,7 @@ describe("CompositeHarnessAuthService", () => {
     const service = createCompositeService(repo, provider);
 
     const artifacts = await service.getAuthArtifacts("codex-cli", {
+      kind: "workspace-owner",
       workspaceOwnerUserId: userId,
     });
 
@@ -118,6 +121,7 @@ describe("CompositeHarnessAuthService", () => {
     const service = createCompositeService(repo, provider);
 
     const artifacts = await service.getAuthArtifacts("codex-cli", {
+      kind: "workspace-owner",
       workspaceOwnerUserId: userId,
     });
 
@@ -133,6 +137,7 @@ describe("CompositeHarnessAuthService", () => {
     const service = createCompositeService(repo, provider);
 
     const artifacts = await service.getAuthArtifacts("claude-code", {
+      kind: "workspace-owner",
       workspaceOwnerUserId: userId,
     });
 

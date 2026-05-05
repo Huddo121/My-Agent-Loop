@@ -69,7 +69,7 @@ export const meHandlers: HonoHandlersFor<["me"], MeApi, Services> = {
           return badUserInput("Unsupported harness credential provider.");
         }
 
-        const accountId = parseChatGptJwt(ctx.body.tokens.access_token);
+        const accountId = await parseChatGptJwt(ctx.body.tokens.access_token);
         if (!accountId.success) {
           return badUserInput("Access token is not a valid ChatGPT JWT.");
         }

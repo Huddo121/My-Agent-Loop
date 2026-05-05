@@ -176,12 +176,12 @@ export class WorkflowExecutionService {
       await this.workspaceMembershipsService.getWorkspaceCreatorUserId(
         project.workspaceId,
       );
-    const auth =
+    const auth = await this.harnessAuthService.getAuthArtifacts(
+      harnessId,
       workspaceOwnerUserId === undefined
-        ? this.harnessAuthService.getFallbackAuthArtifacts(harnessId)
-        : await this.harnessAuthService.getAuthArtifacts(harnessId, {
-            workspaceOwnerUserId,
-          });
+        ? { kind: "no-workspace-owner" }
+        : { kind: "workspace-owner", workspaceOwnerUserId },
+    );
     if (harnessId === "codex-cli" && auth.kind === "none") {
       return {
         success: false,

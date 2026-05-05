@@ -45,3 +45,13 @@ See `docs/decisions/agent-harness-configuration.md` for the full design. Key rul
 
 - To add a new harness, implement `AgentHarness` and add an instance to the `harnesses` array in `src/services.ts`. No other registration is needed.
 - Only call `resolveHarnessId` from places that care about resolving the effective configuration.
+
+## User OAuth credentials
+
+User provider OAuth credentials are stored in `user_harness_oauth_credentials` through `src/user-oauth-credentials/UserOAuthCredentialRepository.ts`. Token material must be encrypted with `SaltedEncryptionService` using `OAUTH_CREDENTIALS_ENCRYPTION_KEY`; do not reuse `FORGE_ENCRYPTION_KEY` for this data.
+
+The repository returns decrypted token material wrapped in `ProtectedString`. Never log, serialize, or return OAuth tokens, `keySalt`, or `encryptedTokens` in API responses. Listing endpoints should expose only safe metadata such as `providerId` and `lastRefresh`.
+
+CLI credential APIs under `/api/me/harness-credentials` use OAuth bearer tokens issued to `mal-cli`, resolved with the bearer helper. Do not use browser session helpers such as `requireAuthSession` for these CLI endpoints.
+
+Codex runtime auth resolution prefers the workspace creator's `openai-codex` OAuth credential and falls back to `OPENAI_API_KEY` only when no stored OAuth credential is available.

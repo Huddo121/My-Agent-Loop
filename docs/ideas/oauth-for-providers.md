@@ -1,5 +1,7 @@
 # OAuth for Providers
 
+> Note: the first implemented slice of this idea is documented in [Codex OAuth via mal-cli](../decisions/codex-oauth-via-mal-cli.md). That decision covers the MAL CLI flow, server-side encrypted user OAuth credential storage, and the Codex runtime fallback from OAuth credentials to `OPENAI_API_KEY`.
+
 At the moment I'm just asking for API keys, which is fine, except that if you're using a subscription you might not get an API key, but instead be expected to authenticate with **supported harnesses** using OAuth.
 So, I'd like to be able to mediate that process for a user.
 

@@ -46,7 +46,7 @@ todos:
     status: completed
   - id: documentation
     content: Add `docs/decisions/codex-oauth-via-mal-cli.md`. Update [docs/00-index.md](docs/00-index.md). Annotate [docs/ideas/oauth-for-providers.md](docs/ideas/oauth-for-providers.md). New `apps/mal-cli/AGENTS.md`. Append 'User OAuth credentials' section to [apps/server/AGENTS.md](apps/server/AGENTS.md).
-    status: pending
+    status: completed
   - id: manual-e2e-verification
     content: "Manual smoke test (document in `apps/mal-cli/AGENTS.md`): start postgres+redis+server+frontend dev server, build mal-cli, run `mal-cli login`, then `mal-cli providers login codex`. Confirm `user_harness_oauth_credentials` row exists. Trigger a Codex run on a test task; `docker exec` to inspect `/root/.codex/auth.json`; confirm no `OPENAI_API_KEY` env was set; confirm Codex completed inference under the subscription. Run `pnpm typecheck` and `pnpm check` repo-wide."
     status: pending

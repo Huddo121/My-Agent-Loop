@@ -49,6 +49,9 @@ const envSchema = z
 
     // Forge token encryption (32-byte key as 64 hex chars or 44 base64 chars)
     FORGE_ENCRYPTION_KEY: z.string().nonempty(),
+
+    // OAuth credential blobs at rest (32-byte key; distinct from FORGE_ENCRYPTION_KEY)
+    OAUTH_CREDENTIALS_ENCRYPTION_KEY: z.string().nonempty(),
   })
   .transform((env) => ({
     ...env,

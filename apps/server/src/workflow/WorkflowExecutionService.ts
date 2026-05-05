@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { stringify } from "yaml";
+import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import type { FileSystemService } from "../file-system/FileSystemService";
@@ -95,6 +96,7 @@ export class WorkflowExecutionService {
     private readonly harnesses: readonly AgentHarness[],
     private readonly harnessConfig: AgentHarnessConfigRepository,
     private readonly harnessAuthService: HarnessAuthService,
+    private readonly workspaceMembershipsService: WorkspaceMembershipsService,
     private readonly forgeSecretRepository: ForgeSecretRepository,
     private readonly driverRunTokenStore: DriverRunTokenStore,
     private readonly liveEventsService: LiveEventsService,
@@ -170,7 +172,25 @@ export class WorkflowExecutionService {
         project.id,
         project.workspaceId,
       );
-    if (!this.harnessAuthService.isAvailable(harnessId)) {
+    const workspaceOwnerUserId =
+      await this.workspaceMembershipsService.getWorkspaceCreatorUserId(
+        project.workspaceId,
+      );
+    const auth = await this.harnessAuthService.getAuthArtifacts(
+      harnessId,
+      workspaceOwnerUserId === undefined
+        ? { kind: "no-workspace-owner" }
+        : { kind: "workspace-owner", workspaceOwnerUserId },
+    );
+    if (harnessId === "codex-cli" && auth.kind === "none") {
+      return {
+        success: false,
+        error: new Error(
+          "No Codex credentials are configured for this workspace. Connect OpenAI Codex credentials for the workspace owner or configure OPENAI_API_KEY.",
+        ),
+      };
+    }
+    if (harnessId !== "opencode" && auth.kind === "none") {
       return {
         success: false,
         error: new Error(
@@ -186,12 +206,11 @@ export class WorkflowExecutionService {
       };
     }
 
-    const credential = this.harnessAuthService.getCredential(harnessId);
     const preparation = harness.prepare({
       projectId: project.id,
       taskId: task.id,
       mcpServerUrl: this.options.mcpServerUrl,
-      credentials: credential,
+      auth,
       modelId,
     });
 

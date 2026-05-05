@@ -25,12 +25,14 @@ import { ClaudeCodeHarness } from "./harness/ClaudeCodeHarness";
 import { CodexCliHarness } from "./harness/CodexCliHarness";
 import { CursorCliHarness } from "./harness/CursorCliHarness";
 import {
+  CompositeHarnessAuthService,
   EnvHarnessAuthService,
   type HarnessAuthService,
 } from "./harness/HarnessAuthService";
 import { OpenCodeHarness } from "./harness/OpenCodeHarness";
 import { LiveEventsService } from "./live-events";
 import { ConsoleLogger, type Logger } from "./logger/Logger";
+import { OpenAiCodexProvider } from "./oauth-providers";
 import { DatabaseProjectService } from "./projects/DatabaseProjectService";
 import type { ProjectsService } from "./projects/ProjectsService";
 import { DatabaseRunsService, type RunsService } from "./runs/RunsService";
@@ -41,9 +43,14 @@ import {
 } from "./sandbox/SandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
+  DefaultUserOAuthCredentialRepository,
+  type UserOAuthCredentialRepository,
+} from "./user-oauth-credentials";
+import {
   DefaultEncryptionService,
   type EncryptionService,
 } from "./utils/EncryptionService";
+import { SaltedEncryptionService } from "./utils/SaltedEncryptionService";
 import { BackgroundWorkflowProcessor } from "./workflow/BackgroundWorkflowProcessor";
 import { WorkflowExecutionService } from "./workflow/WorkflowExecutionService";
 import {
@@ -70,7 +77,9 @@ export interface Services {
   workspaceMembershipsService: WorkspaceMembershipsService;
   runsService: RunsService;
   encryptionService: EncryptionService;
+  saltedEncryptionService: SaltedEncryptionService;
   forgeSecretRepository: ForgeSecretRepository;
+  userOAuthCredentialRepository: UserOAuthCredentialRepository;
   agentHarnessConfigRepository: AgentHarnessConfigRepository;
   harnessAuthService: HarnessAuthService;
   harnesses: readonly AgentHarness[];
@@ -81,8 +90,14 @@ export interface Services {
 const encryptionService = new DefaultEncryptionService(
   env.FORGE_ENCRYPTION_KEY,
 );
+const saltedEncryptionService = new SaltedEncryptionService(
+  env.OAUTH_CREDENTIALS_ENCRYPTION_KEY,
+);
 const forgeSecretRepository = new DefaultForgeSecretRepository(
   encryptionService,
+);
+const userOAuthCredentialRepository = new DefaultUserOAuthCredentialRepository(
+  saltedEncryptionService,
 );
 
 const gitService = new SimpleGitService();
@@ -95,12 +110,18 @@ const taskQueue = new DatabaseTaskQueue();
 const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
-const harnessAuthService = new EnvHarnessAuthService({
+const envHarnessAuthService = new EnvHarnessAuthService({
   OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
   CURSOR_API_KEY: env.CURSOR_API_KEY,
   OPENAI_API_KEY: env.OPENAI_API_KEY,
 });
+const openAiCodexProvider = new OpenAiCodexProvider();
+const harnessAuthService = new CompositeHarnessAuthService(
+  envHarnessAuthService,
+  userOAuthCredentialRepository,
+  openAiCodexProvider,
+);
 const workspacesService = new DatabaseWorkspacesService(
   agentHarnessConfigRepository,
   workspaceMembershipsService,
@@ -148,6 +169,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   harnesses,
   agentHarnessConfigRepository,
   harnessAuthService,
+  workspaceMembershipsService,
   forgeSecretRepository,
   driverRunTokenStore,
   liveEventsService,
@@ -186,7 +208,9 @@ export const services: Services = {
   workspaceMembershipsService,
   runsService,
   encryptionService,
+  saltedEncryptionService,
   forgeSecretRepository,
+  userOAuthCredentialRepository,
   agentHarnessConfigRepository,
   harnessAuthService,
   harnesses,

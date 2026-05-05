@@ -1,16 +1,39 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
-import { magicLink } from "better-auth/plugins";
+import { jwt, magicLink } from "better-auth/plugins";
 import { db } from "../db";
 import {
   accountTable,
+  jwksTable,
+  oauthAccessTokenTable,
+  oauthClientTable,
+  oauthConsentTable,
+  oauthRefreshTokenTable,
   sessionTable,
   userTable,
   verificationTable,
 } from "../db/schema";
 import { env } from "../env";
 
+/** Where Better Auth is mounted (`/oauth2/*`, session, magic link, …). */
 const authBaseURL = new URL("/api/auth", env.APP_BASE_URL).toString();
+
+// OAuth/JWT issuer is the public app origin so discovery stays at
+// `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
+// Endpoints in AS metadata still use `authBaseURL` (see oauth-provider).
+const issuer = new URL(env.APP_BASE_URL).origin;
+
+// The frontend sign-in surface today is the `AuthGate` component rendered at
+// the root path when the user has no session, so the OAuth login prompt
+// redirects there. A future TODO may introduce a dedicated `/sign-in` route;
+// once it does this should be updated to match.
+const loginPage = new URL("/", env.APP_BASE_URL).toString();
+
+// Placeholder for the dedicated frontend OAuth consent route. The
+// `frontend-oauth-consent-route` TODO will create the actual React Router
+// route at this path. Keep these in sync.
+const consentPage = new URL("/oauth/consent", env.APP_BASE_URL).toString();
 
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
@@ -26,6 +49,11 @@ export const auth = betterAuth({
       session: sessionTable,
       account: accountTable,
       verification: verificationTable,
+      jwks: jwksTable,
+      oauthClient: oauthClientTable,
+      oauthRefreshToken: oauthRefreshTokenTable,
+      oauthAccessToken: oauthAccessTokenTable,
+      oauthConsent: oauthConsentTable,
     },
   }),
   plugins: [
@@ -33,6 +61,31 @@ export const auth = betterAuth({
       sendMagicLink: async ({ email, url }) => {
         console.info("Magic link requested", { email, url });
       },
+    }),
+    // The jwt plugin must be registered for the oauth-provider plugin so
+    // access/id tokens are signed asymmetrically and a JWKS endpoint is
+    // exposed. We disable middleware-set JWT headers per the Better Auth
+    // docs because session payloads should not be signed when running as an
+    // OAuth provider.
+    jwt({
+      jwt: {
+        issuer,
+        audience: issuer,
+      },
+      disableSettingJwtHeader: true,
+    }),
+    oauthProvider({
+      scopes: ["openid", "profile", "email", "offline_access"],
+      silenceWarnings: {
+        oauthAuthServerConfig: true,
+        openidConfig: true,
+      },
+      // Tokens issued for the `mal-cli` client are audienced at the issuer
+      // itself. Additional audiences (e.g. resource servers) can be added
+      // here as the surface grows.
+      validAudiences: [issuer],
+      loginPage,
+      consentPage,
     }),
   ],
 });

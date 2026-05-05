@@ -10,9 +10,11 @@ Review the `docs` directory to understand some of the specifics of this project.
   - E.g. don't modify package.json to add a dependency, use a `pnpm` command to do it
   - Don't scaffold out a shadcn component from memory, use the CLI command to do it
 - If you modify the documentation, be sure to update the `00-index.md` if necessary
+  - `00-index.md` should list top-level docs and folders only. Do not add individual decision records under the Decisions entry.
 - Run the `typecheck` and `check` scripts in `package.json` before finishing your task, and endeavour to resolve all found issues.
 - When completing a task, aim to complete the task and don't try to do too much beyond what was asked of you unless it is strictly required to complete your objective
 - If you wish to introduce a new pattern or technology to the codebase, be sure to document it in the `docs/decisions` folder in a markdown file
 - Leverage the `webfetch` tool to get the latest information on things, or to review the documentation of libraries and tools you're using.
   - Repeat the important parts of what you find when you do so
 - When the user is planning work with you, or gives you a set of instructions for work to complete, you are strongly encouraged to ask clarifying questions. Focus especially on missed states and edge cases. If the user suggests a technology to use, and you think there's a better one, surface it as a suggestion before continuing.
+- When the user asks you a question, do not immediately go off and change the code. Present answers to questions, and ask the user if you should execute on the option.

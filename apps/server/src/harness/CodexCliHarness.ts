@@ -28,8 +28,8 @@ export class CodexCliHarness implements AgentHarness {
   readonly id = "codex-cli" as const;
   readonly displayName = "Codex CLI";
   readonly models: readonly HarnessModel[] = [
-    { id: "gpt-5.4", displayName: "GPT-5.4" },
-    { id: "gpt-5.3-codex-spark", displayName: "Codex Spark" },
+    { id: "gpt-5.5", displayName: "GPT-5.5" },
+    { id: "gpt-5.4-mini", displayName: "GPT-5.4 Mini" },
   ];
 
   prepare(context: HarnessPreparationContext): AgentHarnessPreparation {
@@ -38,17 +38,22 @@ export class CodexCliHarness implements AgentHarness {
       [ENV_VAR_PROJECT_ID]: context.projectId,
       [ENV_VAR_TASK_ID]: context.taskId,
     };
-    if (context.credentials !== undefined) {
-      env.OPENAI_API_KEY = context.credentials.getSecretValue();
+    const files = [
+      {
+        containerPath: CODEX_CONFIG_PATH,
+        contents: configToml,
+      },
+    ];
+
+    if (context.auth.kind === "api-key") {
+      env[context.auth.envName] = context.auth.value.getSecretValue();
+    } else if (context.auth.kind === "files-and-env") {
+      files.push(...context.auth.files);
+      Object.assign(env, context.auth.env);
     }
 
     return {
-      files: [
-        {
-          containerPath: CODEX_CONFIG_PATH,
-          contents: configToml,
-        },
-      ],
+      files,
       setupCommands: [],
       runCommand: this.getRunCommand(context.modelId),
       env,

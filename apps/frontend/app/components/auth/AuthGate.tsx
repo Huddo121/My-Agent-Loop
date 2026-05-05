@@ -1,13 +1,24 @@
 import { Network } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { getRelativeCallbackUrl, useMagicLinkSignIn } from "~/lib/auth";
+import {
+  getRelativeCallbackUrl,
+  sanitizeSameOriginRedirect,
+  useMagicLinkSignIn,
+} from "~/lib/auth";
 
 export function AuthGate() {
   const [email, setEmail] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const signIn = useMagicLinkSignIn();
+  const [searchParams] = useSearchParams();
+
+  // If the user landed here via `?redirectTo=/...`, send them back to that
+  // path after the magic-link round trip. Validate same-origin to avoid open
+  // redirects; reject anything cross-origin and fall back to the default.
+  const redirectTo = sanitizeSameOriginRedirect(searchParams.get("redirectTo"));
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -18,7 +29,7 @@ export function AuthGate() {
     signIn.mutate(
       {
         email: normalizedEmail,
-        callbackURL: getRelativeCallbackUrl(),
+        callbackURL: redirectTo ?? getRelativeCallbackUrl(),
       },
       {
         onSuccess: () => {

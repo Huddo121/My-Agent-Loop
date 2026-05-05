@@ -6,10 +6,10 @@ const AUTH_TAG_LENGTH = 16;
 const KEY_LENGTH_BYTES = 32;
 
 /**
- * Parses a master key from env (32-byte hex or base64).
- * Returns a Buffer of exactly 32 bytes.
+ * Parses a 32-byte master key from env (64 hex chars or 44-char base64).
+ * `keyEnvName` is used only in error messages.
  */
-function parseMasterKey(raw: string): Buffer {
+export function parse32ByteMasterKey(raw: string, keyEnvName: string): Buffer {
   let buf: Buffer;
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {
     buf = Buffer.from(raw, "hex");
@@ -18,7 +18,7 @@ function parseMasterKey(raw: string): Buffer {
   }
   if (buf.length !== KEY_LENGTH_BYTES) {
     throw new Error(
-      `FORGE_ENCRYPTION_KEY must decode to 32 bytes (got ${buf.length}). Use 64 hex chars or 44 base64 chars.`,
+      `${keyEnvName} must decode to 32 bytes (got ${buf.length}). Use 64 hex chars or 44 base64 chars.`,
     );
   }
   return buf;
@@ -33,7 +33,7 @@ export class DefaultEncryptionService implements EncryptionService {
   private readonly key: Buffer;
 
   constructor(masterKeyRaw: string) {
-    this.key = parseMasterKey(masterKeyRaw);
+    this.key = parse32ByteMasterKey(masterKeyRaw, "FORGE_ENCRYPTION_KEY");
   }
 
   encrypt(plaintext: string): string {

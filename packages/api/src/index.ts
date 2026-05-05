@@ -1,4 +1,5 @@
 import { adminApi } from "./admin/admin-api";
+import { meApi } from "./me/me-api";
 import { sessionApi } from "./session/session-api";
 import { workspacesApi } from "./workspaces/workspaces-api";
 
@@ -6,6 +7,7 @@ export * from "./admin/admin-api";
 export * from "./handler-utils";
 export * from "./harnesses/harnesses-model";
 export * from "./live-events";
+export * from "./me/me-api";
 export * from "./projects/projects-api";
 export * from "./projects/projects-model";
 export * from "./runs/runs-api";
@@ -22,6 +24,7 @@ export {
 export const myAgentLoopApi = {
   session: sessionApi,
   admin: adminApi,
+  me: meApi,
   workspaces: workspacesApi,
 };
 

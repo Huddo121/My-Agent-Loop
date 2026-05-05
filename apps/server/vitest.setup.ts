@@ -7,4 +7,6 @@ process.env.REDIS_HOST ??= "127.0.0.1";
 process.env.BETTER_AUTH_SECRET ??= "test-better-auth-secret-min-32-chars!";
 process.env.FORGE_ENCRYPTION_KEY ??=
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+process.env.OAUTH_CREDENTIALS_ENCRYPTION_KEY ??=
+  "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 process.env.NODE_ENV ??= "test";

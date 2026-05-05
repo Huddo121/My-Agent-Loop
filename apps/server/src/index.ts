@@ -1,13 +1,19 @@
+import {
+  oauthProviderAuthServerMetadata,
+  oauthProviderOpenIdConfigMetadata,
+} from "@better-auth/oauth-provider";
 import { serve } from "@hono/node-server";
 import { myAgentLoopApi } from "@mono/api";
 import { driverApi } from "@mono/driver-api";
 import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
+import { ensureMalCliClient } from "./auth/oauth-client-seed";
 import { driverApiHandlers } from "./driver-api/driver-api-handlers";
 import { env } from "./env";
 import { handleLiveEvents } from "./live-events/live-events-route";
 import { startMcp } from "./mcp";
+import { meHandlers } from "./me/me-handlers";
 import { services } from "./services";
 import { sessionHandlers } from "./session/session-handlers";
 import { workspacesHandlers } from "./workspaces/workspaces-handlers";
@@ -48,6 +54,7 @@ const app = createHonoServer(
   {
     session: sessionHandlers,
     admin: adminHandlers,
+    me: meHandlers,
     workspaces: workspacesHandlers,
     internal: driverApiHandlers,
   },
@@ -58,9 +65,23 @@ app.on(["GET", "POST"], "/api/auth/*", async (ctx) => {
   return auth.handler(ctx.req.raw);
 });
 
+const oauthAuthorizationServerMetadata = oauthProviderAuthServerMetadata(auth);
+const openIdConfigurationMetadata = oauthProviderOpenIdConfigMetadata(auth);
+
+// Issuer is the app origin; RFC 8414 / OIDC discovery at host root (see `jwt.issuer` in auth.ts).
+app.get("/.well-known/oauth-authorization-server", async (ctx) => {
+  return oauthAuthorizationServerMetadata(ctx.req.raw);
+});
+
+app.get("/.well-known/openid-configuration", async (ctx) => {
+  return openIdConfigurationMetadata(ctx.req.raw);
+});
+
 app.get("/api/workspaces/:workspaceId/live-events", async (ctx) => {
   return handleLiveEvents(ctx, services);
 });
+
+await ensureMalCliClient();
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`);

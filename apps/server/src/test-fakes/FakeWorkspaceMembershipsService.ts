@@ -5,21 +5,35 @@ import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsSe
 const memberKey = (userId: UserId, workspaceId: WorkspaceId) =>
   `${userId}:${workspaceId}`;
 
+type WorkspaceMember = {
+  userId: UserId;
+  workspaceId: WorkspaceId;
+  createdAt: Date;
+};
+
 /**
  * In-memory membership and access rules mirroring production checks at a high level.
  */
 export class FakeWorkspaceMembershipsService
   implements WorkspaceMembershipsService
 {
-  private readonly workspaceMembers = new Set<string>();
+  private readonly workspaceMembers = new Map<string, WorkspaceMember>();
   private readonly projectWorkspace = new Map<ProjectId, WorkspaceId>();
   private readonly taskContext = new Map<
     TaskId,
     { workspaceId: WorkspaceId; projectId: ProjectId }
   >();
 
-  grantWorkspaceMember(userId: UserId, workspaceId: WorkspaceId): void {
-    this.workspaceMembers.add(memberKey(userId, workspaceId));
+  grantWorkspaceMember(
+    userId: UserId,
+    workspaceId: WorkspaceId,
+    createdAt: Date = new Date(),
+  ): void {
+    this.workspaceMembers.set(memberKey(userId, workspaceId), {
+      userId,
+      workspaceId,
+      createdAt,
+    });
   }
 
   /** Declare that a project belongs to a workspace (required for `canAccessProject`). */
@@ -37,14 +51,30 @@ export class FakeWorkspaceMembershipsService
   }
 
   async userHasAnyWorkspace(userId: UserId): Promise<boolean> {
-    for (const key of this.workspaceMembers) {
-      if (key.startsWith(`${userId}:`)) return true;
+    for (const member of this.workspaceMembers.values()) {
+      if (member.userId === userId) return true;
     }
     return false;
   }
 
   async addMembership(userId: UserId, workspaceId: WorkspaceId): Promise<void> {
-    this.workspaceMembers.add(memberKey(userId, workspaceId));
+    this.grantWorkspaceMember(userId, workspaceId);
+  }
+
+  async getWorkspaceCreatorUserId(
+    workspaceId: WorkspaceId,
+  ): Promise<UserId | undefined> {
+    const members = [...this.workspaceMembers.values()]
+      .filter((member) => member.workspaceId === workspaceId)
+      .sort((left, right) => {
+        const createdAtComparison =
+          left.createdAt.getTime() - right.createdAt.getTime();
+        if (createdAtComparison !== 0) {
+          return createdAtComparison;
+        }
+        return left.userId.localeCompare(right.userId);
+      });
+    return members[0]?.userId;
   }
 
   async isWorkspaceMember(

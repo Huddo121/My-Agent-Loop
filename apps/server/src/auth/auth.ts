@@ -84,10 +84,6 @@ export const auth = betterAuth({
       // itself. Additional audiences (e.g. resource servers) can be added
       // here as the surface grows.
       validAudiences: [issuer],
-      // `mal-cli` is a first-party CLI bundled with this product; cache it as
-      // a trusted client so it bypasses the consent prompt and the row is
-      // immutable through the CRUD endpoints.
-      cachedTrustedClients: new Set(["mal-cli"]),
       loginPage,
       consentPage,
     }),

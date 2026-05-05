@@ -36,7 +36,7 @@ export async function ensureMalCliClient(): Promise<void> {
         clientId: MAL_CLI_CLIENT_ID,
         clientSecret: null,
         disabled: false,
-        skipConsent: true,
+        skipConsent: false,
         scopes: [...MAL_CLI_SCOPES],
         redirectUris: [...MAL_CLI_REDIRECT_URIS],
         tokenEndpointAuthMethod: "none",
@@ -53,7 +53,7 @@ export async function ensureMalCliClient(): Promise<void> {
         set: {
           clientSecret: null,
           disabled: false,
-          skipConsent: true,
+          skipConsent: false,
           scopes: [...MAL_CLI_SCOPES],
           redirectUris: [...MAL_CLI_REDIRECT_URIS],
           tokenEndpointAuthMethod: "none",

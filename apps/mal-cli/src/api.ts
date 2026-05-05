@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getConfig } from "./config";
-import { isExpired, refreshMalToken } from "./oauth";
+import { getConfig, getMalOAuthResource } from "./config";
+import { needsMalTokenRefresh, refreshMalToken } from "./oauth";
 import { readAuthFile, writeAuthFile } from "./storage";
 
 const credentialSummarySchema = z.object({
@@ -26,7 +26,7 @@ export async function getMalAccessToken(): Promise<string> {
   }
 
   const config = getConfig();
-  if (!isExpired(authFile.mal)) {
+  if (!needsMalTokenRefresh(authFile.mal)) {
     return authFile.mal.accessToken;
   }
 
@@ -34,6 +34,7 @@ export async function getMalAccessToken(): Promise<string> {
     const refreshed = await refreshMalToken(
       `${config.malAuthBaseUrl}/oauth2/token`,
       authFile.mal,
+      getMalOAuthResource(config),
     );
     await writeAuthFile({ ...authFile, mal: refreshed });
     return refreshed.accessToken;

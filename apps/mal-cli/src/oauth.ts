@@ -47,6 +47,15 @@ export function isExpired(token: StoredToken, clock = new Date()): boolean {
   return new Date(token.expiresAt).getTime() <= clock.getTime() + 30_000;
 }
 
+export function needsMalTokenRefresh(
+  token: StoredToken,
+  clock = new Date(),
+): boolean {
+  return (
+    isExpired(token, clock) || decodeJwtPayload(token.accessToken) === null
+  );
+}
+
 export function tokenResponseToStoredToken(
   response: TokenResponse,
   previous?: StoredToken,
@@ -103,6 +112,7 @@ export async function exchangeToken(
 export async function refreshMalToken(
   tokenUrl: string,
   token: StoredToken,
+  resource: string,
 ): Promise<StoredToken> {
   const response = await exchangeToken(
     tokenUrl,
@@ -110,6 +120,7 @@ export async function refreshMalToken(
       grant_type: "refresh_token",
       refresh_token: token.refreshToken,
       client_id: malOAuthConfig.clientId,
+      resource,
     }),
   );
 

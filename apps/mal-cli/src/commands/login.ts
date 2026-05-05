@@ -1,4 +1,4 @@
-import { getConfig, malOAuthConfig } from "../config";
+import { getConfig, getMalOAuthResource, malOAuthConfig } from "../config";
 import { exchangeToken, tokenResponseToStoredToken } from "../oauth";
 import { runOAuthFlow } from "../oauthFlow";
 import { createPkceChallenge } from "../pkce";
@@ -35,6 +35,7 @@ export async function login(): Promise<void> {
       redirect_uri: malOAuthConfig.redirectUri,
       client_id: malOAuthConfig.clientId,
       code_verifier: pkce.codeVerifier,
+      resource: getMalOAuthResource(config),
     }),
   );
 

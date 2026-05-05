@@ -22,6 +22,10 @@ export function getConfig(): CliConfig {
   };
 }
 
+export function getMalOAuthResource(config: CliConfig): string {
+  return new URL(config.malBaseUrl).origin;
+}
+
 export const malOAuthConfig = {
   clientId: "mal-cli",
   redirectUri: "http://localhost:53682/auth/callback",

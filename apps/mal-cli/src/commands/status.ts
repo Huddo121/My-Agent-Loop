@@ -1,6 +1,6 @@
 import { listHarnessCredentials } from "../api";
 import { getConfig } from "../config";
-import { isExpired } from "../oauth";
+import { needsMalTokenRefresh } from "../oauth";
 import { readAuthFile } from "../storage";
 
 export async function status(): Promise<void> {
@@ -15,7 +15,7 @@ export async function status(): Promise<void> {
 
   console.log(
     `MAL (${config.malBaseUrl}): logged in${
-      isExpired(authFile.mal) ? " (refresh needed)" : ""
+      needsMalTokenRefresh(authFile.mal) ? " (refresh needed)" : ""
     }`,
   );
 

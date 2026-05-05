@@ -2,24 +2,15 @@ import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { magicLinkClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-type AuthSession = {
-  data: unknown | null;
-  isPending: boolean;
-  isRefetching: boolean;
-  error: unknown | null;
-  refetch: () => Promise<void>;
-};
-
-type AppAuthClient = {
-  useSession: () => AuthSession;
-  signIn: {
-    magicLink: (input: {
-      email: string;
-      callbackURL: string;
-    }) => Promise<unknown>;
-  };
-};
-
-export const authClient = createAuthClient({
+const authClientOptions: {
+  plugins: [
+    ReturnType<typeof magicLinkClient>,
+    ReturnType<typeof oauthProviderClient>,
+  ];
+} = {
   plugins: [magicLinkClient(), oauthProviderClient()],
-}) as unknown as AppAuthClient;
+};
+
+type AuthClient = ReturnType<typeof createAuthClient<typeof authClientOptions>>;
+
+export const authClient: AuthClient = createAuthClient(authClientOptions);

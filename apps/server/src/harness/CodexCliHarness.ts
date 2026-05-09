@@ -64,7 +64,13 @@ export class CodexCliHarness implements AgentHarness {
     // Codex Streamable HTTP MCP: url + env_http_headers (header name -> env var name).
     // Container env MAL_PROJECT_ID / MAL_TASK_ID are sent as X-MAL-Project-ID / X-MAL-Task-ID.
     const url = escapeTomlString(mcpServerUrl);
-    return `[mcp_servers."my-agent-loop-tools"]
+    // The container itself is the sandbox, so disable Codex's own bwrap-based
+    // sandbox — Ubuntu 24.04 blocks unprivileged user namespaces under AppArmor
+    // and bwrap fails to start at all.
+    return `sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
+[mcp_servers."my-agent-loop-tools"]
 url = "${url}"
 env_http_headers = { "${MAL_PROJECT_ID_HEADER}" = "${ENV_VAR_PROJECT_ID}", "${MAL_TASK_ID_HEADER}" = "${ENV_VAR_TASK_ID}" }
 `;

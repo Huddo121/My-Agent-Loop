@@ -56,7 +56,7 @@ export function HarnessSelect({
               <span>{h.displayName}</span>
               {!h.isAvailable && (
                 <span className="text-muted-foreground text-xs font-normal">
-                  — API key not set
+                  — credentials not configured
                 </span>
               )}
             </span>

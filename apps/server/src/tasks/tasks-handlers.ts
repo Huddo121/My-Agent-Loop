@@ -12,7 +12,10 @@ import {
 import type { HonoHandlersFor } from "cerato";
 import { requireAuthSession } from "../auth/session";
 import type { Database } from "../db";
-import { validateAgentConfig } from "../harness";
+import {
+  resolveWorkspaceHarnessAuthContext,
+  validateAgentConfig,
+} from "../harness";
 import type { ScopedHarnessConfig } from "../harness/AgentHarnessConfigRepository";
 import type { Services } from "../services";
 import type { Task } from "../task-queue/TaskQueue";
@@ -143,13 +146,6 @@ export const tasksHandlers: HonoHandlersFor<
     if (authSession === null) {
       return unauthenticated();
     }
-    const validationError = validateAgentConfig(ctx.body.agentConfig, {
-      harnessAuthService: ctx.services.harnessAuthService,
-      harnesses: ctx.services.harnesses,
-    });
-    if (validationError !== null) {
-      return badUserInput(validationError);
-    }
     return withNewTransaction(ctx.services.db, async () => {
       const canAccess =
         await ctx.services.workspaceMembershipsService.canAccessProject(
@@ -159,6 +155,17 @@ export const tasksHandlers: HonoHandlersFor<
         );
       if (!canAccess) {
         return notFound();
+      }
+      const validationError = await validateAgentConfig(ctx.body.agentConfig, {
+        harnessAuthService: ctx.services.harnessAuthService,
+        harnesses: ctx.services.harnesses,
+        authContext: await resolveWorkspaceHarnessAuthContext(
+          ctx.services.workspaceMembershipsService,
+          workspaceId as WorkspaceId,
+        ),
+      });
+      if (validationError !== null) {
+        return badUserInput(validationError);
       }
       const task = await ctx.services.taskQueue.addTask(
         projectId as ProjectId,
@@ -239,13 +246,6 @@ export const tasksHandlers: HonoHandlersFor<
       if (authSession === null) {
         return unauthenticated();
       }
-      const validationError = validateAgentConfig(ctx.body.agentConfig, {
-        harnessAuthService: ctx.services.harnessAuthService,
-        harnesses: ctx.services.harnesses,
-      });
-      if (validationError !== null) {
-        return badUserInput(validationError);
-      }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
           await ctx.services.workspaceMembershipsService.canAccessTask(
@@ -256,6 +256,20 @@ export const tasksHandlers: HonoHandlersFor<
           );
         if (!canAccess) {
           return notFound();
+        }
+        const validationError = await validateAgentConfig(
+          ctx.body.agentConfig,
+          {
+            harnessAuthService: ctx.services.harnessAuthService,
+            harnesses: ctx.services.harnesses,
+            authContext: await resolveWorkspaceHarnessAuthContext(
+              ctx.services.workspaceMembershipsService,
+              workspaceId as WorkspaceId,
+            ),
+          },
+        );
+        if (validationError !== null) {
+          return badUserInput(validationError);
         }
         const task = await ctx.services.taskQueue.updateTask(taskId as TaskId, {
           title: ctx.body.title,

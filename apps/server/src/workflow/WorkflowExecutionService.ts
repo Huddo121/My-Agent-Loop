@@ -79,7 +79,7 @@ const buildDriverCliArgs = (options: {
     ["--driver-token", options.driverToken],
     ["--harness-command", options.harnessCommand],
   ]
-    .map(([flag, value]) => `${flag} ${shellQuote(value)}`)
+    .map(([flag, value]) => `${flag}=${shellQuote(value)}`)
     .join(" ");
 
 /**

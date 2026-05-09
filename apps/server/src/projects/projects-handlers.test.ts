@@ -1,6 +1,12 @@
-import type { ProjectId, ProjectShortCode, WorkspaceId } from "@mono/api";
+import type {
+  AgentHarnessId,
+  ProjectId,
+  ProjectShortCode,
+  WorkspaceId,
+} from "@mono/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserId } from "../auth/UserId";
+import type { HarnessAvailability } from "../harness/HarnessAuthService";
 import {
   FakeDatabase,
   FakeForgeSecretRepository,
@@ -20,13 +26,21 @@ vi.mock(import("../auth/session"), () => ({
 
 const projectRouteHandlers = projectsHandlers[":projectId"];
 type ProjectGetContext = Parameters<typeof projectRouteHandlers.GET>[0];
+type ProjectPatchContext = Parameters<typeof projectRouteHandlers.PATCH>[0];
 
-function createCtx(overrides?: { body?: unknown }) {
+function createCtx(overrides?: {
+  body?: unknown;
+  harnessAvailability?: HarnessAvailability;
+}) {
   const db = new FakeDatabase();
   const workspaceMembershipsService = new FakeWorkspaceMembershipsService();
   const projectsService = new FakeProjectsService();
   const forgeSecretRepository = new FakeForgeSecretRepository();
   const liveEventsService = new RecordingLiveEventsService();
+  const harnessAvailability = overrides?.harnessAvailability ?? {
+    isAvailable: false,
+    source: "none",
+  };
 
   const ctx = {
     hono: {
@@ -44,10 +58,54 @@ function createCtx(overrides?: { body?: unknown }) {
       projectsService,
       forgeSecretRepository,
       liveEventsService,
+      harnessAuthService: {
+        getAvailability: vi.fn(async () => harnessAvailability),
+        isAvailable: vi.fn(() => harnessAvailability.isAvailable),
+      },
+      harnesses: [
+        {
+          id: "codex-cli" as AgentHarnessId,
+          displayName: "Codex CLI",
+          models: [],
+          prepare: vi.fn(),
+        },
+      ],
     },
   };
 
   return ctx;
+}
+
+function seedProject(ctx: ReturnType<typeof createCtx>) {
+  const projects = ctx.services.projectsService as FakeProjectsService;
+  projects.seed({
+    id: "project-1" as ProjectId,
+    workspaceId: "workspace-1" as WorkspaceId,
+    name: "Original",
+    shortCode: "PRJ" as ProjectShortCode,
+    repositoryUrl: "https://github.com/owner/repo",
+    workflowConfiguration: {
+      version: "1",
+      onTaskCompleted: "push-branch",
+    },
+    queueState: "idle",
+    forgeType: "github",
+    forgeBaseUrl: "https://github.com",
+    agentConfig: null,
+  });
+}
+
+function grantProjectAccess(ctx: ReturnType<typeof createCtx>) {
+  const memberships = ctx.services
+    .workspaceMembershipsService as FakeWorkspaceMembershipsService;
+  memberships.grantWorkspaceMember(
+    "user-1" as UserId,
+    "workspace-1" as WorkspaceId,
+  );
+  memberships.setProjectWorkspace(
+    "project-1" as ProjectId,
+    "workspace-1" as WorkspaceId,
+  );
 }
 
 describe("projects handlers", () => {
@@ -75,33 +133,8 @@ describe("projects handlers", () => {
     const ctx = createCtx({
       body: { name: "Updated name" },
     });
-    const memberships = ctx.services
-      .workspaceMembershipsService as FakeWorkspaceMembershipsService;
-    memberships.grantWorkspaceMember(
-      "user-1" as UserId,
-      "workspace-1" as WorkspaceId,
-    );
-    memberships.setProjectWorkspace(
-      "project-1" as ProjectId,
-      "workspace-1" as WorkspaceId,
-    );
-
-    const projects = ctx.services.projectsService as FakeProjectsService;
-    projects.seed({
-      id: "project-1" as ProjectId,
-      workspaceId: "workspace-1" as WorkspaceId,
-      name: "Original",
-      shortCode: "PRJ" as ProjectShortCode,
-      repositoryUrl: "https://github.com/owner/repo",
-      workflowConfiguration: {
-        version: "1",
-        onTaskCompleted: "push-branch",
-      },
-      queueState: "idle",
-      forgeType: "github",
-      forgeBaseUrl: "https://github.com",
-      agentConfig: null,
-    });
+    grantProjectAccess(ctx);
+    seedProject(ctx);
 
     const response = await projectsHandlers[":projectId"].PATCH(
       ctx as unknown as Parameters<
@@ -124,5 +157,61 @@ describe("projects handlers", () => {
         }),
       }),
     ]);
+  });
+
+  it("accepts Codex project config when workspace-scoped auth is available", async () => {
+    requireAuthSession.mockResolvedValueOnce({
+      user: { id: "user-1" },
+    });
+    const ctx = createCtx({
+      body: {
+        agentConfig: {
+          harnessId: "codex-cli",
+          modelId: null,
+        },
+      },
+      harnessAvailability: {
+        isAvailable: true,
+        source: "workspace-owner-oauth",
+      },
+    });
+    grantProjectAccess(ctx);
+    seedProject(ctx);
+
+    const response = await projectsHandlers[":projectId"].PATCH(
+      ctx as unknown as ProjectPatchContext,
+    );
+
+    expect(response[0]).toBe(200);
+    expect(response[1]).toMatchObject({
+      agentConfig: { harnessId: "codex-cli", modelId: null },
+    });
+  });
+
+  it("rejects Codex project config when no accepted credential source exists", async () => {
+    requireAuthSession.mockResolvedValueOnce({
+      user: { id: "user-1" },
+    });
+    const ctx = createCtx({
+      body: {
+        agentConfig: {
+          harnessId: "codex-cli",
+          modelId: null,
+        },
+      },
+      harnessAvailability: { isAvailable: false, source: "none" },
+    });
+    grantProjectAccess(ctx);
+    seedProject(ctx);
+
+    const response = await projectsHandlers[":projectId"].PATCH(
+      ctx as unknown as ProjectPatchContext,
+    );
+
+    expect(response[0]).toBe(400);
+    expect(response[1]).toMatchObject({
+      message:
+        'Agent harness "codex-cli" is not available (credentials not configured).',
+    });
   });
 });

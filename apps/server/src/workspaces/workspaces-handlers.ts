@@ -8,7 +8,10 @@ import {
 } from "@mono/api";
 import type { HonoHandlersFor } from "cerato";
 import { requireAuthSession } from "../auth/session";
-import { validateAgentConfig } from "../harness";
+import {
+  resolveWorkspaceHarnessAuthContext,
+  validateAgentConfig,
+} from "../harness";
 import { projectsHandlers } from "../projects/projects-handlers";
 import type { Services } from "../services";
 import { withNewTransaction } from "../utils/transaction-context";
@@ -63,13 +66,6 @@ export const workspacesHandlers: HonoHandlersFor<
         return unauthenticated();
       }
       const body = ctx.body;
-      const validationError = validateAgentConfig(body.agentConfig, {
-        harnessAuthService: ctx.services.harnessAuthService,
-        harnesses: ctx.services.harnesses,
-      });
-      if (validationError !== null) {
-        return badUserInput(validationError);
-      }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
           await ctx.services.workspaceMembershipsService.isWorkspaceMember(
@@ -78,6 +74,17 @@ export const workspacesHandlers: HonoHandlersFor<
           );
         if (!canAccess) {
           return notFound();
+        }
+        const validationError = await validateAgentConfig(body.agentConfig, {
+          harnessAuthService: ctx.services.harnessAuthService,
+          harnesses: ctx.services.harnesses,
+          authContext: await resolveWorkspaceHarnessAuthContext(
+            ctx.services.workspaceMembershipsService,
+            workspaceId as WorkspaceId,
+          ),
+        });
+        if (validationError !== null) {
+          return badUserInput(validationError);
         }
         const agentConfig =
           body.agentConfig === undefined
@@ -123,15 +130,26 @@ export const workspacesHandlers: HonoHandlersFor<
           if (workspace === undefined) {
             return notFound();
           }
-          const harnesses = ctx.services.harnesses.map((h) => ({
-            id: h.id,
-            displayName: h.displayName,
-            isAvailable: ctx.services.harnessAuthService.isAvailable(h.id),
-            models: h.models.map((m) => ({
-              id: m.id,
-              displayName: m.displayName,
+          const authContext = await resolveWorkspaceHarnessAuthContext(
+            ctx.services.workspaceMembershipsService,
+            workspaceId as WorkspaceId,
+          );
+          const harnesses = await Promise.all(
+            ctx.services.harnesses.map(async (h) => ({
+              id: h.id,
+              displayName: h.displayName,
+              isAvailable: (
+                await ctx.services.harnessAuthService.getAvailability(
+                  h.id,
+                  authContext,
+                )
+              ).isAvailable,
+              models: h.models.map((m) => ({
+                id: m.id,
+                displayName: m.displayName,
+              })),
             })),
-          }));
+          );
           return ok({ harnesses });
         });
       },

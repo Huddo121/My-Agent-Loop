@@ -1,24 +1,44 @@
-import type { AgentConfig, AgentHarnessId } from "@mono/api";
+import type { AgentConfig, AgentHarnessId, WorkspaceId } from "@mono/api";
+import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import type { AgentHarness } from "./AgentHarness";
-import type { HarnessAuthService } from "./HarnessAuthService";
+import type {
+  HarnessAuthContext,
+  HarnessAuthService,
+} from "./HarnessAuthService";
 
 type Params = {
   readonly harnessAuthService: HarnessAuthService;
   readonly harnesses: readonly AgentHarness[];
+  readonly authContext: HarnessAuthContext;
 };
 
-export function validateAgentConfig(
+export async function resolveWorkspaceHarnessAuthContext(
+  workspaceMembershipsService: WorkspaceMembershipsService,
+  workspaceId: WorkspaceId,
+): Promise<HarnessAuthContext> {
+  const workspaceOwnerUserId =
+    await workspaceMembershipsService.getWorkspaceCreatorUserId(workspaceId);
+  return workspaceOwnerUserId === undefined
+    ? { kind: "no-workspace-owner" }
+    : { kind: "workspace-owner", workspaceOwnerUserId };
+}
+
+export async function validateAgentConfig(
   agentConfig: AgentConfig | null | undefined,
   params: Params,
-): string | null {
+): Promise<string | null> {
   if (agentConfig == null) {
     return null;
   }
 
   const harnessId: AgentHarnessId = agentConfig.harnessId;
+  const availability = await params.harnessAuthService.getAvailability(
+    harnessId,
+    params.authContext,
+  );
 
-  if (!params.harnessAuthService.isAvailable(harnessId)) {
-    return `Agent harness "${harnessId}" is not available (API key not configured).`;
+  if (!availability.isAvailable) {
+    return `Agent harness "${harnessId}" is not available (credentials not configured).`;
   }
 
   if (agentConfig.modelId !== null) {

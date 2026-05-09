@@ -21,6 +21,7 @@ export interface UserOAuthCredentialRepository {
     userId: UserId,
     providerId: string,
   ): Promise<UserOAuthCredential | undefined>;
+  hasCredential(userId: UserId, providerId: string): Promise<boolean>;
   upsertCredential(
     userId: UserId,
     providerId: string,
@@ -73,6 +74,22 @@ export class DefaultUserOAuthCredentialRepository
       tokens: new ProtectedString(plainTokens),
       lastRefresh: row.lastRefresh,
     };
+  }
+
+  async hasCredential(userId: UserId, providerId: string): Promise<boolean> {
+    const tx = getTransaction();
+    const [row] = await tx
+      .select({ providerId: userHarnessOAuthCredentialsTable.providerId })
+      .from(userHarnessOAuthCredentialsTable)
+      .where(
+        and(
+          eq(userHarnessOAuthCredentialsTable.userId, userId),
+          eq(userHarnessOAuthCredentialsTable.providerId, providerId),
+        ),
+      )
+      .limit(1);
+
+    return row !== undefined;
   }
 
   async upsertCredential(

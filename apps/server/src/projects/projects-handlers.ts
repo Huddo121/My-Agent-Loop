@@ -17,7 +17,10 @@ import {
   defaultForgeBaseUrl,
   getProjectPathFromRepositoryUrl,
 } from "../forge";
-import { validateAgentConfig } from "../harness";
+import {
+  resolveWorkspaceHarnessAuthContext,
+  validateAgentConfig,
+} from "../harness";
 import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
 import { ProtectedString } from "../utils/ProtectedString";
@@ -69,13 +72,6 @@ export const projectsHandlers: HonoHandlersFor<
     if (authSession === null) {
       return unauthenticated();
     }
-    const validationError = validateAgentConfig(ctx.body.agentConfig, {
-      harnessAuthService: ctx.services.harnessAuthService,
-      harnesses: ctx.services.harnesses,
-    });
-    if (validationError !== null) {
-      return badUserInput(validationError);
-    }
     return withNewTransaction(ctx.services.db, async () => {
       const canAccess =
         await ctx.services.workspaceMembershipsService.isWorkspaceMember(
@@ -84,6 +80,17 @@ export const projectsHandlers: HonoHandlersFor<
         );
       if (!canAccess) {
         return notFound();
+      }
+      const validationError = await validateAgentConfig(ctx.body.agentConfig, {
+        harnessAuthService: ctx.services.harnessAuthService,
+        harnesses: ctx.services.harnesses,
+        authContext: await resolveWorkspaceHarnessAuthContext(
+          ctx.services.workspaceMembershipsService,
+          workspaceId as WorkspaceId,
+        ),
+      });
+      if (validationError !== null) {
+        return badUserInput(validationError);
       }
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
@@ -170,13 +177,6 @@ export const projectsHandlers: HonoHandlersFor<
       if (authSession === null) {
         return unauthenticated();
       }
-      const validationError = validateAgentConfig(ctx.body.agentConfig, {
-        harnessAuthService: ctx.services.harnessAuthService,
-        harnesses: ctx.services.harnesses,
-      });
-      if (validationError !== null) {
-        return badUserInput(validationError);
-      }
       return withNewTransaction(ctx.services.db, async () => {
         const canAccess =
           await ctx.services.workspaceMembershipsService.canAccessProject(
@@ -186,6 +186,20 @@ export const projectsHandlers: HonoHandlersFor<
           );
         if (!canAccess) {
           return notFound();
+        }
+        const validationError = await validateAgentConfig(
+          ctx.body.agentConfig,
+          {
+            harnessAuthService: ctx.services.harnessAuthService,
+            harnesses: ctx.services.harnesses,
+            authContext: await resolveWorkspaceHarnessAuthContext(
+              ctx.services.workspaceMembershipsService,
+              workspaceId as WorkspaceId,
+            ),
+          },
+        );
+        if (validationError !== null) {
+          return badUserInput(validationError);
         }
         const updatePayload: Parameters<
           typeof ctx.services.projectsService.updateProject

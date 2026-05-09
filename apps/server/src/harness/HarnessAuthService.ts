@@ -17,6 +17,11 @@ export type HarnessAuthContext =
       kind: "no-workspace-owner";
     };
 
+export type HarnessAvailability = {
+  isAvailable: boolean;
+  source: "env" | "workspace-owner-oauth" | "none";
+};
+
 type WorkspaceOwnerAuthContext = Extract<
   HarnessAuthContext,
   { kind: "workspace-owner" }
@@ -33,6 +38,15 @@ export interface HarnessAuthService {
     harnessId: AgentHarnessId,
     context: HarnessAuthContext,
   ): Promise<HarnessAuthArtifacts>;
+  /**
+   * Report whether a harness can be selected in a specific workspace context.
+   * This must remain a cheap metadata check: do not decrypt, parse, refresh, or
+   * otherwise validate stored OAuth token material here.
+   */
+  getAvailability(
+    harnessId: AgentHarnessId,
+    context: HarnessAuthContext,
+  ): Promise<HarnessAvailability>;
   /**
    * Report whether a harness can be selected before a concrete run exists.
    * This only reflects static availability, not per-workspace OAuth state.
@@ -67,6 +81,21 @@ export class EnvHarnessAuthService implements HarnessAuthService {
       return { kind: "none" };
     }
     return { kind: "api-key", envName, value };
+  }
+
+  async getAvailability(
+    harnessId: AgentHarnessId,
+    _context: HarnessAuthContext,
+  ): Promise<HarnessAvailability> {
+    if (harnessId === "opencode") {
+      return { isAvailable: true, source: "none" };
+    }
+
+    if (this.env[HARNESS_ENV_KEYS[harnessId]] !== undefined) {
+      return { isAvailable: true, source: "env" };
+    }
+
+    return { isAvailable: false, source: "none" };
   }
 
   isAvailable(harnessId: AgentHarnessId): boolean {
@@ -108,6 +137,28 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
 
   isAvailable(harnessId: AgentHarnessId): boolean {
     return this.fallbackAuthService.isAvailable(harnessId);
+  }
+
+  async getAvailability(
+    harnessId: AgentHarnessId,
+    context: HarnessAuthContext,
+  ): Promise<HarnessAvailability> {
+    if (harnessId !== "codex-cli") {
+      return this.fallbackAuthService.getAvailability(harnessId, context);
+    }
+
+    if (context.kind === "workspace-owner") {
+      const hasOAuthCredential =
+        await this.userOAuthCredentialRepository.hasCredential(
+          context.workspaceOwnerUserId,
+          OPENAI_CODEX_PROVIDER_ID,
+        );
+      if (hasOAuthCredential) {
+        return { isAvailable: true, source: "workspace-owner-oauth" };
+      }
+    }
+
+    return this.fallbackAuthService.getAvailability(harnessId, context);
   }
 
   private async getCodexOAuthArtifacts(

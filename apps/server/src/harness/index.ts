@@ -8,4 +8,7 @@ export { ClaudeCodeHarness } from "./ClaudeCodeHarness";
 export { CodexCliHarness } from "./CodexCliHarness";
 export { CursorCliHarness } from "./CursorCliHarness";
 export { OpenCodeHarness } from "./OpenCodeHarness";
-export { validateAgentConfig } from "./validateAgentConfig";
+export {
+  resolveWorkspaceHarnessAuthContext,
+  validateAgentConfig,
+} from "./validateAgentConfig";

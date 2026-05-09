@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y \
   iputils-ping \
   ca-certificates \
   gnupg \
-  build-essential
+  build-essential \
+  bubblewrap
+  # Bubblewrap is needed for Codex
 
 # Install Node.js 24.x (active LTS)
 RUN mkdir -p /etc/apt/keyrings && \

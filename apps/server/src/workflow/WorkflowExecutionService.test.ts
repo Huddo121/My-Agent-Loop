@@ -153,7 +153,7 @@ describe("WorkflowExecutionService", () => {
     );
 
     expect(sandboxService.lastDriverCliArgs).toContain(
-      "--host-api-base-url 'http://host.docker.internal:3000'",
+      "--host-api-base-url='http://host.docker.internal:3000'",
     );
   });
 
@@ -632,6 +632,10 @@ class RecordingHarnessAuthService implements HarnessAuthService {
   ) {
     this.lastContext = context;
     return this.authArtifacts;
+  }
+
+  async getAvailability() {
+    return { isAvailable: true as const, source: "env" as const };
   }
 
   isAvailable() {

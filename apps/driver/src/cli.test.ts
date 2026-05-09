@@ -26,6 +26,20 @@ describe("CLI argument parsing", () => {
       expect(result.harnessCommand).toBe("echo hello");
     });
 
+    it("parses option values that start with a dash when passed with equals syntax", () => {
+      const argv = [
+        "--run-id=run-123",
+        "--task-id=task-456",
+        "--host-api-base-url=http://localhost:3000",
+        "--driver-token=-secret-token",
+        "--harness-command=echo hello",
+      ];
+
+      const result = parseDriverInvocation(argv);
+
+      expect(result.driverToken).toBe("-secret-token");
+    });
+
     it("throws on missing required argument", () => {
       const argv = [
         "--run-id",

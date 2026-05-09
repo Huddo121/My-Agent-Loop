@@ -48,12 +48,64 @@ describe("EnvHarnessAuthService", () => {
 
     expect(service.isAvailable("opencode")).toBe(true);
     await expect(
+      service.getAvailability("opencode", { kind: "no-workspace-owner" }),
+    ).resolves.toEqual({ isAvailable: true, source: "none" });
+    await expect(
       service.getAuthArtifacts("opencode", { kind: "no-workspace-owner" }),
     ).resolves.toEqual({ kind: "none" });
   });
 });
 
 describe("CompositeHarnessAuthService", () => {
+  it("reports Codex available from the workspace creator OAuth credential", async () => {
+    const repo = createOAuthCredentialRepository({
+      tokens: JSON.stringify(storedTokens),
+      lastRefresh: new Date("2026-05-01T00:00:00.000Z"),
+    });
+    const provider = createOAuthProvider();
+    const service = createCompositeService(repo, provider, {
+      includeOpenAiApiKey: false,
+    });
+
+    const availability = await service.getAvailability("codex-cli", {
+      kind: "workspace-owner",
+      workspaceOwnerUserId: userId,
+    });
+
+    expect(availability).toEqual({
+      isAvailable: true,
+      source: "workspace-owner-oauth",
+    });
+    expect(repo.getCredential).not.toHaveBeenCalled();
+  });
+
+  it("reports Codex available from env fallback without a workspace creator credential", async () => {
+    const repo = createOAuthCredentialRepository();
+    const provider = createOAuthProvider();
+    const service = createCompositeService(repo, provider);
+
+    const availability = await service.getAvailability("codex-cli", {
+      kind: "no-workspace-owner",
+    });
+
+    expect(availability).toEqual({ isAvailable: true, source: "env" });
+  });
+
+  it("reports Codex unavailable when no accepted credential source exists", async () => {
+    const repo = createOAuthCredentialRepository();
+    const provider = createOAuthProvider();
+    const service = createCompositeService(repo, provider, {
+      includeOpenAiApiKey: false,
+    });
+
+    const availability = await service.getAvailability("codex-cli", {
+      kind: "workspace-owner",
+      workspaceOwnerUserId: userId,
+    });
+
+    expect(availability).toEqual({ isAvailable: false, source: "none" });
+  });
+
   it("prefers Codex OAuth artifacts over the env fallback", async () => {
     const repo = createOAuthCredentialRepository({
       tokens: JSON.stringify(storedTokens),
@@ -136,6 +188,12 @@ describe("CompositeHarnessAuthService", () => {
     const provider = createOAuthProvider();
     const service = createCompositeService(repo, provider);
 
+    await expect(
+      service.getAvailability("claude-code", {
+        kind: "workspace-owner",
+        workspaceOwnerUserId: userId,
+      }),
+    ).resolves.toEqual({ isAvailable: true, source: "env" });
     const artifacts = await service.getAuthArtifacts("claude-code", {
       kind: "workspace-owner",
       workspaceOwnerUserId: userId,
@@ -153,10 +211,13 @@ describe("CompositeHarnessAuthService", () => {
 function createCompositeService(
   repo: UserOAuthCredentialRepository,
   provider: OAuthProvider,
+  options: { includeOpenAiApiKey?: boolean } = {},
 ): CompositeHarnessAuthService {
   return new CompositeHarnessAuthService(
     new EnvHarnessAuthService({
-      OPENAI_API_KEY: new ProtectedString("env-openai-key"),
+      ...(options.includeOpenAiApiKey === false
+        ? {}
+        : { OPENAI_API_KEY: new ProtectedString("env-openai-key") }),
       ANTHROPIC_API_KEY: new ProtectedString("env-anthropic-key"),
     }),
     repo,
@@ -179,6 +240,7 @@ function createOAuthCredentialRepository(credential?: {
             lastRefresh: credential.lastRefresh,
           },
     ),
+    hasCredential: vi.fn(async () => credential !== undefined),
     upsertCredential: vi.fn(async () => {}),
     deleteCredential: vi.fn(async () => {}),
     listCredentials: vi.fn(

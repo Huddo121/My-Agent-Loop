@@ -56,6 +56,10 @@ class FakeUserOAuthCredentialRepository
     return undefined;
   }
 
+  async hasCredential() {
+    return false;
+  }
+
   async upsertCredential(
     userId: UserId,
     providerId: string,

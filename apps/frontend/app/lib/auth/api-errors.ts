@@ -1,3 +1,5 @@
+import type { Branded } from "@mono/type-utils";
+
 export function getRelativeCallbackUrl(): string {
   if (typeof window === "undefined") {
     return "/";
@@ -11,11 +13,7 @@ export function getRelativeCallbackUrl(): string {
   return `${pathname}${search}${hash}`;
 }
 
-declare const validRedirectBrand: unique symbol;
-
-export type ValidRedirect = string & {
-  readonly [validRedirectBrand]: "ValidRedirect";
-};
+export type ValidRedirect = Branded<string, "ValidRedirect">;
 
 /**
  * Validate a `redirectTo` value for same-origin path safety.

@@ -19,12 +19,17 @@
     "paths": {
       "~/*": ["./app/*"],
       "@mono/api": ["../../packages/api/src/index.ts"],
-      "@mono/api/*": ["../../packages/api/src/*"]
+      "@mono/api/*": ["../../packages/api/src/*"],
+      "@mono/type-utils": ["../../packages/type-utils/src/index.ts"],
+      "@mono/type-utils/*": ["../../packages/type-utils/src/*"]
     }
   },
   "references": [
     {
       "path": "../../packages/api"
+    },
+    {
+      "path": "../../packages/type-utils"
     }
   ]
 }

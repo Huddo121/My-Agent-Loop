@@ -64,6 +64,9 @@ importers:
       '@mono/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@mono/type-utils':
+        specifier: workspace:*
+        version: link:../../packages/type-utils
       '@radix-ui/react-dialog':
         specifier: 1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.8))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -344,6 +347,12 @@ importers:
       zod:
         specifier: 4.3.5
         version: 4.3.5
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/type-utils:
     devDependencies:
       typescript:
         specifier: 5.9.3

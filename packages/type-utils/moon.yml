@@ -1,0 +1,8 @@
+tasks:
+  dev:
+    command: noop
+    local: true
+  build:
+    command: pnpm run build
+    outputs:
+      - dist

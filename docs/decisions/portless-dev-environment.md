@@ -79,7 +79,8 @@ resources (a standalone database, for migration work).
   auto-start it (a linked worktree starting it would create a divergent
   stack against its own `.devloop`). Run `pnpm db:up` there; shared `pnpm dev`
   warns if Postgres/Redis are unreachable.
-- The server dev script still passes `--inspect`, which uses a fixed debugger
-  port; running many worktree servers at once will leave all but the first
-  without an attached inspector. The app port itself is always conflict-free.
+- The server dev script uses `--inspect=0` so each worktree's debugger gets a
+  random free port (printed on startup) rather than fighting over the fixed
+  9229. Editors must attach by auto-attach / process pick rather than a
+  hard-coded port.
 - `pnpm dev:moon` preserves the old `moon :dev` path if it is ever needed.

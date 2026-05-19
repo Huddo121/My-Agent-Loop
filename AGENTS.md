@@ -18,3 +18,8 @@ Review the `docs` directory to understand some of the specifics of this project.
   - Repeat the important parts of what you find when you do so
 - When the user is planning work with you, or gives you a set of instructions for work to complete, you are strongly encouraged to ask clarifying questions. Focus especially on missed states and edge cases. If the user suggests a technology to use, and you think there's a better one, surface it as a suggestion before continuing.
 - When the user asks you a question, do not immediately go off and change the code. Present answers to questions, and ask the user if you should execute on the option.
+
+## Dev environment
+
+- Start the app with `pnpm dev` (shared resources) or `pnpm dev:isolated` (a standalone per-worktree Postgres/Redis). See `docs/decisions/portless-dev-environment.md`.
+- The frontend is served by Portless at `https://mal.localhost` — or `https://<worktree>.mal.localhost` from a linked worktree. The backend has no URL of its own; it is reached through the frontend's `/api` proxy. Use the Portless URL, not a `localhost:<port>` URL.

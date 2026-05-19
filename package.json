@@ -8,7 +8,12 @@
   "scripts": {
     "check": "biome check .",
     "check:fix": "biome check . --write",
-    "dev": "moon :dev",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev": "node scripts/dev-env.mjs",
+    "dev:isolated": "node scripts/dev-env.mjs --isolated",
+    "dev:isolated:down": "node scripts/dev-env.mjs --down",
+    "dev:moon": "moon :dev",
     "docker:build": "pnpm driver:build:linux && docker build -t my-agent-loop .",
     "driver:build": "moon driver:build",
     "driver:build:bundle": "moon driver:build-bundle",
@@ -25,6 +30,11 @@
     "mal:login": "pnpm mal -- login",
     "mal:logout": "pnpm mal -- logout",
     "mal:status": "pnpm mal -- status",
+    "portless:clean": "portless clean",
+    "portless:list": "portless list",
+    "portless:trust": "portless trust",
+    "proxy:start": "portless proxy start",
+    "proxy:stop": "portless proxy stop",
     "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
     "sync": "moon sync",
     "sync-agents": "pnpm --filter=@mono/scripts sync-agents",
@@ -38,6 +48,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
+    "portless": "0.13.0",
     "typescript": "5.9.3"
   }
 }

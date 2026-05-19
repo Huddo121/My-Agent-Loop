@@ -5,12 +5,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file=.env.local --env-file-if-exists=.env --watch --inspect src/index.ts",
+    "dev": "tsx --env-file=.env.local --env-file-if-exists=.env --env-file-if-exists=.env.portless.local --watch --inspect=0 src/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
-    "drizzle": "DOTENV_CONFIG_PATH=.env.local drizzle-kit"
+    "drizzle": "drizzle-kit"
   },
   "keywords": [],
   "author": "",

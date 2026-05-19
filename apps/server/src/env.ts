@@ -20,6 +20,16 @@ const envSchema = z
 
     REDIS_HOST: z.string().nonempty(),
 
+    // Defaulted so the shared docker-compose Redis works without extra config;
+    // the Portless dev wrapper overrides it for isolated worktree stacks.
+    REDIS_PORT: z
+      .string()
+      .default("6379")
+      .transform((val) => parseInt(val, 10))
+      .refine((val) => !Number.isNaN(val) && val > 0 && val < 65536, {
+        message: "REDIS_PORT must be a valid port number (1-65535)",
+      }),
+
     // Server
     PORT: z
       .string()

@@ -136,7 +136,7 @@ const fileSystemService = new LocalFileSystemService(
 
 const runsService = new DatabaseRunsService();
 
-const workflowQueues = new WorkflowQueues(env.REDIS_HOST);
+const workflowQueues = new WorkflowQueues(env.REDIS_HOST, env.REDIS_PORT);
 
 const harnesses: readonly AgentHarness[] = [
   new OpenCodeHarness(),

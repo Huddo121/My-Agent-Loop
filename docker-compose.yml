@@ -1,16 +1,21 @@
+# Host ports and volume paths are parameterised so the Portless dev wrapper can
+# bring up isolated per-worktree stacks (`docker compose -p mal-<worktree>`)
+# without clashing with the shared stack. Unset vars fall back to the original
+# shared-stack defaults, so a plain `docker compose up` is unchanged.
+# `container_name` is intentionally omitted: it is global, so pinning it would
+# stop a second (isolated) stack from starting.
 services:
   my-agent-loop-db:
     image: postgres:18.1
-    container_name: my-agent-loop-db
     ports:
-      - 5432:5432
+      - ${MAL_DB_PORT:-5432}:5432
     restart: unless-stopped
     environment:
       - POSTGRES_DB=my_agent_loop
       - POSTGRES_USER=my_agent_loop
       - POSTGRES_PASSWORD=my_agent_loop
     volumes:
-      - ./.devloop/volumes/my_agent_loop/data:/var/lib/postgresql
+      - ./.devloop/volumes/${MAL_STACK:-my_agent_loop}/data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 5s
@@ -20,15 +25,13 @@ services:
   # http://localhost:8010/?pgsql=my-agent-loop-db&username=my_agent_loop&db=my_agent_loop&ns=public
   adminer:
     image: adminer
-    container_name: my-agent-loop-db-admin
     restart: unless-stopped
     ports:
-      - 8010:8080
+      - ${MAL_ADMINER_PORT:-8010}:8080
 
   my-agent-loop-redis:
     image: redis:8.2.0
-    container_name: my-agent-loop-redis
     ports:
-      - 6379:6379
+      - ${MAL_REDIS_PORT:-6379}:6379
     volumes:
-      - ./.devloop/volumes/redis:/data
+      - ./.devloop/volumes/${MAL_STACK:-my_agent_loop}/redis:/data

@@ -62,6 +62,14 @@ const envSchema = z
 
     // OAuth credential blobs at rest (32-byte key; distinct from FORGE_ENCRYPTION_KEY)
     OAUTH_CREDENTIALS_ENCRYPTION_KEY: z.string().nonempty(),
+
+    // VM sandbox configuration
+    VM_KERNEL_PATH: z.string().optional(),
+    VM_ROOTFS_PATH: z.string().optional(),
+    VIRTIOFSD_PATH: z.string().optional(),
+    CLOUD_HYPERVISOR_PATH: z.string().optional(),
+    VFKIT_PATH: z.string().optional(),
+    VM_HOST_BRIDGE_IP: z.string().default("192.168.100.1"),
   })
   .transform((env) => ({
     ...env,

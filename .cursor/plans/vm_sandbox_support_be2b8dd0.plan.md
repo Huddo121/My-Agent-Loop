@@ -4,7 +4,7 @@ overview: Add VM-based sandboxes alongside existing Docker sandboxes, using Clou
 todos:
   - id: env-config
     content: "Add VM env vars to `apps/server/src/env.ts`. Read the existing file to see how env vars are defined (Zod validation pattern). Add these optional vars: VM_KERNEL_PATH, VM_ROOTFS_PATH, VIRTIOFSD_PATH, CLOUD_HYPERVISOR_PATH, VFKIT_PATH, VM_HOST_BRIDGE_IP (default 192.168.100.1). All should be optional strings. See plan section 9 for details."
-    status: pending
+    status: completed
   - id: sandbox-type-db
     content: Add sandbox type configuration to the DB layer. (1) Add `sandboxTypeEnum` and `sandboxTypeConfigurationTable` to `apps/server/src/db/schema.ts` -- see the exact schema in plan section 6. (2) Create `apps/server/src/sandbox/SandboxTypeConfigRepository.ts` with a `DatabaseSandboxTypeConfigRepository` class. Read `apps/server/src/harness/AgentHarnessConfigRepository.ts` as the pattern to follow -- it has the same hierarchical resolution logic (task -> project -> workspace -> default), but sandbox type only uses project -> workspace -> default 'docker'. Do NOT generate a DB migration; a human will do that.
     status: pending

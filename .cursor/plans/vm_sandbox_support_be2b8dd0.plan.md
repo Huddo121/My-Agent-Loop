@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: sandbox-type-db
     content: Add sandbox type configuration to the DB layer. (1) Add `sandboxTypeEnum` and `sandboxTypeConfigurationTable` to `apps/server/src/db/schema.ts` -- see the exact schema in plan section 6. (2) Create `apps/server/src/sandbox/SandboxTypeConfigRepository.ts` with a `DatabaseSandboxTypeConfigRepository` class. Read `apps/server/src/harness/AgentHarnessConfigRepository.ts` as the pattern to follow -- it has the same hierarchical resolution logic (task -> project -> workspace -> default), but sandbox type only uses project -> workspace -> default 'docker'. Do NOT generate a DB migration; a human will do that.
-    status: pending
+    status: completed
   - id: vm-init-script
     content: Create `apps/server/src/sandbox/vm/vm-init.sh`. This is a minimal shell script that will be baked into the VM rootfs at /sbin/vm-init. It mounts /proc, /sys, /dev, then mounts virtio-fs at /mnt/host using tag 'hostshare', then execs /mnt/host/vm-mount-setup.sh. See the exact script in plan section 3.
     status: pending

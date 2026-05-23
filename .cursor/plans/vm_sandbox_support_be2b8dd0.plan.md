@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: vm-init-script
     content: Create `apps/server/src/sandbox/vm/vm-init.sh`. This is a minimal shell script that will be baked into the VM rootfs at /sbin/vm-init. It mounts /proc, /sys, /dev, then mounts virtio-fs at /mnt/host using tag 'hostshare', then execs /mnt/host/vm-mount-setup.sh. See the exact script in plan section 3.
-    status: pending
+    status: completed
   - id: vm-platform-adapter
     content: Create the VM platform abstraction layer under `apps/server/src/sandbox/vm/`. (1) Define `VmPlatformAdapter` interface in VmPlatformAdapter.ts -- see plan section 1 for the full interface. (2) Implement `CloudHypervisorAdapter` -- spawns virtiofsd and cloud-hypervisor as child processes, talks to Cloud Hypervisor REST API over Unix socket (PUT /api/v1/vm.boot, PUT /api/v1/vm.shutdown, GET /api/v1/vm.info). Use Node.js http.request with socketPath option for Unix socket HTTP. (3) Implement `VfkitAdapter` -- spawns vfkit with --device virtio-fs,sharedDir=...,mountTag=... and --restful-uri unix://..., talks to vfkit REST API. vfkit handles virtio-fs natively (no separate virtiofsd). Binary paths come from env vars added in the env-config todo. See plan section 1 for full details.
     status: pending

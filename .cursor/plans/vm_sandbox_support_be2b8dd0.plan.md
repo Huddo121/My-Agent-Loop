@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: vm-platform-adapter
     content: Create the VM platform abstraction layer under `apps/server/src/sandbox/vm/`. (1) Define `VmPlatformAdapter` interface in VmPlatformAdapter.ts -- see plan section 1 for the full interface. (2) Implement `CloudHypervisorAdapter` -- spawns virtiofsd and cloud-hypervisor as child processes, talks to Cloud Hypervisor REST API over Unix socket (PUT /api/v1/vm.boot, PUT /api/v1/vm.shutdown, GET /api/v1/vm.info). Use Node.js http.request with socketPath option for Unix socket HTTP. (3) Implement `VfkitAdapter` -- spawns vfkit with --device virtio-fs,sharedDir=...,mountTag=... and --restful-uri unix://..., talks to vfkit REST API. vfkit handles virtio-fs natively (no separate virtiofsd). Binary paths come from env vars added in the env-config todo. See plan section 1 for full details.
-    status: pending
+    status: in-progress
   - id: vm-sandbox-service
     content: "Implement `VmSandboxService` in `apps/server/src/sandbox/vm/VmSandboxService.ts` implementing the `SandboxService` interface from `apps/server/src/sandbox/SandboxService.ts`. Read `DockerSandboxService` in the same file as the pattern -- it implements the same interface. Key difference: instead of Docker containers, this service (a) starts virtiofsd + VMM via the adapter, (b) generates a vm-mount-setup.sh script that maps SandboxInitOptions.volumes to symlinks/copies inside the VM (see plan section 2 for the mapping logic and examples), (c) monitors the VMM child process for exit. The SandboxInitOptions type is already defined and stays unchanged. See plan section 2 for full lifecycle details."
     status: pending

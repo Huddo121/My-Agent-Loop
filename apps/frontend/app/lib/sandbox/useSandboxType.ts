@@ -12,10 +12,10 @@ import { handleUnauthenticated } from "~/lib/auth/api-errors";
 // Query key hierarchy mirrors the URL hierarchy so invalidating a parent key
 // automatically invalidates all child sandbox-type queries.
 //
-const workspaceSandboxTypeQueryKey = (workspaceId: WorkspaceId) =>
+export const workspaceSandboxTypeQueryKey = (workspaceId: WorkspaceId) =>
   ["workspaces", workspaceId, "sandbox-type"] as const;
 
-const projectSandboxTypeQueryKey = (
+export const projectSandboxTypeQueryKey = (
   workspaceId: WorkspaceId,
   projectId: ProjectId,
 ) =>

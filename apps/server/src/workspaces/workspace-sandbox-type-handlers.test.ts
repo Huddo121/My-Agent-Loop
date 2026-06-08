@@ -6,7 +6,7 @@ import {
   FakeSandboxTypeConfigRepository,
   FakeWorkspaceMembershipsService,
 } from "../test-fakes";
-import { sandboxTypeHandlers } from "./workspace-sandbox-type-handlers";
+import { workspaceSandboxTypeHandlers } from "./workspace-sandbox-type-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
@@ -16,8 +16,12 @@ vi.mock(import("../auth/session"), () => ({
   requireAuthSession,
 }));
 
-type SandboxTypeGetContext = Parameters<typeof sandboxTypeHandlers.GET>[0];
-type SandboxTypePutContext = Parameters<typeof sandboxTypeHandlers.PUT>[0];
+type SandboxTypeGetContext = Parameters<
+  typeof workspaceSandboxTypeHandlers.GET
+>[0];
+type SandboxTypePutContext = Parameters<
+  typeof workspaceSandboxTypeHandlers.PUT
+>[0];
 
 function createCtx(overrides?: { body?: unknown }) {
   const db = new FakeDatabase();
@@ -64,7 +68,7 @@ describe("workspace sandbox-type handlers", () => {
       requireAuthSession.mockResolvedValueOnce(null);
       const ctx = createCtx();
 
-      const response = await sandboxTypeHandlers.GET(
+      const response = await workspaceSandboxTypeHandlers.GET(
         ctx as unknown as SandboxTypeGetContext,
       );
 
@@ -75,7 +79,7 @@ describe("workspace sandbox-type handlers", () => {
       requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
       const ctx = createCtx();
 
-      const response = await sandboxTypeHandlers.GET(
+      const response = await workspaceSandboxTypeHandlers.GET(
         ctx as unknown as SandboxTypeGetContext,
       );
 
@@ -87,7 +91,7 @@ describe("workspace sandbox-type handlers", () => {
       const ctx = createCtx();
       grantWorkspaceAccess(ctx);
 
-      const response = await sandboxTypeHandlers.GET(
+      const response = await workspaceSandboxTypeHandlers.GET(
         ctx as unknown as SandboxTypeGetContext,
       );
 
@@ -103,7 +107,7 @@ describe("workspace sandbox-type handlers", () => {
         .sandboxTypeConfigRepository as FakeSandboxTypeConfigRepository;
       await repo.setWorkspaceConfig("workspace-1" as WorkspaceId, "vm");
 
-      const response = await sandboxTypeHandlers.GET(
+      const response = await workspaceSandboxTypeHandlers.GET(
         ctx as unknown as SandboxTypeGetContext,
       );
 
@@ -117,7 +121,7 @@ describe("workspace sandbox-type handlers", () => {
       requireAuthSession.mockResolvedValueOnce(null);
       const ctx = createCtx({ body: { sandboxType: "vm" } });
 
-      const response = await sandboxTypeHandlers.PUT(
+      const response = await workspaceSandboxTypeHandlers.PUT(
         ctx as unknown as SandboxTypePutContext,
       );
 
@@ -128,7 +132,7 @@ describe("workspace sandbox-type handlers", () => {
       requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
       const ctx = createCtx({ body: { sandboxType: "vm" } });
 
-      const response = await sandboxTypeHandlers.PUT(
+      const response = await workspaceSandboxTypeHandlers.PUT(
         ctx as unknown as SandboxTypePutContext,
       );
 
@@ -140,7 +144,7 @@ describe("workspace sandbox-type handlers", () => {
       const ctx = createCtx({ body: { sandboxType: "vm" } });
       grantWorkspaceAccess(ctx);
 
-      const response = await sandboxTypeHandlers.PUT(
+      const response = await workspaceSandboxTypeHandlers.PUT(
         ctx as unknown as SandboxTypePutContext,
       );
 
@@ -152,11 +156,13 @@ describe("workspace sandbox-type handlers", () => {
       requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
       const putCtx = createCtx({ body: { sandboxType: "vm" } });
       grantWorkspaceAccess(putCtx);
-      await sandboxTypeHandlers.PUT(putCtx as unknown as SandboxTypePutContext);
+      await workspaceSandboxTypeHandlers.PUT(
+        putCtx as unknown as SandboxTypePutContext,
+      );
 
       // Reuse the same context (same fake repo) for the GET
       requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
-      const getResponse = await sandboxTypeHandlers.GET(
+      const getResponse = await workspaceSandboxTypeHandlers.GET(
         putCtx as unknown as SandboxTypeGetContext,
       );
 
@@ -172,7 +178,7 @@ describe("workspace sandbox-type handlers", () => {
         .sandboxTypeConfigRepository as FakeSandboxTypeConfigRepository;
       await repo.setWorkspaceConfig("workspace-1" as WorkspaceId, "vm");
 
-      const response = await sandboxTypeHandlers.PUT(
+      const response = await workspaceSandboxTypeHandlers.PUT(
         ctx as unknown as SandboxTypePutContext,
       );
 

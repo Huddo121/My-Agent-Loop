@@ -13,7 +13,7 @@ import { withNewTransaction } from "../utils/transaction-context";
 type WorkspaceSandboxTypeApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["sandbox-type"];
 
-export const sandboxTypeHandlers: HonoHandlersFor<
+export const workspaceSandboxTypeHandlers: HonoHandlersFor<
   ["workspaces", ":workspaceId", "sandbox-type"],
   WorkspaceSandboxTypeApi,
   Services

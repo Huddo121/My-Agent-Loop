@@ -18,7 +18,7 @@ export const getSandboxTypeMcpHandler = withRequiredProjectId({
     );
 
     if (project === undefined) {
-      console.error("Can not get sandbox type, project not found", {
+      services.logger.error("Could not get sandbox type, project not found", {
         projectId,
       });
       return JSON.stringify({ error: "Project not found" });
@@ -33,7 +33,7 @@ export const getSandboxTypeMcpHandler = withRequiredProjectId({
         ),
     );
 
-    console.info("Returning resolved sandbox type", { projectId, sandboxType });
+    services.logger.info("Resolved sandbox type", { projectId, sandboxType });
     return JSON.stringify({ sandboxType });
   },
 });

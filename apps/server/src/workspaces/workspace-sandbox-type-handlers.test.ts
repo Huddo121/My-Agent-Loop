@@ -38,6 +38,7 @@ function createCtx(overrides?: { body?: unknown }) {
       db: db.asDatabase(),
       workspaceMembershipsService,
       sandboxTypeConfigRepository,
+      logger: { error() {}, warn() {}, info() {}, debug() {} },
     },
   };
 

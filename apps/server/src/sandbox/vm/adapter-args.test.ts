@@ -46,14 +46,17 @@ describe("buildCloudHypervisorArgs", () => {
     apiSocketPath: "/tmp/ch.sock",
     kernelPath: "/vm/vmlinux",
     rootfsPath: "/vm/rootfs.raw",
+    initrdPath: "/vm/initramfs.cpio.gz",
     virtiofsSocketPath: "/tmp/vfsd.sock",
     virtiofsTag: "hostshare",
     memorySizeMb: 2048,
     cpuCount: 2,
     networkConfig: {},
+    sharedDir: "/run/share",
+    consoleLogPath: "/tmp/vm-console.log",
   };
 
-  it("builds the core boot args with a serial console cmdline and shared memory", () => {
+  it("builds the core boot args with initramfs, serial console and shared memory", () => {
     const args = buildCloudHypervisorArgs(base);
     expect(args).toEqual([
       "--api-socket",
@@ -70,21 +73,11 @@ describe("buildCloudHypervisorArgs", () => {
       "size=2048M,shared=on",
       "--cpus",
       "boot=2",
+      "--initramfs",
+      "/vm/initramfs.cpio.gz",
+      "--serial",
+      "file=/tmp/vm-console.log",
     ]);
-  });
-
-  it("adds --initramfs and --serial when an initrd and console log are provided", () => {
-    const args = buildCloudHypervisorArgs({
-      ...base,
-      initrdPath: "/vm/initramfs.cpio.gz",
-      consoleLogPath: "/tmp/vm-console.log",
-    });
-    const initrdIndex = args.indexOf("--initramfs");
-    expect(initrdIndex).toBeGreaterThan(-1);
-    expect(args[initrdIndex + 1]).toBe("/vm/initramfs.cpio.gz");
-    const serialIndex = args.indexOf("--serial");
-    expect(serialIndex).toBeGreaterThan(-1);
-    expect(args[serialIndex + 1]).toBe("file=/tmp/vm-console.log");
   });
 
   it("appends a --net arg when network config is provided", () => {
@@ -135,23 +128,5 @@ describe("buildVfkitArgs", () => {
       "--restful-uri",
       "unix:///tmp/vfkit.sock",
     ]);
-  });
-
-  it("throws when sharedDir is missing because vfkit needs the directory, not a socket", () => {
-    expect(() => buildVfkitArgs({ ...base, sharedDir: undefined })).toThrow(
-      /sharedDir is required/,
-    );
-  });
-
-  it("throws when initrdPath is missing because the Linux bootloader needs an initramfs", () => {
-    expect(() => buildVfkitArgs({ ...base, initrdPath: undefined })).toThrow(
-      /initrdPath is required/,
-    );
-  });
-
-  it("throws when consoleLogPath is missing because the console needs a file, not a TTY", () => {
-    expect(() =>
-      buildVfkitArgs({ ...base, consoleLogPath: undefined }),
-    ).toThrow(/consoleLogPath is required/);
   });
 });

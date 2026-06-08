@@ -83,23 +83,6 @@ export class VfkitAdapter implements VmPlatformAdapter {
  * - The guest console must go to a file; `virtio-serial,stdio` fails without a TTY when headless.
  */
 export function buildVfkitArgs(options: StartVmmOptions): string[] {
-  // vfkit shares the directory directly for virtio-fs (it has no separate virtiofsd socket).
-  if (options.sharedDir === undefined) {
-    throw new Error(
-      "VfkitAdapter.startVmm: sharedDir is required — vfkit shares the directory directly for virtio-fs",
-    );
-  }
-  if (options.initrdPath === undefined) {
-    throw new Error(
-      "VfkitAdapter.startVmm: initrdPath is required — vfkit's Linux bootloader needs an initramfs",
-    );
-  }
-  if (options.consoleLogPath === undefined) {
-    throw new Error(
-      "VfkitAdapter.startVmm: consoleLogPath is required — vfkit's stdio console needs a TTY, so guest output must be written to a file",
-    );
-  }
-
   return [
     "--cpus",
     String(options.cpuCount),

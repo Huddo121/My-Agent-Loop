@@ -60,7 +60,7 @@ export const sandboxTypeHandlers: HonoHandlersFor<
         workspaceId as WorkspaceId,
         sandboxType,
       );
-      console.info("Updated workspace sandbox type", {
+      ctx.services.logger.info("Updated workspace sandbox type", {
         workspaceId,
         sandboxType,
       });

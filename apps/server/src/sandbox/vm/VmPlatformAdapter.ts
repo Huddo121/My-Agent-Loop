@@ -28,8 +28,9 @@ export interface StartVmmOptions {
   kernelPath: string;
   rootfsPath: string;
   // Path to the initramfs. vfkit's Linux bootloader requires it (and Virtualization.framework does
-  // not mount the root disk itself); cloud-hypervisor can use it via --initramfs.
-  initrdPath?: string;
+  // not mount the root disk itself); cloud-hypervisor uses it via --initramfs. The caller always
+  // supplies it, so it is required here — vfkit can then rely on it without a runtime guard.
+  initrdPath: string;
   virtiofsSocketPath: string;
   virtiofsTag: string;
   memorySizeMb: number;
@@ -37,11 +38,11 @@ export interface StartVmmOptions {
   networkConfig: VmNetworkConfig;
   // vfkit needs the actual host directory rather than a virtiofsd socket because it handles
   // virtio-fs natively via Virtualization.framework. cloud-hypervisor ignores this field and
-  // uses virtiofsSocketPath instead.
-  sharedDir?: string;
+  // uses virtiofsSocketPath instead. Required because vfkit cannot start without it.
+  sharedDir: string;
   // File the guest serial console is written to. vfkit needs a file path here because its stdio
   // console requires a TTY, which is unavailable when the VMM is spawned headless.
-  consoleLogPath?: string;
+  consoleLogPath: string;
 }
 
 export interface VmPlatformAdapter {

@@ -18,7 +18,7 @@ import type { LiveEventsService } from "../live-events";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
-import type { SandboxTypeConfigRepository } from "../sandbox/SandboxTypeConfigRepository";
+import type { SandboxTypeConfigRepository } from "../sandbox-config/SandboxTypeConfigRepository";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { toTaskDto } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
@@ -213,6 +213,11 @@ export class WorkflowExecutionService {
         endpoints: this.options.vm,
       }))
       .exhaustive();
+    console.info("Resolved sandbox type for task", {
+      runId,
+      projectId: project.id,
+      sandboxType,
+    });
 
     const { harnessId, modelId } =
       await this.harnessConfig.resolveHarnessConfig(

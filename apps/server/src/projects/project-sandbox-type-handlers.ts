@@ -63,7 +63,10 @@ export const projectSandboxTypeHandlers: HonoHandlersFor<
         projectId as ProjectId,
         sandboxType,
       );
-      console.info("Updated project sandbox type", { projectId, sandboxType });
+      ctx.services.logger.info("Updated project sandbox type", {
+        projectId,
+        sandboxType,
+      });
       return ok({ sandboxType });
     });
   },

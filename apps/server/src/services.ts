@@ -41,13 +41,13 @@ import {
   DockerSandboxService,
   type SandboxService,
 } from "./sandbox/SandboxService";
-import {
-  DatabaseSandboxTypeConfigRepository,
-  type SandboxTypeConfigRepository,
-} from "./sandbox/SandboxTypeConfigRepository";
 import { CloudHypervisorAdapter } from "./sandbox/vm/CloudHypervisorAdapter";
 import { VfkitAdapter } from "./sandbox/vm/VfkitAdapter";
 import { VmSandboxService } from "./sandbox/vm/VmSandboxService";
+import {
+  DatabaseSandboxTypeConfigRepository,
+  type SandboxTypeConfigRepository,
+} from "./sandbox-config/SandboxTypeConfigRepository";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
   DefaultUserOAuthCredentialRepository,

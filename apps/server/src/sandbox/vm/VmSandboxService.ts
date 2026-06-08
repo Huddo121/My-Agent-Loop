@@ -436,11 +436,11 @@ export class VmSandboxService implements SandboxService {
     // exit code is what the guest wrote to the shared dir; its absence means the run did not finish
     // normally (crash, kill, or panic), which we treat as an error.
     const guestExitCode = readGuestExitCode(state.sharedDir);
-    const exitResult = {
+    // "timeout" is part of the shared success union but the VM path never produces it — the caller
+    // enforces the timeout. Typing the result lets the narrower ternary assign without a cast.
+    const exitResult: WaitForSandboxToFinishSuccess = {
       exitCode: guestExitCode ?? vmmExitCode,
-      reason: (guestExitCode === 0 ? "completed" : "error") as
-        | "completed"
-        | "error",
+      reason: guestExitCode === 0 ? "completed" : "error",
     };
 
     this.logger.info("VM sandbox finished", {

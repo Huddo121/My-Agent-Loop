@@ -1,7 +1,9 @@
+import type { ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AbsoluteFilePath } from "../../file-system/FilePath";
 import type { Logger } from "../../logger/Logger";
 import type { VmPlatformAdapter } from "./VmPlatformAdapter";
@@ -425,5 +427,264 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
     await expect(
       service.createNewSandbox({ volumes: [], env: {} }),
     ).rejects.toThrow("VM_INITRD_PATH");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VmSandboxService lifecycle — start/wait/stop against an in-memory fake adapter
+// ---------------------------------------------------------------------------
+
+// Stands in for the VMM child process. It only models what VmSandboxService touches: the exit code,
+// the "exit" event, the stdout/stderr streams it attaches log forwarding to, and kill().
+class FakeVmmProcess extends EventEmitter {
+  exitCode: number | null = null;
+  readonly stdout = new EventEmitter();
+  readonly stderr = new EventEmitter();
+  killSignal: NodeJS.Signals | number | undefined;
+
+  kill(signal?: NodeJS.Signals | number): boolean {
+    this.killSignal = signal;
+    return true;
+  }
+
+  // Drives the resolution of waitForSandboxToFinish, mirroring the real process emitting "exit".
+  simulateExit(code: number): void {
+    this.exitCode = code;
+    this.emit("exit", code);
+  }
+}
+
+describe("VmSandboxService lifecycle", () => {
+  const tmpDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of tmpDirs) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    tmpDirs.length = 0;
+  });
+
+  // A service wired to a fake adapter. startVmm hands back a fresh FakeVmmProcess per sandbox, so
+  // multiple sandboxes can be tracked independently; bootVm/shutdownVm calls are counted.
+  function makeService(opts: { bootShouldThrow?: boolean } = {}) {
+    const vmmProcesses: FakeVmmProcess[] = [];
+    const calls = { boot: 0, shutdown: 0 };
+    const adapter: VmPlatformAdapter = {
+      platform: "macos",
+      isAvailable: async () => true,
+      startVirtiofsd: async () => null,
+      startVmm: async () => {
+        const proc = new FakeVmmProcess();
+        vmmProcesses.push(proc);
+        return proc as unknown as ChildProcess;
+      },
+      bootVm: async () => {
+        calls.boot++;
+        if (opts.bootShouldThrow) {
+          throw new Error("boot failed");
+        }
+      },
+      shutdownVm: async () => {
+        calls.shutdown++;
+      },
+      getVmInfo: async () => ({ state: "Running" }),
+    };
+    const service = new VmSandboxService(
+      adapter,
+      "/kernel",
+      "/rootfs.raw",
+      "/initrd.cpio.gz",
+      noopLogger,
+    );
+    return { service, vmmProcesses, calls };
+  }
+
+  async function addSandbox(service: VmSandboxService) {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-svc-"));
+    tmpDirs.push(tmpDir);
+    // Two volumes whose common parent is tmpDir, so tmpDir becomes the shared dir the service
+    // reads the guest exit code back from.
+    const sandbox = await service.createNewSandbox({
+      volumes: [
+        {
+          hostPath: `${tmpDir}/code` as AbsoluteFilePath,
+          containerPath: "/code",
+        },
+        {
+          hostPath: `${tmpDir}/task.txt` as AbsoluteFilePath,
+          containerPath: "/task.txt",
+        },
+      ],
+      env: {},
+    });
+    return { sandbox, tmpDir };
+  }
+
+  describe("startSandbox", () => {
+    it("returns container-not-found for an unknown sandbox", async () => {
+      const { service } = makeService();
+      const result = await service.startSandbox("missing" as never);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-found" },
+      });
+    });
+
+    it("returns container-already-started when the VMM has already exited", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox } = await addSandbox(service);
+      vmmProcesses[0].exitCode = 1;
+      const result = await service.startSandbox(sandbox.id);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-already-started" },
+      });
+    });
+
+    it("boots the VM and returns started on the happy path", async () => {
+      const { service, calls } = makeService();
+      const { sandbox } = await addSandbox(service);
+      const result = await service.startSandbox(sandbox.id);
+      expect(result).toEqual({ success: true, value: "started" });
+      expect(calls.boot).toBe(1);
+    });
+
+    it("returns container-not-found when booting throws", async () => {
+      const { service } = makeService({ bootShouldThrow: true });
+      const { sandbox } = await addSandbox(service);
+      const result = await service.startSandbox(sandbox.id);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-found" },
+      });
+    });
+  });
+
+  describe("waitForSandboxToFinish", () => {
+    it("returns container-not-found for an unknown sandbox", async () => {
+      const { service } = makeService();
+      const result = await service.waitForSandboxToFinish("missing" as never);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-found" },
+      });
+    });
+
+    it("returns container-not-running when the VMM exited before waiting", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox } = await addSandbox(service);
+      vmmProcesses[0].exitCode = 0;
+      const result = await service.waitForSandboxToFinish(sandbox.id);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-running" },
+      });
+    });
+
+    it("reports completed with the guest exit code when the guest recorded 0", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox, tmpDir } = await addSandbox(service);
+      fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "0\n");
+      const waitPromise = service.waitForSandboxToFinish(sandbox.id);
+      vmmProcesses[0].simulateExit(0);
+      const result = await waitPromise;
+      expect(result).toEqual({
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      });
+    });
+
+    it("reports error with the guest exit code when the guest recorded non-zero", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox, tmpDir } = await addSandbox(service);
+      fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "3\n");
+      const waitPromise = service.waitForSandboxToFinish(sandbox.id);
+      vmmProcesses[0].simulateExit(0);
+      const result = await waitPromise;
+      expect(result).toEqual({
+        success: true,
+        value: { exitCode: 3, reason: "error" },
+      });
+    });
+
+    it("reports error and falls back to the VMM exit code when the guest recorded nothing", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox } = await addSandbox(service);
+      // No .vm-exit-code file written → the run did not finish normally (crash/kill/panic).
+      const waitPromise = service.waitForSandboxToFinish(sandbox.id);
+      vmmProcesses[0].simulateExit(137);
+      const result = await waitPromise;
+      expect(result).toEqual({
+        success: true,
+        value: { exitCode: 137, reason: "error" },
+      });
+    });
+  });
+
+  describe("stopSandbox", () => {
+    it("is a no-op for an unknown sandbox", async () => {
+      const { service } = makeService();
+      await expect(
+        service.stopSandbox("missing" as never),
+      ).resolves.toBeUndefined();
+    });
+
+    it("requests graceful shutdown and forgets the sandbox", async () => {
+      const { service, vmmProcesses, calls } = makeService();
+      const { sandbox } = await addSandbox(service);
+      // Already exited, so the grace-period wait resolves immediately without a force-kill.
+      vmmProcesses[0].exitCode = 0;
+      await service.stopSandbox(sandbox.id);
+      expect(calls.shutdown).toBe(1);
+      expect(vmmProcesses[0].killSignal).toBeUndefined();
+      // The sandbox is gone: waiting on it now reports not-found.
+      const result = await service.waitForSandboxToFinish(sandbox.id);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-found" },
+      });
+    });
+
+    it("force-kills the VMM when it does not exit within the grace period", async () => {
+      vi.useFakeTimers();
+      try {
+        const { service, vmmProcesses, calls } = makeService();
+        const { sandbox } = await addSandbox(service);
+        // exitCode stays null, so graceful shutdown never completes and the timer fires.
+        const stopPromise = service.stopSandbox(sandbox.id);
+        await vi.advanceTimersByTimeAsync(30_000);
+        await stopPromise;
+        expect(calls.shutdown).toBe(1);
+        expect(vmmProcesses[0].killSignal).toBe("SIGKILL");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("stopAllSandboxes", () => {
+    it("does nothing when no sandboxes are active", async () => {
+      const { service, calls } = makeService();
+      await service.stopAllSandboxes();
+      expect(calls.shutdown).toBe(0);
+    });
+
+    it("stops every active sandbox", async () => {
+      const { service, vmmProcesses, calls } = makeService();
+      const first = await addSandbox(service);
+      const second = await addSandbox(service);
+      // Both already exited so each stop resolves without waiting out the grace period.
+      vmmProcesses[0].exitCode = 0;
+      vmmProcesses[1].exitCode = 0;
+      await service.stopAllSandboxes();
+      expect(calls.shutdown).toBe(2);
+      for (const { sandbox } of [first, second]) {
+        const result = await service.waitForSandboxToFinish(sandbox.id);
+        expect(result).toEqual({
+          success: false,
+          error: { reason: "container-not-found" },
+        });
+      }
+    });
   });
 });

@@ -407,6 +407,80 @@ describe("WorkflowExecutionService", () => {
     expect(dockerSandboxService.lastDriverCliArgs).toBe("");
   });
 
+  it("routes to the vm sandbox service when only the workspace resolves to vm", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    // No project-level config — the workspace tier must drive the selection.
+    await sandboxTypeConfig.setWorkspaceConfig(
+      "workspace-1" as WorkspaceId,
+      "vm",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-workspace-vm"),
+      createTask("task-workspace-vm"),
+      createProject("project-workspace-vm"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(vmSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
+  it("routes to the docker sandbox service when neither project nor workspace is configured", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    // Empty config — resolveSandboxType must fall back to the "docker" default.
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-default-docker"),
+      createTask("task-default-docker"),
+      createProject("project-default-docker"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(dockerSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+  });
+
   it("allows Codex to use env fallback auth when no workspace creator is recorded", async () => {
     const driverRunTokenStore = new RecordingDriverRunTokenStore();
     const sandboxService = new RecordingSandboxService(driverRunTokenStore, {

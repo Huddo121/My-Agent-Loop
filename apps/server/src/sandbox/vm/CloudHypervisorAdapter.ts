@@ -121,18 +121,14 @@ export function buildCloudHypervisorArgs(options: StartVmmOptions): string[] {
     `size=${options.memorySizeMb}M,shared=on`,
     "--cpus",
     `boot=${options.cpuCount}`,
+    // The same busybox initramfs the vfkit path uses; required to mount the rootfs disk and switch
+    // into /sbin/vm-init before the agent runs.
+    "--initramfs",
+    options.initrdPath,
+    // Capture the guest serial console to a file so runs are debuggable, mirroring vfkit's logFilePath.
+    "--serial",
+    `file=${options.consoleLogPath}`,
   ];
-
-  // The same busybox initramfs the vfkit path uses; required to mount the rootfs disk and switch
-  // into /sbin/vm-init before the agent runs.
-  if (options.initrdPath !== undefined) {
-    args.push("--initramfs", options.initrdPath);
-  }
-
-  // Capture the guest serial console to a file so runs are debuggable, mirroring vfkit's logFilePath.
-  if (options.consoleLogPath !== undefined) {
-    args.push("--serial", `file=${options.consoleLogPath}`);
-  }
 
   const netArg = buildNetArg(options.networkConfig);
   if (netArg !== undefined) {

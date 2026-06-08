@@ -3,11 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AbsoluteFilePath } from "../../file-system/FilePath";
+import type { Logger } from "../../logger/Logger";
+import type { VmPlatformAdapter } from "./VmPlatformAdapter";
 import {
   findCommonParentDir,
   generateVmMountSetupScript,
   readGuestExitCode,
   shellQuote,
+  VmSandboxService,
 } from "./VmSandboxService";
 
 // ---------------------------------------------------------------------------
@@ -341,5 +344,86 @@ describe("readGuestExitCode", () => {
   it("returns undefined for unparseable contents", () => {
     fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "not-a-number");
     expect(readGuestExitCode(tmpDir)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VmSandboxService.createNewSandbox — missing-path guard
+// ---------------------------------------------------------------------------
+
+// Minimal in-memory fake that satisfies VmPlatformAdapter. The guard in createNewSandbox fires
+// before the adapter is ever called, so the fake methods don't need real implementations.
+const noopAdapter: VmPlatformAdapter = {
+  platform: "macos",
+  isAvailable: async () => false,
+  startVirtiofsd: async () => null,
+  startVmm: async () => {
+    throw new Error("startVmm should not be called when paths are missing");
+  },
+  bootVm: async () => {},
+  shutdownVm: async () => {},
+  getVmInfo: async () => ({ state: "Unknown" }),
+};
+
+const noopLogger: Logger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+};
+
+describe("VmSandboxService.createNewSandbox — missing path guard", () => {
+  it("rejects when all three paths are undefined", async () => {
+    const service = new VmSandboxService(
+      noopAdapter,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
+    await expect(
+      service.createNewSandbox({ volumes: [], env: {} }),
+    ).rejects.toThrow(
+      "VM sandbox requires VM_KERNEL_PATH, VM_ROOTFS_PATH and VM_INITRD_PATH to be configured",
+    );
+  });
+
+  it("rejects when only kernelPath is undefined", async () => {
+    const service = new VmSandboxService(
+      noopAdapter,
+      undefined,
+      "/rootfs.raw",
+      "/initrd.cpio.gz",
+      noopLogger,
+    );
+    await expect(
+      service.createNewSandbox({ volumes: [], env: {} }),
+    ).rejects.toThrow("VM_KERNEL_PATH");
+  });
+
+  it("rejects when only rootfsPath is undefined", async () => {
+    const service = new VmSandboxService(
+      noopAdapter,
+      "/kernel",
+      undefined,
+      "/initrd.cpio.gz",
+      noopLogger,
+    );
+    await expect(
+      service.createNewSandbox({ volumes: [], env: {} }),
+    ).rejects.toThrow("VM_ROOTFS_PATH");
+  });
+
+  it("rejects when only initrdPath is undefined", async () => {
+    const service = new VmSandboxService(
+      noopAdapter,
+      "/kernel",
+      "/rootfs.raw",
+      undefined,
+      noopLogger,
+    );
+    await expect(
+      service.createNewSandbox({ volumes: [], env: {} }),
+    ).rejects.toThrow("VM_INITRD_PATH");
   });
 });

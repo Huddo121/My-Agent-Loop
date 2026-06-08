@@ -41,7 +41,13 @@ import {
   DockerSandboxService,
   type SandboxService,
 } from "./sandbox/SandboxService";
-import { DatabaseSandboxTypeConfigRepository } from "./sandbox/SandboxTypeConfigRepository";
+import {
+  DatabaseSandboxTypeConfigRepository,
+  type SandboxTypeConfigRepository,
+} from "./sandbox/SandboxTypeConfigRepository";
+import { CloudHypervisorAdapter } from "./sandbox/vm/CloudHypervisorAdapter";
+import { VfkitAdapter } from "./sandbox/vm/VfkitAdapter";
+import { VmSandboxService } from "./sandbox/vm/VmSandboxService";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
   DefaultUserOAuthCredentialRepository,
@@ -68,6 +74,8 @@ export interface Services {
   taskQueue: TaskQueue;
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  vmSandboxService: SandboxService;
+  sandboxTypeConfigRepository: SandboxTypeConfigRepository;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
   workflowManager: WorkflowManager;
@@ -162,13 +170,35 @@ const workflowManager = new DatabaseWorkflowManager(
   agentHarnessConfigRepository,
 );
 
-// TODO(services-wiring): wire real VmSandboxService + per-type endpoints
+// Logger is defined here (before VmSandboxService) rather than at the bottom because VmSandboxService
+// needs it at construction time and module-level const declarations are evaluated top-to-bottom.
+const logger: Logger = ConsoleLogger;
+
+// Choose the VMM adapter for the current platform. VfkitAdapter uses Apple's Virtualization.framework
+// on macOS (no separate virtiofsd); CloudHypervisorAdapter uses KVM + virtiofsd on Linux.
+const vmPlatformAdapter =
+  process.platform === "darwin"
+    ? new VfkitAdapter(env.VFKIT_PATH)
+    : new CloudHypervisorAdapter(env.CLOUD_HYPERVISOR_PATH, env.VIRTIOFSD_PATH);
+
 const sandboxTypeConfigRepository = new DatabaseSandboxTypeConfigRepository();
+
+// VM path env vars are optional — VM sandbox support may not be configured on all deployments.
+// VmSandboxService accepts undefined here and throws a descriptive error at createNewSandbox time
+// if a run actually requests a VM sandbox without the paths being set.
+const vmSandboxService = new VmSandboxService(
+  vmPlatformAdapter,
+  env.VM_KERNEL_PATH,
+  env.VM_ROOTFS_PATH,
+  env.VM_INITRD_PATH,
+  logger,
+);
+
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
-  sandboxService, // dockerSandboxService
-  sandboxService, // vmSandboxService: provisional — real VmSandboxService wired in services-wiring TODO
+  sandboxService,
+  vmSandboxService,
   sandboxTypeConfigRepository,
   fileSystemService,
   harnesses,
@@ -183,10 +213,11 @@ const workflowExecutionService = new WorkflowExecutionService(
       mcpServerUrl: env.MCP_SERVER_URL,
       driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
     },
+    // The in-VM guest cannot reach host.docker.internal (that's a Docker networking alias, not
+    // available inside a VM). It reaches the host via the bridge IP instead.
     vm: {
-      // Provisional: same values as docker until services-wiring TODO sets up VM_HOST_BRIDGE_IP-derived URLs
-      mcpServerUrl: env.MCP_SERVER_URL,
-      driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+      mcpServerUrl: `http://${env.VM_HOST_BRIDGE_IP}:3050/mcp`,
+      driverHostApiBaseUrl: `http://${env.VM_HOST_BRIDGE_IP}:${env.PORT}`,
     },
   },
 );
@@ -205,13 +236,13 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   agentHarnessConfigRepository,
 );
 
-const logger: Logger = ConsoleLogger;
-
 export const services: Services = {
   db,
   taskQueue,
   driverRunTokenStore,
   sandboxService,
+  vmSandboxService,
+  sandboxTypeConfigRepository,
   gitService,
   workflowManager,
   workflowExecutionService,

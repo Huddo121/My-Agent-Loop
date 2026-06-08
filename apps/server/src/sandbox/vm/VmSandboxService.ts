@@ -213,9 +213,13 @@ export class VmSandboxService implements SandboxService {
 
   constructor(
     private readonly adapter: VmPlatformAdapter,
-    private readonly kernelPath: string,
-    private readonly rootfsPath: string,
-    private readonly initrdPath: string,
+    // Paths are optional in env (VM sandboxes may not be configured on all deployments), so we
+    // accept undefined here and validate at the point where a sandbox is actually requested — not
+    // at construction time, since the service is always instantiated even when VM sandboxes are
+    // not in use. The guard in createNewSandbox surfaces a clear error naming the missing vars.
+    private readonly kernelPath: string | undefined,
+    private readonly rootfsPath: string | undefined,
+    private readonly initrdPath: string | undefined,
     private readonly logger: Logger,
     options: VmSandboxServiceOptions = {},
   ) {
@@ -225,6 +229,25 @@ export class VmSandboxService implements SandboxService {
   }
 
   async createNewSandbox(options: SandboxInitOptions): Promise<Sandbox> {
+    // Validate required paths before doing any work. These come from optional env vars, so they may
+    // be absent when the server runs without VM sandbox support configured. Fail fast with a clear
+    // error rather than propagating undefined into the adapter or spawning processes that will crash.
+    if (
+      this.kernelPath === undefined ||
+      this.rootfsPath === undefined ||
+      this.initrdPath === undefined
+    ) {
+      throw new Error(
+        "VM sandbox requires VM_KERNEL_PATH, VM_ROOTFS_PATH and VM_INITRD_PATH to be configured",
+      );
+    }
+
+    // After the guard above, TypeScript still sees the fields as string | undefined because they
+    // are instance properties. Shadow them as narrowed locals so the rest of the method is typed.
+    const kernelPath: string = this.kernelPath;
+    const rootfsPath: string = this.rootfsPath;
+    const initrdPath: string = this.initrdPath;
+
     const volumes = options.volumes ?? [];
 
     // The shared directory is the common parent of the run's volume host paths.
@@ -283,9 +306,9 @@ export class VmSandboxService implements SandboxService {
 
     const vmmProcess = await this.adapter.startVmm({
       apiSocketPath,
-      kernelPath: this.kernelPath,
-      rootfsPath: this.rootfsPath,
-      initrdPath: this.initrdPath,
+      kernelPath,
+      rootfsPath,
+      initrdPath,
       virtiofsSocketPath: virtiofsdSocketPath,
       // VIRTIOFS_TAG must match the tag in vm-init.sh; mismatches cause a silent mount failure.
       virtiofsTag: VIRTIOFS_TAG,

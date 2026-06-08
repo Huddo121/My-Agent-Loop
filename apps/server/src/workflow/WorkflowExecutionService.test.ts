@@ -40,6 +40,7 @@ import type {
   WaitForSandboxToFinishSuccess,
 } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
+import { FakeSandboxTypeConfigRepository } from "../test-fakes/FakeSandboxTypeConfigRepository";
 import { FakeWorkspaceMembershipsService } from "../test-fakes/FakeWorkspaceMembershipsService";
 import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
@@ -140,8 +141,14 @@ describe("WorkflowExecutionService", () => {
       driverRunTokenStore,
       sandboxService,
       workflowExecutionOptions: {
-        mcpServerUrl: "http://host.docker.internal:3050/mcp",
-        driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        docker: {
+          mcpServerUrl: "http://host.docker.internal:3050/mcp",
+          driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        },
+        vm: {
+          mcpServerUrl: "http://192.168.100.1:3050/mcp",
+          driverHostApiBaseUrl: "http://192.168.100.1:3000",
+        },
       },
     });
 
@@ -363,6 +370,43 @@ describe("WorkflowExecutionService", () => {
     expect(driverRunTokenStore.lastIssuedToken).toBeUndefined();
   });
 
+  it("routes to the vm sandbox service when the project resolves to vm", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    await sandboxTypeConfig.setProjectConfig("project-vm" as ProjectId, "vm");
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-vm"),
+      createTask("task-vm"),
+      createProject("project-vm"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    // The vm service should have been selected: it created the sandbox and waited
+    expect(vmSandboxService.lastDriverCliArgs).not.toBe("");
+    // The docker service should not have been used
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
   it("allows Codex to use env fallback auth when no workspace creator is recorded", async () => {
     const driverRunTokenStore = new RecordingDriverRunTokenStore();
     const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
@@ -402,6 +446,8 @@ describe("WorkflowExecutionService", () => {
 function createService(options: {
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  vmSandboxService?: SandboxService;
+  sandboxTypeConfig?: FakeSandboxTypeConfigRepository;
   harness?: AgentHarness;
   harnessConfigRepository?: AgentHarnessConfigRepository;
   harnessAuthService?: RecordingHarnessAuthService;
@@ -412,6 +458,8 @@ function createService(options: {
     createTaskQueue(),
     createGitService(),
     options.sandboxService,
+    options.vmSandboxService ?? options.sandboxService,
+    options.sandboxTypeConfig ?? new FakeSandboxTypeConfigRepository(),
     createFileSystemService(),
     [options.harness ?? createHarness()],
     options.harnessConfigRepository ?? createHarnessConfigRepository(),

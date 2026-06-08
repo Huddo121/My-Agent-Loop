@@ -41,6 +41,7 @@ import {
   DockerSandboxService,
   type SandboxService,
 } from "./sandbox/SandboxService";
+import { DatabaseSandboxTypeConfigRepository } from "./sandbox/SandboxTypeConfigRepository";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
   DefaultUserOAuthCredentialRepository,
@@ -161,10 +162,14 @@ const workflowManager = new DatabaseWorkflowManager(
   agentHarnessConfigRepository,
 );
 
+// TODO(services-wiring): wire real VmSandboxService + per-type endpoints
+const sandboxTypeConfigRepository = new DatabaseSandboxTypeConfigRepository();
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
-  sandboxService,
+  sandboxService, // dockerSandboxService
+  sandboxService, // vmSandboxService: provisional — real VmSandboxService wired in services-wiring TODO
+  sandboxTypeConfigRepository,
   fileSystemService,
   harnesses,
   agentHarnessConfigRepository,
@@ -174,8 +179,15 @@ const workflowExecutionService = new WorkflowExecutionService(
   driverRunTokenStore,
   liveEventsService,
   {
-    mcpServerUrl: env.MCP_SERVER_URL,
-    driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+    docker: {
+      mcpServerUrl: env.MCP_SERVER_URL,
+      driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+    },
+    vm: {
+      // Provisional: same values as docker until services-wiring TODO sets up VM_HOST_BRIDGE_IP-derived URLs
+      mcpServerUrl: env.MCP_SERVER_URL,
+      driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+    },
   },
 );
 

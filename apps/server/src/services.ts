@@ -47,7 +47,7 @@ import { VmSandboxService } from "./sandbox/vm/VmSandboxService";
 import {
   DatabaseSandboxTypeConfigRepository,
   type SandboxTypeConfigRepository,
-} from "./sandbox-config/SandboxTypeConfigRepository";
+} from "./sandbox-config";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
   DefaultUserOAuthCredentialRepository,
@@ -208,6 +208,7 @@ const workflowExecutionService = new WorkflowExecutionService(
   forgeSecretRepository,
   driverRunTokenStore,
   liveEventsService,
+  logger,
   {
     docker: {
       mcpServerUrl: env.MCP_SERVER_URL,

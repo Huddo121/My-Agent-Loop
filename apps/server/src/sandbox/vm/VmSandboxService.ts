@@ -374,7 +374,7 @@ export class VmSandboxService implements SandboxService {
         sandboxId: id,
         error: error instanceof Error ? error.message : String(error),
       });
-      return { success: false, error: { reason: "container-not-found" } };
+      return { success: false, error: { reason: "boot-failed" } };
     }
 
     // Forward VMM stdout/stderr to the logger as structured lines. The VMM process uses

@@ -45,8 +45,9 @@ describe("sandbox-type query keys", () => {
     ).toEqual(prefix);
   });
 
-  // Encodes the mutation onSuccess assumption: writing the updated value under the query key makes
-  // it the cached value a subsequent read resolves, without a refetch.
+  // The mutation's onSuccess writes the updated value under this exact key. This does not drive the
+  // hook itself; it pins the key/cache round-trip that onSuccess depends on, so a key-shape change
+  // that would silently break the optimistic update is caught here.
   it("serves the value written under the project key from the cache", () => {
     const queryClient = new QueryClient();
     const updated: SandboxTypeConfigResponse = { sandboxType: "vm" };

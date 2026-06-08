@@ -9,7 +9,8 @@ import type {
   VmPlatformAdapter,
 } from "./VmPlatformAdapter";
 
-// Typed response shape for the cloud-hypervisor GET /api/v1/vm.info endpoint.
+// Only `state` is relied on; the rest of the cloud-hypervisor vm.info response is intentionally left
+// opaque so changes to fields we don't use don't ripple into this type.
 interface CloudHypervisorVmInfoResponse {
   state: string;
   [key: string]: unknown;

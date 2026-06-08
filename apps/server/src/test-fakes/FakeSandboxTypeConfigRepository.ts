@@ -1,5 +1,5 @@
 import type { ProjectId, SandboxType, WorkspaceId } from "@mono/api";
-import type { SandboxTypeConfigRepository } from "../sandbox-config/SandboxTypeConfigRepository";
+import type { SandboxTypeConfigRepository } from "../sandbox-config";
 
 const DEFAULT_SANDBOX_TYPE: SandboxType = "docker";
 

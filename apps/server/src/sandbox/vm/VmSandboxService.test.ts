@@ -549,13 +549,13 @@ describe("VmSandboxService lifecycle", () => {
       expect(calls.boot).toBe(1);
     });
 
-    it("returns container-not-found when booting throws", async () => {
+    it("returns boot-failed when booting throws", async () => {
       const { service } = makeService({ bootShouldThrow: true });
       const { sandbox } = await addSandbox(service);
       const result = await service.startSandbox(sandbox.id);
       expect(result).toEqual({
         success: false,
-        error: { reason: "container-not-found" },
+        error: { reason: "boot-failed" },
       });
     });
   });
@@ -629,7 +629,7 @@ describe("VmSandboxService lifecycle", () => {
       ).resolves.toBeUndefined();
     });
 
-    it("requests graceful shutdown and forgets the sandbox", async () => {
+    it("forgets the sandbox when the VMM has already exited", async () => {
       const { service, vmmProcesses, calls } = makeService();
       const { sandbox } = await addSandbox(service);
       // Already exited, so the grace-period wait resolves immediately without a force-kill.
@@ -643,6 +643,27 @@ describe("VmSandboxService lifecycle", () => {
         success: false,
         error: { reason: "container-not-found" },
       });
+    });
+
+    it("waits for the VMM exit event during graceful shutdown, without force-killing", async () => {
+      vi.useFakeTimers();
+      try {
+        const { service, vmmProcesses, calls } = makeService();
+        const { sandbox } = await addSandbox(service);
+        // exitCode stays null, so the service must wait on the "exit" event rather than the
+        // already-exited fast path.
+        const stopPromise = service.stopSandbox(sandbox.id);
+        // Flush the graceful-shutdown request so the exit listener is registered, then emit the
+        // exit within the grace period (before the 30s force-kill timer fires).
+        await vi.advanceTimersByTimeAsync(0);
+        vmmProcesses[0].simulateExit(0);
+        await stopPromise;
+        expect(calls.shutdown).toBe(1);
+        // Exited on its own, so no SIGKILL was needed.
+        expect(vmmProcesses[0].killSignal).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("force-kills the VMM when it does not exit within the grace period", async () => {

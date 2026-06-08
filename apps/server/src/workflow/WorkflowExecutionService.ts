@@ -15,10 +15,11 @@ import type { AgentHarness } from "../harness";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../harness/HarnessAuthService";
 import type { LiveEventsService } from "../live-events";
+import type { Logger } from "../logger/Logger";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
-import type { SandboxTypeConfigRepository } from "../sandbox-config/SandboxTypeConfigRepository";
+import type { SandboxTypeConfigRepository } from "../sandbox-config";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { toTaskDto } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
@@ -119,6 +120,7 @@ export class WorkflowExecutionService {
     private readonly forgeSecretRepository: ForgeSecretRepository,
     private readonly driverRunTokenStore: DriverRunTokenStore,
     private readonly liveEventsService: LiveEventsService,
+    private readonly logger: Logger,
     private readonly options: WorkflowExecutionServiceOptions = defaultOptions,
   ) {}
 
@@ -178,10 +180,10 @@ export class WorkflowExecutionService {
     });
 
     if (checkoutResult.success === false) {
-      console.error(
-        `Failed to checkout repository for task ${task.id}:`,
-        checkoutResult.error.message,
-      );
+      this.logger.error("Failed to checkout repository for task", {
+        taskId: task.id,
+        error: checkoutResult.error.message,
+      });
       return { success: false, error: checkoutResult.error };
     }
 
@@ -213,7 +215,7 @@ export class WorkflowExecutionService {
         endpoints: this.options.vm,
       }))
       .exhaustive();
-    console.info("Resolved sandbox type for task", {
+    this.logger.info("Resolved sandbox type for task", {
       runId,
       projectId: project.id,
       sandboxType,
@@ -380,9 +382,11 @@ export class WorkflowExecutionService {
       }
       sandboxFinished = true;
 
-      console.log(
-        `Container ${sandbox.id} exited with code ${result.value.exitCode}, reason: ${result.value.reason}`,
-      );
+      this.logger.info("Sandbox finished", {
+        sandboxId: sandbox.id,
+        exitCode: result.value.exitCode,
+        reason: result.value.reason,
+      });
 
       if (result.value.reason === "completed") {
         const workflowOnTaskCompletedResult = await workflow.onTaskCompleted(
@@ -391,10 +395,10 @@ export class WorkflowExecutionService {
         );
 
         if (workflowOnTaskCompletedResult.success === false) {
-          console.error(
-            `Failed to complete task ${task.id}:`,
-            workflowOnTaskCompletedResult.error.message,
-          );
+          this.logger.error("Failed to complete task", {
+            taskId: task.id,
+            error: workflowOnTaskCompletedResult.error.message,
+          });
           return { success: false, error: workflowOnTaskCompletedResult.error };
         }
 
@@ -416,7 +420,7 @@ export class WorkflowExecutionService {
             projectId: project.id,
             task: dto,
           });
-          console.info("Marked task as completed", {
+          this.logger.info("Marked task as completed", {
             taskId: task.id,
             task: completedTask,
           });

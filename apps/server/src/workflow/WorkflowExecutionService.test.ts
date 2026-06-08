@@ -481,6 +481,49 @@ describe("WorkflowExecutionService", () => {
     expect(vmSandboxService.lastDriverCliArgs).toBe("");
   });
 
+  it("lets a project docker override beat a workspace vm setting", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    // Project says docker, workspace says vm — the project tier must win.
+    await sandboxTypeConfig.setWorkspaceConfig(
+      "workspace-1" as WorkspaceId,
+      "vm",
+    );
+    await sandboxTypeConfig.setProjectConfig(
+      "project-precedence" as ProjectId,
+      "docker",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-precedence"),
+      createTask("task-precedence"),
+      createProject("project-precedence"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(dockerSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+  });
+
   it("allows Codex to use env fallback auth when no workspace creator is recorded", async () => {
     const driverRunTokenStore = new RecordingDriverRunTokenStore();
     const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
@@ -542,6 +585,7 @@ function createService(options: {
     createForgeSecretRepository(),
     options.driverRunTokenStore,
     createLiveEventsService(),
+    { error() {}, warn() {}, info() {}, debug() {} },
     options.workflowExecutionOptions,
   );
 }

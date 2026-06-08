@@ -8,7 +8,8 @@ import type {
   VmPlatformAdapter,
 } from "./VmPlatformAdapter";
 
-// Typed response shape for the vfkit state endpoint.
+// Only `state` is relied on; the rest of vfkit's state response is intentionally left opaque so
+// changes to fields we don't use don't ripple into this type.
 interface VfkitStateResponse {
   state: string;
   [key: string]: unknown;
@@ -92,16 +93,15 @@ export function buildVfkitArgs(options: StartVmmOptions): string[] {
     // double quotes (vfkit strips them); required so values containing spaces parse correctly.
     "--bootloader",
     `linux,kernel=${options.kernelPath},initrd=${options.initrdPath},cmdline="${VFKIT_KERNEL_CMDLINE}"`,
-    // Root disk as virtio-blk; the initramfs mounts it as /dev/vda and switch_roots into it.
+    // The initramfs expects the root disk as the first virtio-blk device (/dev/vda) and switch_roots
+    // into it, so this entry must stay ahead of the other --device entries.
     "--device",
     `virtio-blk,path=${options.rootfsPath}`,
-    // Host directory shared into the guest; vm-init.sh mounts this tag at /mnt/host.
     "--device",
     `virtio-fs,sharedDir=${options.sharedDir},mountTag=${options.virtiofsTag}`,
     // Guest serial console written to a file (stdio console needs a TTY, unavailable when headless).
     "--device",
     `virtio-serial,logFilePath=${options.consoleLogPath}`,
-    // REST API over a Unix socket for lifecycle control (state queries, graceful stop).
     "--restful-uri",
     `unix://${options.apiSocketPath}`,
   ];

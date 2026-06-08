@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { match } from "ts-pattern";
 import { stringify } from "yaml";
 import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
@@ -200,12 +201,18 @@ export class WorkflowExecutionService {
       project.id,
       project.workspaceId,
     );
-    const sandboxService =
-      sandboxType === "docker"
-        ? this.dockerSandboxService
-        : this.vmSandboxService;
-    const endpoints =
-      sandboxType === "docker" ? this.options.docker : this.options.vm;
+    // Exhaustive match so adding a new SandboxType is a compile error here rather
+    // than silently routing to the VM service via a fall-through ternary.
+    const { sandboxService, endpoints } = match(sandboxType)
+      .with("docker", () => ({
+        sandboxService: this.dockerSandboxService,
+        endpoints: this.options.docker,
+      }))
+      .with("vm", () => ({
+        sandboxService: this.vmSandboxService,
+        endpoints: this.options.vm,
+      }))
+      .exhaustive();
 
     const { harnessId, modelId } =
       await this.harnessConfig.resolveHarnessConfig(

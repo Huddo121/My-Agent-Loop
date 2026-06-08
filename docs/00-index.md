@@ -10,4 +10,5 @@ My Agent Loop is a project that aims to make it easier to allow agents to more a
 - [Test fakes](./04-test-fakes.md): Using in-memory fakes vs mocks for `@mono/server` tests (test doubles, when to use which)
 - [Concepts](./03-concepts.md): More detailed information about the high level concepts in use in this project
 - [Decisions](./decisions): Architecture and design decisions
+  - [VM-based sandboxes](./decisions/vm-sandboxing.md): Running agent sandboxes in VMs (Cloud Hypervisor / vfkit) alongside Docker
 - [Ideas](./ideas): This is a folder of notes for things that I'm thinking about but not yet working on, or may never work on

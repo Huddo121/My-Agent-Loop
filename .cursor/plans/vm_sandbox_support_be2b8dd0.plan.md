@@ -40,7 +40,7 @@ todos:
     status: completed
   - id: docs
     content: "Create `docs/decisions/vm-sandboxing.md` documenting: why VMs (isolation, future Docker-in-VM), why Cloud Hypervisor + vfkit (virtio-fs, REST API), architecture overview (VmPlatformAdapter abstraction), setup instructions for Linux (install binaries, run networking script, build rootfs) and macOS (install vfkit via Homebrew, build rootfs). Update `docs/00-index.md` to link to the new file. Read existing decisions docs (e.g., docs/decisions/forge-authentication.md) for the style."
-    status: pending
+    status: completed
 isProject: false
 ---
 

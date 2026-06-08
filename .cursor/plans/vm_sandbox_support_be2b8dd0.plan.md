@@ -27,7 +27,7 @@ todos:
     content: "Refactor `apps/server/src/workflow/WorkflowExecutionService.ts` to support both sandbox types. Read the current file first. Changes: (1) Replace the single `sandboxService: SandboxService` constructor param with `dockerSandboxService: DockerSandboxService` and `vmSandboxService: VmSandboxService` plus `sandboxTypeConfig: SandboxTypeConfigRepository`. (2) In prepare(), resolve sandbox type via sandboxTypeConfig.resolveSandboxType(project.id, project.workspaceId), then select the matching service. (3) Adjust MCP_SERVER_URL: Docker uses 'http://host.docker.internal:3050/mcp', VM uses the env var VM_HOST_BRIDGE_IP. (4) The rest of the flow (startSandbox, waitForSandboxToFinish, stopSandbox) stays the same since both services implement SandboxService. See plan section 7."
     status: pending
   - id: services-wiring
-    content: "Update `apps/server/src/services.ts` to wire the new services. Read the current file first -- it has all the DI wiring. Changes: (1) Import and instantiate VmSandboxService with the platform-appropriate adapter (process.platform === 'darwin' for VfkitAdapter, 'linux' for CloudHypervisorAdapter). (2) Instantiate DatabaseSandboxTypeConfigRepository. (3) Update WorkflowExecutionService constructor call to pass both sandbox services + config repo (matching the workflow-refactor changes). (4) Add sandboxTypeConfigRepository and vmSandboxService to the Services interface. (5) Ensure BackgroundWorkflowProcessor.shutdown() stops both sandbox services."
+    content: "Update `apps/server/src/services.ts` to wire the new services. Read the current file first -- it has all the DI wiring. Changes: (1) Import and instantiate VmSandboxService with the platform-appropriate adapter (process.platform === 'darwin' for VfkitAdapter, 'linux' for CloudHypervisorAdapter). NOTE: VmSandboxService's constructor is (adapter, kernelPath, rootfsPath, initrdPath, logger, options?) -- pass env.VM_KERNEL_PATH, env.VM_ROOTFS_PATH, env.VM_INITRD_PATH (see the 'Validated Boot Recipe & Findings' section). (2) Instantiate DatabaseSandboxTypeConfigRepository. (3) Update WorkflowExecutionService constructor call to pass both sandbox services + config repo (matching the workflow-refactor changes). (4) Add sandboxTypeConfigRepository and vmSandboxService to the Services interface. (5) Ensure shutdown (in apps/server/src/index.ts, where stopAllSandboxes is currently called) stops BOTH the docker and vm sandbox services."
     status: pending
   - id: sandbox-type-api
     content: Add HTTP API endpoints for sandbox type configuration. Read existing handler files to find where workspace and project routes are defined (look in apps/server/src/workspaces/ and apps/server/src/projects/ for handler files). Add GET/PUT endpoints for /api/workspaces/:id/sandbox-type and /api/projects/:id/sandbox-type. Require an authenticated Better Auth session, return `401` when no session is present, return `404` when the caller is not a member of the workspace, and return `404` when the caller cannot access the target project. These call SandboxTypeConfigRepository. Also add MCP tools -- read apps/server/src/projects/projects-mcp-handlers.ts for the MCP tool pattern (uses satisfies McpTool, getMcpServices(), withRequiredProjectId). Register new tools in apps/server/src/mcp.ts. The API package (packages/api) will need the SandboxType type exported -- read packages/api/AGENTS.md for cerato patterns.
@@ -460,6 +460,34 @@ Since VMs have their own kernel, Docker can run natively inside the VM. The root
 - **Networking not configured (Linux):** If the bridge is not set up, VM creation should fail with a descriptive error explaining how to run the setup script.
 - **Teardown on timeout:** For v1, if a VM run times out, the VMM process is killed directly. Teardown scripts do not run in this case (acceptable for v1; the Docker path has the same limitation when a container is force-killed). Future improvement: send a command into the VM via vsock or serial before killing.
 - **Concurrent VMs:** Each VM has its own VMM process, virtiofsd, and sockets. No shared state between VMs. Concurrency is bounded by the same BullMQ worker concurrency (currently 5).
+
+## Validated Boot Recipe & Findings (2026-06-08, macOS/vfkit)
+
+A VM now boots end to end on macOS/Apple Silicon and is verified by `pnpm vm:smoke-test`
+(kernel boot → initramfs → switch_root → `/sbin/vm-init` → virtio-fs mount → `vm-mount-setup.sh`,
+including a host↔guest virtio-fs write round-trip). Key learnings, already reflected in the code:
+
+- **An initramfs is required.** vfkit 0.6.3 (Homebrew stable) rejects the Linux bootloader without an
+  `initrd`, and Virtualization.framework does not mount the root disk itself. `build-vm-rootfs.sh`
+  now produces a tiny busybox `initramfs.cpio.gz` that mounts `/dev/vda` and `switch_root`s into
+  `/sbin/vm-init`. New env var `VM_INITRD_PATH`.
+- **vfkit CLI specifics** (the original spec-written `VfkitAdapter` was wrong): kernel goes via
+  `--bootloader linux,kernel=…,initrd=…,cmdline="console=hvc0"` (not `--kernel`); the disk and the
+  virtio-fs share are `--device virtio-blk,path=…` / `--device virtio-fs,…` (there is no `--disk`);
+  the guest console must be `--device virtio-serial,logFilePath=…` (stdio console needs a TTY and
+  fails when the VMM is spawned headless).
+- **The cloud-hypervisor `Image-arm64` kernel boots fine under Virtualization.framework**, so the
+  same kernel asset works for both backends; the build downloads it from the
+  `ch-release-v6.16.9-20260508` release (assets `Image-arm64` / `bzImage-x86_64`).
+- **Clean shutdown + exit code.** `vm-mount-setup.sh` must NOT `exec` lifecycle.sh — as PID 1, an
+  exit panics the kernel and hangs the VM. It now runs lifecycle.sh, writes the exit code to the
+  shared dir (`.vm-exit-code`), and powers off via magic sysrq. `VmSandboxService.waitForSandboxToFinish`
+  reads that file (the VMM exit code cannot carry the agent's status).
+- **`VmSandboxService` constructor now takes `initrdPath`** (after `rootfsPath`). The services-wiring
+  TODO must pass `env.VM_INITRD_PATH` and construct the service accordingly.
+- **Still unvalidated:** the Linux/cloud-hypervisor path (this project's dev machines are macOS) and
+  the full app-driven boot (needs the workflow/services wiring + driver/MCP context). The
+  `CloudHypervisorAdapter` mirrors the proven vfkit model but must be re-verified on a Linux/KVM host.
 
 ## Out of Scope
 

@@ -208,13 +208,70 @@ trap - EXIT
 cleanup
 
 # ---------------------------------------------------------------------------
+# Step 6: Build the initramfs
+# ---------------------------------------------------------------------------
+# vfkit's Linux bootloader requires an initrd, and Virtualization.framework does
+# not mount the root disk for us — so we ship a tiny busybox initramfs whose only
+# job is to mount the rootfs disk (/dev/vda) and switch_root into the baked-in
+# init (/sbin/vm-init). The kernel boots this first, then hands off to the rootfs.
+#
+# This initramfs is generic: it depends only on the disk appearing as /dev/vda
+# and the rootfs providing /sbin/vm-init, so it does not need rebuilding when the
+# rootfs contents change. We still build it here so all VM artifacts come from one
+# command.
+
+INITRAMFS_OUT="${OUTPUT_DIR_ABS}/initramfs.cpio.gz"
+INIT_SCRIPT="${OUTPUT_DIR_ABS}/.initramfs-init"
+
+# Write the initramfs /init on the host with a quoted heredoc so none of the
+# runtime expansions ($(...), $i) are evaluated now — they must run inside the VM.
+cat >"${INIT_SCRIPT}" <<'INITRAMFS_INIT'
+#!/bin/busybox sh
+/bin/busybox --install -s /bin
+mount -t devtmpfs dev /dev 2>/dev/null
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+# The virtio-blk root disk can take a moment to appear; wait briefly for it.
+for _ in $(seq 1 25); do [ -b /dev/vda ] && break; sleep 0.2; done
+mkdir -p /mnt/root
+if mount -t ext4 /dev/vda /mnt/root; then
+  exec switch_root /mnt/root /sbin/vm-init
+fi
+echo "initramfs: failed to mount /dev/vda as ext4 root" >&2
+exec sh
+INITRAMFS_INIT
+
+log "Building initramfs..."
+docker run --rm \
+  -v "${OUTPUT_DIR_ABS}:/out" \
+  debian:bookworm-slim \
+  bash -euo pipefail -c '
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -q >/dev/null
+    apt-get install -y -q --no-install-recommends busybox-static cpio gzip >/dev/null
+
+    rm -rf /ird && mkdir -p /ird/bin /ird/dev /ird/proc /ird/sys /ird/mnt
+    cp "$(command -v busybox)" /ird/bin/busybox
+    cp /out/.initramfs-init /ird/init
+    chmod +x /ird/init
+
+    # newc is the cpio format the kernel expects for an initramfs.
+    (cd /ird && find . | cpio -o -H newc 2>/dev/null | gzip) > /out/initramfs.cpio.gz
+  '
+
+rm -f "${INIT_SCRIPT}"
+log "initramfs created at ${INITRAMFS_OUT}"
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 
 log "Build complete. Artifacts in ${OUTPUT_DIR_ABS}:"
-echo "  Rootfs : ${ROOTFS_RAW}"
-echo "  Kernel : ${KERNEL_OUT}"
+echo "  Rootfs    : ${ROOTFS_RAW}"
+echo "  Kernel    : ${KERNEL_OUT}"
+echo "  Initramfs : ${INITRAMFS_OUT}"
 echo ""
 echo "Configure the server by setting:"
 echo "  VM_ROOTFS_PATH=${ROOTFS_RAW}"
 echo "  VM_KERNEL_PATH=${KERNEL_OUT}"
+echo "  VM_INITRD_PATH=${INITRAMFS_OUT}"

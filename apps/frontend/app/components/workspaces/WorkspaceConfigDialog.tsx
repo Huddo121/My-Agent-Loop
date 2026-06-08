@@ -21,6 +21,15 @@ import {
   parseModelValue,
 } from "~/components/ui/ModelSelect";
 import {
+  parseSandboxTypeValue,
+  SANDBOX_TYPE_DEFAULT_VALUE,
+  SandboxTypeSelect,
+} from "~/components/ui/SandboxTypeSelect";
+import {
+  useSetWorkspaceSandboxType,
+  useWorkspaceSandboxTypeQuery,
+} from "~/lib/sandbox/useSandboxType";
+import {
   useHarnessesQuery,
   useUpdateWorkspace,
 } from "~/lib/workspaces/useWorkspaces";
@@ -44,10 +53,16 @@ export function WorkspaceConfigDialog({
   const [modelValue, setModelValue] = useState<string>(
     workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE,
   );
+  const [sandboxTypeValue, setSandboxTypeValue] = useState<string>(
+    SANDBOX_TYPE_DEFAULT_VALUE,
+  );
 
   const { data: harnessesData, isLoading: isLoadingHarnesses } =
     useHarnessesQuery(workspace.id);
+  const { data: sandboxTypeData, isLoading: isLoadingSandboxType } =
+    useWorkspaceSandboxTypeQuery(workspace.id);
   const updateWorkspace = useUpdateWorkspace(workspace.id);
+  const setWorkspaceSandboxType = useSetWorkspaceSandboxType(workspace.id);
 
   const harnesses = harnessesData?.harnesses ?? [];
 
@@ -66,8 +81,16 @@ export function WorkspaceConfigDialog({
       setName(workspace.name);
       setHarnessValue(workspace.agentConfig?.harnessId ?? INHERIT_VALUE);
       setModelValue(workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE);
+      setSandboxTypeValue(
+        sandboxTypeData?.sandboxType ?? SANDBOX_TYPE_DEFAULT_VALUE,
+      );
     }
-  }, [open, workspace.name, workspace.agentConfig]);
+  }, [
+    open,
+    workspace.name,
+    workspace.agentConfig,
+    sandboxTypeData?.sandboxType,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +103,10 @@ export function WorkspaceConfigDialog({
             modelId: parseModelValue(modelValue),
           };
 
+    setWorkspaceSandboxType.mutate({
+      sandboxType: parseSandboxTypeValue(sandboxTypeValue),
+    });
+
     updateWorkspace.mutate(
       { name: name.trim(), agentConfig },
       {
@@ -89,7 +116,8 @@ export function WorkspaceConfigDialog({
   };
 
   const canSubmit = name.trim().length > 0;
-  const isPending = updateWorkspace.isPending;
+  const isPending =
+    updateWorkspace.isPending || setWorkspaceSandboxType.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -165,9 +193,30 @@ export function WorkspaceConfigDialog({
                 </div>
               )}
             </div>
-            {updateWorkspace.isError && (
+            <div>
+              <label
+                htmlFor="workspace-config-sandbox-type"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Sandbox type
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                Used when a project does not override it.
+              </p>
+              <div className="mt-1">
+                <SandboxTypeSelect
+                  id="workspace-config-sandbox-type"
+                  value={sandboxTypeValue}
+                  onValueChange={setSandboxTypeValue}
+                  isLoading={isLoadingSandboxType}
+                  nullOptionLabel="System default (Docker)"
+                />
+              </div>
+            </div>
+            {(updateWorkspace.isError || setWorkspaceSandboxType.isError) && (
               <p className="text-sm text-destructive">
-                {updateWorkspace.error?.message}
+                {updateWorkspace.error?.message ??
+                  setWorkspaceSandboxType.error?.message}
               </p>
             )}
           </div>

@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: vm-rootfs-build
     content: "Create `scripts/build-vm-rootfs.sh` and add `pnpm vm:build-rootfs` to root package.json. The script: (1) builds the Docker image from the existing Dockerfile, (2) docker export to get a rootfs tarball, (3) creates a raw ext4 disk image, (4) copies the exported filesystem into it, (5) adds the vm-init.sh script (from the vm-init-script todo) to /sbin/vm-init. Also downloads a pre-built kernel from https://github.com/cloud-hypervisor/linux/releases. See plan section 4 for full steps."
-    status: pending
+    status: completed
   - id: host-networking
     content: Create `scripts/setup-vm-networking.sh` for Linux host networking (bridge, NAT, IP forwarding). See plan section 5 for the exact commands. On macOS, vfkit handles networking via Virtualization.framework NAT -- no manual setup needed. This script is run once by the developer, not automated.
     status: pending

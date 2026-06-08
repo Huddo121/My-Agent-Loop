@@ -28,6 +28,8 @@ interface VmSandboxState {
   apiSocketPath: string;
   virtiofsdSocketPath: string;
   sharedDir: string;
+  // File the guest serial console is written to, for debugging and (future) log streaming.
+  consoleLogPath: string;
 }
 
 export interface VmSandboxServiceOptions {
@@ -171,6 +173,7 @@ export class VmSandboxService implements SandboxService {
     private readonly adapter: VmPlatformAdapter,
     private readonly kernelPath: string,
     private readonly rootfsPath: string,
+    private readonly initrdPath: string,
     private readonly logger: Logger,
     options: VmSandboxServiceOptions = {},
   ) {
@@ -216,6 +219,8 @@ export class VmSandboxService implements SandboxService {
     // Socket paths under the OS temp dir — one per sandbox to avoid conflicts between concurrent VMs.
     const apiSocketPath = path.join(os.tmpdir(), `ch-${uuid}.sock`);
     const virtiofsdSocketPath = path.join(os.tmpdir(), `virtiofs-${uuid}.sock`);
+    // The VMM writes the guest serial console here (vfkit cannot use a stdio console headless).
+    const consoleLogPath = path.join(os.tmpdir(), `vm-console-${uuid}.log`);
 
     // Start virtiofsd first so the socket is ready before the VMM connects to it.
     // On macOS this returns null (vfkit handles virtio-fs via Virtualization.framework).
@@ -238,6 +243,7 @@ export class VmSandboxService implements SandboxService {
       apiSocketPath,
       kernelPath: this.kernelPath,
       rootfsPath: this.rootfsPath,
+      initrdPath: this.initrdPath,
       virtiofsSocketPath: virtiofsdSocketPath,
       // VIRTIOFS_TAG must match the tag in vm-init.sh; mismatches cause a silent mount failure.
       virtiofsTag: VIRTIOFS_TAG,
@@ -245,6 +251,7 @@ export class VmSandboxService implements SandboxService {
       cpuCount: this.cpuCount,
       networkConfig: this.networkConfig,
       sharedDir,
+      consoleLogPath,
     });
 
     const id = `vm-sandbox-${uuid}` as SandboxId;
@@ -255,6 +262,7 @@ export class VmSandboxService implements SandboxService {
       apiSocketPath,
       virtiofsdSocketPath,
       sharedDir,
+      consoleLogPath,
     });
 
     this.logger.info("Created VM sandbox", {
@@ -430,13 +438,17 @@ export class VmSandboxService implements SandboxService {
       }
     }
 
-    // Step 5: clean up socket files and the generated setup script.
-    // Ignore errors — sockets may not have been created if the VMM failed to start.
-    for (const socketPath of [state.apiSocketPath, state.virtiofsdSocketPath]) {
+    // Step 5: clean up socket files and the console log.
+    // Ignore errors — these may not exist if the VMM failed to start.
+    for (const tempPath of [
+      state.apiSocketPath,
+      state.virtiofsdSocketPath,
+      state.consoleLogPath,
+    ]) {
       try {
-        fs.unlinkSync(socketPath);
+        fs.unlinkSync(tempPath);
       } catch {
-        // socket may not exist if the process never got that far
+        // file may not exist if the process never got that far
       }
     }
     // Remove the per-run files we wrote into the shared dir (the setup script and our copy of

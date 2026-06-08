@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { unixSocketRequest } from "./unixSocketHttp";
 import type {
+  StartVmmOptions,
   VmInfo,
   VmNetworkConfig,
   VmPlatformAdapter,
@@ -13,6 +14,10 @@ interface CloudHypervisorVmInfoResponse {
   state: string;
   [key: string]: unknown;
 }
+
+// The shared initramfs mounts /dev/vda and switch_roots into /sbin/vm-init, so the cmdline only
+// needs to point the console at the serial port. cloud-hypervisor's serial shows up as ttyS0.
+const CLOUD_HYPERVISOR_KERNEL_CMDLINE = "console=ttyS0";
 
 export class CloudHypervisorAdapter implements VmPlatformAdapter {
   readonly platform = "linux" as const;
@@ -48,17 +53,7 @@ export class CloudHypervisorAdapter implements VmPlatformAdapter {
     return spawn(this.virtiofsdPath, args, { stdio: "pipe" });
   }
 
-  async startVmm(options: {
-    apiSocketPath: string;
-    kernelPath: string;
-    rootfsPath: string;
-    virtiofsSocketPath: string;
-    virtiofsTag: string;
-    memorySizeMb: number;
-    cpuCount: number;
-    networkConfig: VmNetworkConfig;
-    sharedDir?: string;
-  }): Promise<ChildProcess> {
+  async startVmm(options: StartVmmOptions): Promise<ChildProcess> {
     if (this.cloudHypervisorPath === undefined) {
       throw new Error("CLOUD_HYPERVISOR_PATH is not configured");
     }
@@ -103,22 +98,20 @@ export function buildVirtiofsdArgs(
 /**
  * Builds the cloud-hypervisor argument array.
  * Extracted for testability — pure function, no side effects.
+ *
+ * NOTE: the Linux/cloud-hypervisor path has not been booted on this project's dev machines (macOS),
+ * unlike the vfkit path which `pnpm vm:smoke-test` exercises. The configuration here mirrors the
+ * validated vfkit boot model — same initramfs (mount /dev/vda, switch_root into /sbin/vm-init) and a
+ * serial console captured to a file — and should be re-verified on a Linux/KVM host.
  */
-export function buildCloudHypervisorArgs(options: {
-  apiSocketPath: string;
-  kernelPath: string;
-  rootfsPath: string;
-  virtiofsSocketPath: string;
-  virtiofsTag: string;
-  memorySizeMb: number;
-  cpuCount: number;
-  networkConfig: VmNetworkConfig;
-}): string[] {
+export function buildCloudHypervisorArgs(options: StartVmmOptions): string[] {
   const args = [
     "--api-socket",
     options.apiSocketPath,
     "--kernel",
     options.kernelPath,
+    "--cmdline",
+    CLOUD_HYPERVISOR_KERNEL_CMDLINE,
     "--disk",
     `path=${options.rootfsPath}`,
     "--fs",
@@ -129,6 +122,17 @@ export function buildCloudHypervisorArgs(options: {
     "--cpus",
     `boot=${options.cpuCount}`,
   ];
+
+  // The same busybox initramfs the vfkit path uses; required to mount the rootfs disk and switch
+  // into /sbin/vm-init before the agent runs.
+  if (options.initrdPath !== undefined) {
+    args.push("--initramfs", options.initrdPath);
+  }
+
+  // Capture the guest serial console to a file so runs are debuggable, mirroring vfkit's logFilePath.
+  if (options.consoleLogPath !== undefined) {
+    args.push("--serial", `file=${options.consoleLogPath}`);
+  }
 
   const netArg = buildNetArg(options.networkConfig);
   if (netArg !== undefined) {

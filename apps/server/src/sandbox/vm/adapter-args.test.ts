@@ -50,15 +50,18 @@ describe("buildCloudHypervisorArgs", () => {
     virtiofsTag: "hostshare",
     memorySizeMb: 2048,
     cpuCount: 2,
+    networkConfig: {},
   };
 
-  it("builds the core boot args with shared memory enabled for virtio-fs", () => {
-    const args = buildCloudHypervisorArgs({ ...base, networkConfig: {} });
+  it("builds the core boot args with a serial console cmdline and shared memory", () => {
+    const args = buildCloudHypervisorArgs(base);
     expect(args).toEqual([
       "--api-socket",
       "/tmp/ch.sock",
       "--kernel",
       "/vm/vmlinux",
+      "--cmdline",
+      "console=ttyS0",
       "--disk",
       "path=/vm/rootfs.raw",
       "--fs",
@@ -68,6 +71,20 @@ describe("buildCloudHypervisorArgs", () => {
       "--cpus",
       "boot=2",
     ]);
+  });
+
+  it("adds --initramfs and --serial when an initrd and console log are provided", () => {
+    const args = buildCloudHypervisorArgs({
+      ...base,
+      initrdPath: "/vm/initramfs.cpio.gz",
+      consoleLogPath: "/tmp/vm-console.log",
+    });
+    const initrdIndex = args.indexOf("--initramfs");
+    expect(initrdIndex).toBeGreaterThan(-1);
+    expect(args[initrdIndex + 1]).toBe("/vm/initramfs.cpio.gz");
+    const serialIndex = args.indexOf("--serial");
+    expect(serialIndex).toBeGreaterThan(-1);
+    expect(args[serialIndex + 1]).toBe("file=/tmp/vm-console.log");
   });
 
   it("appends a --net arg when network config is provided", () => {
@@ -81,40 +98,60 @@ describe("buildCloudHypervisorArgs", () => {
   });
 
   it("omits --net when network config is empty", () => {
-    const args = buildCloudHypervisorArgs({ ...base, networkConfig: {} });
-    expect(args).not.toContain("--net");
+    expect(buildCloudHypervisorArgs(base)).not.toContain("--net");
   });
 });
 
 describe("buildVfkitArgs", () => {
+  // A complete, valid set of options matching the recipe validated by `pnpm vm:smoke-test`.
   const base = {
     apiSocketPath: "/tmp/vfkit.sock",
-    kernelPath: "/vm/vmlinux",
+    kernelPath: "/vm/Image-arm64",
     rootfsPath: "/vm/rootfs.raw",
+    initrdPath: "/vm/initramfs.cpio.gz",
+    virtiofsSocketPath: "/tmp/vfsd.sock",
     virtiofsTag: "hostshare",
     memorySizeMb: 2048,
     cpuCount: 2,
+    networkConfig: {},
+    sharedDir: "/run/share",
+    consoleLogPath: "/tmp/vm-console.log",
   };
 
-  it("passes the shared directory directly to the virtio-fs device", () => {
-    const args = buildVfkitArgs({ ...base, sharedDir: "/run/share" });
-    expect(args).toEqual([
-      "--kernel",
-      "/vm/vmlinux",
-      "--disk",
-      "path=/vm/rootfs.raw",
-      "--device",
-      "virtio-fs,sharedDir=/run/share,mountTag=hostshare",
-      "--memory",
-      "2048",
+  it("builds the bootloader, virtio-blk/fs/serial devices and REST socket", () => {
+    expect(buildVfkitArgs(base)).toEqual([
       "--cpus",
       "2",
+      "--memory",
+      "2048",
+      "--bootloader",
+      'linux,kernel=/vm/Image-arm64,initrd=/vm/initramfs.cpio.gz,cmdline="console=hvc0"',
+      "--device",
+      "virtio-blk,path=/vm/rootfs.raw",
+      "--device",
+      "virtio-fs,sharedDir=/run/share,mountTag=hostshare",
+      "--device",
+      "virtio-serial,logFilePath=/tmp/vm-console.log",
       "--restful-uri",
       "unix:///tmp/vfkit.sock",
     ]);
   });
 
   it("throws when sharedDir is missing because vfkit needs the directory, not a socket", () => {
-    expect(() => buildVfkitArgs(base)).toThrow(/sharedDir is required/);
+    expect(() => buildVfkitArgs({ ...base, sharedDir: undefined })).toThrow(
+      /sharedDir is required/,
+    );
+  });
+
+  it("throws when initrdPath is missing because the Linux bootloader needs an initramfs", () => {
+    expect(() => buildVfkitArgs({ ...base, initrdPath: undefined })).toThrow(
+      /initrdPath is required/,
+    );
+  });
+
+  it("throws when consoleLogPath is missing because the console needs a file, not a TTY", () => {
+    expect(() =>
+      buildVfkitArgs({ ...base, consoleLogPath: undefined }),
+    ).toThrow(/consoleLogPath is required/);
   });
 });

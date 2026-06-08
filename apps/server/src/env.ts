@@ -66,6 +66,7 @@ const envSchema = z
     // VM sandbox configuration
     VM_KERNEL_PATH: z.string().optional(),
     VM_ROOTFS_PATH: z.string().optional(),
+    VM_INITRD_PATH: z.string().optional(),
     VIRTIOFSD_PATH: z.string().optional(),
     CLOUD_HYPERVISOR_PATH: z.string().optional(),
     VFKIT_PATH: z.string().optional(),

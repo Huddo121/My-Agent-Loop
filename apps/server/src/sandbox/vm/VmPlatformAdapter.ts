@@ -23,6 +23,27 @@ export interface VmNetworkConfig {
   mac?: string;
 }
 
+export interface StartVmmOptions {
+  apiSocketPath: string;
+  kernelPath: string;
+  rootfsPath: string;
+  // Path to the initramfs. vfkit's Linux bootloader requires it (and Virtualization.framework does
+  // not mount the root disk itself); cloud-hypervisor can use it via --initramfs.
+  initrdPath?: string;
+  virtiofsSocketPath: string;
+  virtiofsTag: string;
+  memorySizeMb: number;
+  cpuCount: number;
+  networkConfig: VmNetworkConfig;
+  // vfkit needs the actual host directory rather than a virtiofsd socket because it handles
+  // virtio-fs natively via Virtualization.framework. cloud-hypervisor ignores this field and
+  // uses virtiofsSocketPath instead.
+  sharedDir?: string;
+  // File the guest serial console is written to. vfkit needs a file path here because its stdio
+  // console requires a TTY, which is unavailable when the VMM is spawned headless.
+  consoleLogPath?: string;
+}
+
 export interface VmPlatformAdapter {
   readonly platform: "linux" | "macos";
 
@@ -35,20 +56,7 @@ export interface VmPlatformAdapter {
     sharedDir: string;
   }): Promise<ChildProcess | null>;
 
-  startVmm(options: {
-    apiSocketPath: string;
-    kernelPath: string;
-    rootfsPath: string;
-    virtiofsSocketPath: string;
-    virtiofsTag: string;
-    memorySizeMb: number;
-    cpuCount: number;
-    networkConfig: VmNetworkConfig;
-    // vfkit needs the actual host directory rather than a virtiofsd socket because it handles
-    // virtio-fs natively via Virtualization.framework. cloud-hypervisor ignores this field and
-    // uses virtiofsSocketPath instead.
-    sharedDir?: string;
-  }): Promise<ChildProcess>;
+  startVmm(options: StartVmmOptions): Promise<ChildProcess>;
 
   bootVm(apiSocketPath: string): Promise<void>;
   shutdownVm(apiSocketPath: string): Promise<void>;

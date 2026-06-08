@@ -1,12 +1,11 @@
-import type { ProjectId, WorkspaceId } from "@mono/api";
+// SandboxType is the single source of truth for the wire and TS type.
+// The Postgres enum values in apps/server/src/db/schema.ts must match — keep them in sync.
+import type { ProjectId, SandboxType, WorkspaceId } from "@mono/api";
 import { eq } from "drizzle-orm";
-import {
-  sandboxTypeConfigurationTable,
-  type sandboxTypeEnum,
-} from "../db/schema";
+import { sandboxTypeConfigurationTable } from "../db/schema";
 import { getTransaction } from "../utils/transaction-context";
 
-export type SandboxType = (typeof sandboxTypeEnum.enumValues)[number];
+export type { SandboxType };
 
 const DEFAULT_SANDBOX_TYPE: SandboxType = "docker";
 

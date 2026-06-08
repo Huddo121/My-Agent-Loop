@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: sandbox-type-api
     content: Add HTTP API endpoints for sandbox type configuration. Read existing handler files to find where workspace and project routes are defined (look in apps/server/src/workspaces/ and apps/server/src/projects/ for handler files). Add GET/PUT endpoints for /api/workspaces/:id/sandbox-type and /api/projects/:id/sandbox-type. Require an authenticated Better Auth session, return `401` when no session is present, return `404` when the caller is not a member of the workspace, and return `404` when the caller cannot access the target project. These call SandboxTypeConfigRepository. Also add MCP tools -- read apps/server/src/projects/projects-mcp-handlers.ts for the MCP tool pattern (uses satisfies McpTool, getMcpServices(), withRequiredProjectId). Register new tools in apps/server/src/mcp.ts. The API package (packages/api) will need the SandboxType type exported -- read packages/api/AGENTS.md for cerato patterns.
-    status: pending
+    status: completed
   - id: frontend-api
     content: Add sandbox type API integration to the frontend. (1) Add the SandboxType type and API endpoint types to packages/api (read packages/api/AGENTS.md for cerato codec patterns -- first param = wire type, second = app type). (2) Create a useSandboxType hook in apps/frontend/app/lib/sandbox/useSandboxType.ts. Read apps/frontend/app/lib/projects/useProjects.ts as the pattern -- it shows how to use React Query with cerato API calls, including queries and mutations with cache invalidation.
     status: pending

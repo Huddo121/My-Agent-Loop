@@ -15,6 +15,7 @@ import {
 import { projectsHandlers } from "../projects/projects-handlers";
 import type { Services } from "../services";
 import { withNewTransaction } from "../utils/transaction-context";
+import { sandboxTypeHandlers } from "./workspace-sandbox-type-handlers";
 
 export const workspacesHandlers: HonoHandlersFor<
   ["workspaces"],
@@ -108,6 +109,7 @@ export const workspacesHandlers: HonoHandlersFor<
         return ok(workspace);
       });
     },
+    "sandbox-type": sandboxTypeHandlers,
     harnesses: {
       GET: async (ctx) => {
         const { workspaceId } = ctx.hono.req.param();

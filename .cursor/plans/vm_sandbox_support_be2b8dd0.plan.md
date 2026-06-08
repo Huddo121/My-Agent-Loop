@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: host-networking
     content: Create `scripts/setup-vm-networking.sh` for Linux host networking (bridge, NAT, IP forwarding). See plan section 5 for the exact commands. On macOS, vfkit handles networking via Virtualization.framework NAT -- no manual setup needed. This script is run once by the developer, not automated.
-    status: pending
+    status: completed
   - id: workflow-refactor
     content: "Refactor `apps/server/src/workflow/WorkflowExecutionService.ts` to support both sandbox types. Read the current file first. Changes: (1) Replace the single `sandboxService: SandboxService` constructor param with `dockerSandboxService: DockerSandboxService` and `vmSandboxService: VmSandboxService` plus `sandboxTypeConfig: SandboxTypeConfigRepository`. (2) In prepare(), resolve sandbox type via sandboxTypeConfig.resolveSandboxType(project.id, project.workspaceId), then select the matching service. (3) Adjust MCP_SERVER_URL: Docker uses 'http://host.docker.internal:3050/mcp', VM uses the env var VM_HOST_BRIDGE_IP. (4) The rest of the flow (startSandbox, waitForSandboxToFinish, stopSandbox) stays the same since both services implement SandboxService. See plan section 7."
     status: pending

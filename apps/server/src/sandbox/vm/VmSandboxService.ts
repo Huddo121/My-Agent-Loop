@@ -21,6 +21,11 @@ import type { VmNetworkConfig, VmPlatformAdapter } from "./VmPlatformAdapter";
 // `mount -t virtiofs`. Any mismatch would silently cause the mount to fail at boot time.
 const VIRTIOFS_TAG = "hostshare";
 
+// The guest writes lifecycle.sh's exit code to this file in the shared dir before powering off.
+// A VM has no equivalent of a container exit code (the VMM process exiting does not carry the
+// workload's status), so we pass the result back through virtio-fs and read it on the host.
+export const EXIT_CODE_FILENAME = ".vm-exit-code";
+
 interface VmSandboxState {
   // null on macOS where vfkit handles virtio-fs natively (no separate virtiofsd process)
   virtiofsdProcess: ChildProcess | null;
@@ -99,7 +104,7 @@ export function findCommonParentDir(
  * The script:
  * 1. Creates symlinks or copies for each volume so the VM sees the same paths as Docker would.
  * 2. Exports environment variables needed by the agent.
- * 3. Hands off to lifecycle.sh via exec.
+ * 3. Runs lifecycle.sh, records its exit code on the shared mount, and powers the VM off.
  *
  * Mapping rules (mirroring the Docker bind-mount behaviour):
  * - Directory volumes → symlink: `ln -s /mnt/host/<rel> <containerPath>`
@@ -109,7 +114,7 @@ export function findCommonParentDir(
  * @param volumes     The SandboxInitOptions volumes array (may be undefined/empty).
  * @param env         The SandboxInitOptions env map (may be undefined/empty).
  * @param sharedDir   The host directory shared into the VM at /mnt/host.
- * @param lifecycleRelativePath  Path to lifecycle.sh relative to sharedDir, used in the final exec.
+ * @param lifecycleRelativePath  Path to lifecycle.sh relative to sharedDir, run as the final step.
  */
 export function generateVmMountSetupScript(
   volumes: SandboxInitOptions["volumes"],
@@ -154,13 +159,50 @@ export function generateVmMountSetupScript(
   }
 
   // lifecycle.sh is copied into the shared dir by VmSandboxService.createNewSandbox, so it is
-  // reachable through /mnt/host like everything else. We exec it directly from there rather than
-  // symlinking it to a container path first.
+  // reachable through /mnt/host like everything else.
+  //
+  // We deliberately do NOT `exec` it: this script runs as PID 1 (after switch_root), and if PID 1
+  // exits the kernel panics and the VM hangs instead of shutting down. Instead we run lifecycle.sh,
+  // record its exit code on the shared mount (the VMM's own exit code can't carry it back), flush,
+  // and power the VM off cleanly via magic sysrq so the VMM process exits and the host detects
+  // completion.
   lines.push("");
-  lines.push("# Hand off to lifecycle script (also on the shared mount)");
-  lines.push(`exec /mnt/host/${lifecycleRelativePath}`);
+  lines.push(
+    "# Run the lifecycle script, capturing its exit code for the host to read.",
+  );
+  lines.push(
+    "# Disable errexit first so a failing run still records its code and powers off.",
+  );
+  lines.push("set +e");
+  lines.push(`/mnt/host/${lifecycleRelativePath}`);
+  lines.push("LIFECYCLE_EXIT_CODE=$?");
+  lines.push(`echo "$LIFECYCLE_EXIT_CODE" > /mnt/host/${EXIT_CODE_FILENAME}`);
+  lines.push("sync");
+  lines.push("");
+  lines.push(
+    "# Power off so the VMM process exits (PID 1 must not just return — that panics the kernel).",
+  );
+  lines.push(
+    "echo o > /proc/sysrq-trigger 2>/dev/null || halt -f 2>/dev/null || poweroff -f 2>/dev/null || true",
+  );
 
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Reads the lifecycle exit code the guest wrote to the shared dir before powering off.
+ * Returns undefined when the file is missing or unparseable (the run did not finish normally).
+ */
+export function readGuestExitCode(sharedDir: string): number | undefined {
+  try {
+    const raw = fs
+      .readFileSync(path.join(sharedDir, EXIT_CODE_FILENAME), "utf8")
+      .trim();
+    const code = Number.parseInt(raw, 10);
+    return Number.isNaN(code) ? undefined : code;
+  } catch {
+    return undefined;
+  }
 }
 
 export class VmSandboxService implements SandboxService {
@@ -360,22 +402,30 @@ export class VmSandboxService implements SandboxService {
       return { success: false, error: { reason: "container-not-running" } };
     }
 
-    const exitResult = await new Promise<{
-      exitCode: number;
-      reason: "completed" | "error";
-    }>((resolve) => {
-      state.vmmProcess.once("exit", (code) => {
-        const exitCode = code ?? -1;
-        resolve({ exitCode, reason: exitCode === 0 ? "completed" : "error" });
-      });
+    const vmmExitCode = await new Promise<number>((resolve) => {
+      state.vmmProcess.once("exit", (code) => resolve(code ?? -1));
     });
 
     this.knownSandboxes.delete(id);
+
+    // The VMM exit code only reports that the hypervisor stopped, not how the agent finished —
+    // vm-mount-setup.sh powers the VM off cleanly regardless of the lifecycle result. The real
+    // exit code is what the guest wrote to the shared dir; its absence means the run did not finish
+    // normally (crash, kill, or panic), which we treat as an error.
+    const guestExitCode = readGuestExitCode(state.sharedDir);
+    const exitResult = {
+      exitCode: guestExitCode ?? vmmExitCode,
+      reason: (guestExitCode === 0 ? "completed" : "error") as
+        | "completed"
+        | "error",
+    };
 
     this.logger.info("VM sandbox finished", {
       sandboxId: id,
       exitCode: exitResult.exitCode,
       reason: exitResult.reason,
+      // Surfaces when the guest never recorded a result (vs. a non-zero agent exit).
+      guestExitCodeRecorded: guestExitCode !== undefined,
     });
 
     return { success: true, value: exitResult };
@@ -451,9 +501,14 @@ export class VmSandboxService implements SandboxService {
         // file may not exist if the process never got that far
       }
     }
-    // Remove the per-run files we wrote into the shared dir (the setup script and our copy of
-    // lifecycle.sh). The run temp dir itself is owned by WorkflowExecutionService, so we leave it.
-    for (const fileName of ["vm-mount-setup.sh", "lifecycle.sh"]) {
+    // Remove the per-run files we wrote into the shared dir (the setup script, our copy of
+    // lifecycle.sh, and the guest exit-code file). The run temp dir itself is owned by
+    // WorkflowExecutionService, so we leave it.
+    for (const fileName of [
+      "vm-mount-setup.sh",
+      "lifecycle.sh",
+      EXIT_CODE_FILENAME,
+    ]) {
       try {
         fs.unlinkSync(path.join(state.sharedDir, fileName));
       } catch {

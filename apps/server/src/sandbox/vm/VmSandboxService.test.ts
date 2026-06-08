@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AbsoluteFilePath } from "../../file-system/FilePath";
 import {
   findCommonParentDir,
   generateVmMountSetupScript,
+  readGuestExitCode,
   shellQuote,
 } from "./VmSandboxService";
 
@@ -81,7 +85,7 @@ describe("generateVmMountSetupScript", () => {
   const sharedDir = "/abs/.devloop/runs/abc123";
 
   // The four volumes from the plan's concrete example. lifecycle.sh is NOT a volume — VmSandboxService
-  // copies it into the shared dir and the script execs it via /mnt/host/lifecycle.sh.
+  // copies it into the shared dir and the script runs it via /mnt/host/lifecycle.sh.
   const volumes: NonNullable<
     { hostPath: AbsoluteFilePath; containerPath: string; mode?: "ro" | "rw" }[]
   > = [
@@ -135,8 +139,16 @@ describe("generateVmMountSetupScript", () => {
         "# Export environment",
         `export AGENT_RUN_COMMAND='opencode run "..."'`,
         "",
-        "# Hand off to lifecycle script (also on the shared mount)",
-        "exec /mnt/host/lifecycle.sh",
+        "# Run the lifecycle script, capturing its exit code for the host to read.",
+        "# Disable errexit first so a failing run still records its code and powers off.",
+        "set +e",
+        "/mnt/host/lifecycle.sh",
+        "LIFECYCLE_EXIT_CODE=$?",
+        'echo "$LIFECYCLE_EXIT_CODE" > /mnt/host/.vm-exit-code',
+        "sync",
+        "",
+        "# Power off so the VMM process exits (PID 1 must not just return — that panics the kernel).",
+        "echo o > /proc/sysrq-trigger 2>/dev/null || halt -f 2>/dev/null || poweroff -f 2>/dev/null || true",
         "",
       ].join("\n"),
     );
@@ -154,16 +166,21 @@ describe("generateVmMountSetupScript", () => {
     expect(lines[1]).toBe("set -e");
   });
 
-  it("ends with exec of lifecycle under /mnt/host", () => {
+  it("runs lifecycle (without exec) and records its exit code before powering off", () => {
     const script = generateVmMountSetupScript(
       [],
       {},
       sharedDir,
       "lifecycle.sh",
     );
-    // Last non-empty line must be the exec
-    const nonEmpty = script.split("\n").filter((l) => l.trim() !== "");
-    expect(nonEmpty.at(-1)).toBe("exec /mnt/host/lifecycle.sh");
+    // It must NOT exec lifecycle: as PID 1, exec-then-exit panics the kernel.
+    expect(script).not.toContain("exec /mnt/host/lifecycle.sh");
+    expect(script).toContain("/mnt/host/lifecycle.sh");
+    expect(script).toContain("LIFECYCLE_EXIT_CODE=$?");
+    expect(script).toContain(
+      'echo "$LIFECYCLE_EXIT_CODE" > /mnt/host/.vm-exit-code',
+    );
+    expect(script).toContain("/proc/sysrq-trigger");
   });
 
   it("handles a lifecycle.sh in a subdirectory", () => {
@@ -173,7 +190,7 @@ describe("generateVmMountSetupScript", () => {
       sharedDir,
       "sub/lifecycle.sh",
     );
-    expect(script).toContain("exec /mnt/host/sub/lifecycle.sh");
+    expect(script).toContain("/mnt/host/sub/lifecycle.sh");
   });
 
   it("emits symlinks for standard root-level directory volumes", () => {
@@ -292,6 +309,37 @@ describe("generateVmMountSetupScript", () => {
       "lifecycle.sh",
     );
     expect(script).toContain("#!/bin/sh");
-    expect(script).toContain("exec /mnt/host/lifecycle.sh");
+    expect(script).toContain("/mnt/host/lifecycle.sh");
+  });
+});
+
+describe("readGuestExitCode", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-exit-code-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns undefined when the exit-code file is missing", () => {
+    expect(readGuestExitCode(tmpDir)).toBeUndefined();
+  });
+
+  it("reads a zero exit code", () => {
+    fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "0\n");
+    expect(readGuestExitCode(tmpDir)).toBe(0);
+  });
+
+  it("reads a non-zero exit code", () => {
+    fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "137\n");
+    expect(readGuestExitCode(tmpDir)).toBe(137);
+  });
+
+  it("returns undefined for unparseable contents", () => {
+    fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "not-a-number");
+    expect(readGuestExitCode(tmpDir)).toBeUndefined();
   });
 });

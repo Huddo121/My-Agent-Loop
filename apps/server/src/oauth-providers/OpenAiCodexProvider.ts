@@ -118,6 +118,10 @@ export class OpenAiCodexProvider implements OAuthProvider {
           containerPath: OPENAI_CODEX_AUTH_JSON_PATH,
           contents: JSON.stringify(
             {
+              // Codex reads auth_mode to decide how to authenticate. Without "chatgpt" it does not
+              // use the OAuth tokens below and the API rejects the connection with 401, even though
+              // the tokens are valid. This mirrors the auth.json the Codex CLI writes itself.
+              auth_mode: "chatgpt",
               OPENAI_API_KEY: null,
               tokens: {
                 access_token: stored.access_token,

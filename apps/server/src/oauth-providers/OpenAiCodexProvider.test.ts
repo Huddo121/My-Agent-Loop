@@ -23,6 +23,8 @@ describe("OpenAiCodexProvider", () => {
       containerPath: "/root/.codex/auth.json",
       contents: JSON.stringify(
         {
+          // Codex needs auth_mode "chatgpt" to actually use the OAuth tokens (otherwise: 401).
+          auth_mode: "chatgpt",
           OPENAI_API_KEY: null,
           tokens: {
             access_token: "access-token",

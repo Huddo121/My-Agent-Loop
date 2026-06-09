@@ -1,7 +1,10 @@
 import type { ChildProcess } from "node:child_process";
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { execFile, spawn } from "node:child_process";
+import { copyFileSync, existsSync } from "node:fs";
+import { promisify } from "node:util";
 import { unixSocketRequest } from "./unixSocketHttp";
+
+const execFileAsync = promisify(execFile);
 import type {
   StartVmmOptions,
   VmInfo,
@@ -49,6 +52,17 @@ export class VfkitAdapter implements VmPlatformAdapter {
 
     const args = buildVfkitArgs(options);
     return spawn(this.vfkitPath, args, { stdio: "pipe" });
+  }
+
+  // `cp -c` requests an APFS clonefile: a copy-on-write clone that is near-instant and shares blocks
+  // until one side is written. Node's copyFileSync(COPYFILE_FICLONE) does NOT use clonefile on macOS
+  // (it silently full-copies), so we shell out. Fall back to a plain copy if the volume can't clone.
+  async cloneRootfs(baseRootfsPath: string, destPath: string): Promise<void> {
+    try {
+      await execFileAsync("cp", ["-c", baseRootfsPath, destPath]);
+    } catch {
+      copyFileSync(baseRootfsPath, destPath);
+    }
   }
 
   // vfkit boots automatically when the process starts, so bootVm is a no-op.

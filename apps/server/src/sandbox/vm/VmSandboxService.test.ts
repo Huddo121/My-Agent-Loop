@@ -379,6 +379,9 @@ const noopAdapter: VmPlatformAdapter = {
   startVmm: async () => {
     throw new Error("startVmm should not be called when paths are missing");
   },
+  cloneRootfs: async () => {
+    throw new Error("cloneRootfs should not be called when paths are missing");
+  },
   bootVm: async () => {},
   shutdownVm: async () => {},
   getVmInfo: async () => ({ state: "Unknown" }),
@@ -495,6 +498,11 @@ describe("VmSandboxService lifecycle", () => {
         vmmProcesses.push(proc);
         return proc as unknown as ChildProcess;
       },
+      // Real fs copy stands in for the platform CoW clone — enough for the service to track and
+      // later delete a distinct per-run file, without depending on a clone-capable filesystem.
+      cloneRootfs: async (base: string, dest: string) => {
+        fs.copyFileSync(base, dest);
+      },
       bootVm: async () => {
         calls.boot++;
         if (opts.bootShouldThrow) {
@@ -506,14 +514,20 @@ describe("VmSandboxService lifecycle", () => {
       },
       getVmInfo: async () => ({ state: "Running" }),
     };
+    // createNewSandbox clones the base rootfs per run (copy-on-write), so the base must be a real
+    // file. Put it in its own temp dir; the per-run clones land beside it and are swept in afterEach.
+    const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-base-"));
+    tmpDirs.push(baseDir);
+    const baseRootfs = path.join(baseDir, "rootfs.raw");
+    fs.writeFileSync(baseRootfs, "dummy-rootfs-contents");
     const service = new VmSandboxService(
       adapter,
       "/kernel",
-      "/rootfs.raw",
+      baseRootfs,
       "/initrd.cpio.gz",
       noopLogger,
     );
-    return { service, vmmProcesses, calls };
+    return { service, vmmProcesses, calls, baseDir };
   }
 
   async function addSandbox(service: VmSandboxService) {
@@ -697,6 +711,38 @@ describe("VmSandboxService lifecycle", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("per-run rootfs isolation", () => {
+    // The clone files the service writes next to the base rootfs, so concurrent VMs don't share one
+    // exclusively-attachable disk.
+    const cloneFiles = (baseDir: string) =>
+      fs.readdirSync(baseDir).filter((f) => /^\.vm-rootfs-.*\.raw$/.test(f));
+
+    it("gives each concurrent sandbox its own rootfs clone, distinct from the base", async () => {
+      const { service, baseDir } = makeService();
+      await addSandbox(service);
+      await addSandbox(service);
+
+      const clones = cloneFiles(baseDir);
+      // Two sandboxes alive at once → two distinct clones, neither of which is the base image.
+      expect(clones).toHaveLength(2);
+      expect(new Set(clones).size).toBe(2);
+      expect(clones).not.toContain("rootfs.raw");
+    });
+
+    it("deletes the rootfs clone when the sandbox is stopped", async () => {
+      const { service, vmmProcesses, baseDir } = makeService();
+      const { sandbox } = await addSandbox(service);
+      expect(cloneFiles(baseDir)).toHaveLength(1);
+
+      vmmProcesses[0].exitCode = 0;
+      await service.stopSandbox(sandbox.id);
+      // The clone is reclaimed so runs don't accumulate disk images.
+      expect(cloneFiles(baseDir)).toHaveLength(0);
+      // The base image is untouched.
+      expect(fs.existsSync(path.join(baseDir, "rootfs.raw"))).toBe(true);
     });
   });
 

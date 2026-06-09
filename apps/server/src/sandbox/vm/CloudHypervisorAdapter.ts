@@ -1,7 +1,10 @@
 import type { ChildProcess } from "node:child_process";
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { execFile, spawn } from "node:child_process";
+import { copyFileSync, existsSync } from "node:fs";
+import { promisify } from "node:util";
 import { unixSocketRequest } from "./unixSocketHttp";
+
+const execFileAsync = promisify(execFile);
 import type {
   StartVmmOptions,
   VmInfo,
@@ -61,6 +64,17 @@ export class CloudHypervisorAdapter implements VmPlatformAdapter {
 
     const args = buildCloudHypervisorArgs(options);
     return spawn(this.cloudHypervisorPath, args, { stdio: "pipe" });
+  }
+
+  // `cp --reflink=auto` makes a copy-on-write clone on filesystems that support reflinks (btrfs, xfs)
+  // and transparently falls back to a full copy elsewhere, so the per-run rootfs is cheap where it
+  // can be. The extra catch guards against `cp` variants without --reflink.
+  async cloneRootfs(baseRootfsPath: string, destPath: string): Promise<void> {
+    try {
+      await execFileAsync("cp", ["--reflink=auto", baseRootfsPath, destPath]);
+    } catch {
+      copyFileSync(baseRootfsPath, destPath);
+    }
   }
 
   async bootVm(apiSocketPath: string): Promise<void> {

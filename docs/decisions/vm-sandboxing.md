@@ -85,8 +85,8 @@ the vmnet/NAT gateway (`192.168.64.1` by default). A VM run without it fails wit
 2. `pnpm vm:build-rootfs` (produces an x86_64 `bzImage` kernel + rootfs + initramfs).
 3. `sudo bash scripts/setup-vm-networking.sh` once — creates the `br0` bridge, enables IP
    forwarding, and sets up NAT so VMs reach the host MCP server and the internet.
-4. Set `VM_HOST_BRIDGE_IP` (default `192.168.100.1`) so the in-VM driver and MCP client reach
-   the host.
+4. Set `VM_HOST_BRIDGE_IP` to the bridge gateway so the in-VM driver and MCP client reach the host
+   (no default — see the Setup note above).
 
 ## Consequences
 
@@ -96,13 +96,21 @@ the vmnet/NAT gateway (`192.168.64.1` by default). A VM run without it fails wit
   disk itself and vfkit's Linux bootloader needs an initrd.
 - A VM has no container-style exit code, so `vm-mount-setup.sh` writes `lifecycle.sh`'s exit
   code to the shared dir and powers the VM off cleanly (a bare `exec` would leave PID 1 to exit
-  and panic the kernel). `VmSandboxService` reads that file to decide completed vs error.
-- The macOS/vfkit path is exercised by `pnpm vm:smoke-test`. The Linux/cloud-hypervisor path
-  mirrors the same boot model but has not yet been booted on a Linux/KVM host and should be
-  re-verified there.
+  and panic the kernel). `VmSandboxService` reads that file to decide completed vs error. The
+  script never uses `set -e`: as PID 1, any uncaught error would panic the kernel and leave the
+  VMM hung, so setup errors are tracked and still fall through to the clean power-off.
+- Each VM boots from its own per-run copy-on-write clone of the base rootfs (APFS clonefile on
+  macOS, reflink on Linux, via the platform adapter), not the shared base image. This is required:
+  the VMM demands exclusive read-write access to a disk image, so attaching one base image to
+  concurrent VMs fails — and it also isolates per-run disk writes. The clone is reclaimed on stop.
+- The macOS/vfkit path is exercised by `pnpm vm:smoke-test`, which also checks NAT networking. The
+  Linux/cloud-hypervisor path mirrors the same boot model but has not yet been booted on a
+  Linux/KVM host and should be re-verified there.
 
 ## Out of scope (future)
 
-Docker-in-VM (the primary long-term motivation), dynamic port exposure, VM snapshotting,
-OverlayFS-shared rootfs across VMs, and an in-VM log-streaming daemon. The architecture leaves
-room for all of these (e.g. the guest serial console is already captured to a file per run).
+Docker-in-VM (the primary long-term motivation), dynamic port exposure, VM snapshotting, and an
+in-VM log-streaming daemon. The architecture leaves room for all of these (e.g. the guest serial
+console is already captured to a file per run). Concurrent runs are supported via per-run CoW rootfs
+clones; sharing a single read-only base across VMs with overlays (to further cut memory) remains a
+possible future optimisation.

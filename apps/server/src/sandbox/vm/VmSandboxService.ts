@@ -35,6 +35,9 @@ interface VmSandboxState {
   sharedDir: string;
   // File the guest serial console is written to, for debugging and (future) log streaming.
   consoleLogPath: string;
+  // Per-run copy-on-write clone of the base rootfs this VM boots from. Deleted on stop. Each VM gets
+  // its own so concurrent runs don't contend for exclusive read-write access to one disk image.
+  runRootfsPath: string;
 }
 
 export interface VmSandboxServiceOptions {
@@ -321,10 +324,22 @@ export class VmSandboxService implements SandboxService {
     );
     fs.writeFileSync(setupScriptPath, scriptContent, { mode: 0o755 });
 
+    // Give each VM its own writable disk. Virtualization.framework (and KVM) require exclusive
+    // read-write access to a disk image, so attaching the single base rootfs.raw to more than one VM
+    // at once fails with "storage device attachment is invalid" and serialises every run. The adapter
+    // clones the base per sandbox using a platform copy-on-write clone (APFS clonefile / reflink) so
+    // it is effectively instant and space-free. The clone lives beside the base so it lands on the
+    // same filesystem (CoW only works within one volume); stopSandbox deletes it.
+    const runRootfsPath = path.join(
+      path.dirname(rootfsPath),
+      `.vm-rootfs-${uuid}.raw`,
+    );
+    await this.adapter.cloneRootfs(rootfsPath, runRootfsPath);
+
     const vmmProcess = await this.adapter.startVmm({
       apiSocketPath,
       kernelPath,
-      rootfsPath,
+      rootfsPath: runRootfsPath,
       initrdPath,
       virtiofsSocketPath: virtiofsdSocketPath,
       // VIRTIOFS_TAG must match the tag in vm-init.sh; mismatches cause a silent mount failure.
@@ -345,12 +360,15 @@ export class VmSandboxService implements SandboxService {
       virtiofsdSocketPath,
       sharedDir,
       consoleLogPath,
+      runRootfsPath,
     });
 
     this.logger.info("Created VM sandbox", {
       sandboxId: id,
       platform: this.adapter.platform,
       sharedDir,
+      // Per-run rootfs clone so concurrent VMs each get an exclusively-attachable disk.
+      runRootfsPath,
       // virtiofsd only runs on Linux; on macOS vfkit handles virtio-fs natively (process is null).
       virtiofsdStarted: virtiofsdProcess !== null,
     });
@@ -528,12 +546,14 @@ export class VmSandboxService implements SandboxService {
       }
     }
 
-    // Step 5: clean up socket files and the console log.
+    // Step 5: clean up socket files, the console log, and the per-run rootfs clone.
+    // The rootfs clone matters most: even CoW-backed, leaving one per run accumulates on disk.
     // Ignore errors — these may not exist if the VMM failed to start.
     for (const tempPath of [
       state.apiSocketPath,
       state.virtiofsdSocketPath,
       state.consoleLogPath,
+      state.runRootfsPath,
     ]) {
       try {
         fs.unlinkSync(tempPath);

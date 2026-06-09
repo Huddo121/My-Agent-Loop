@@ -61,6 +61,13 @@ export interface VmPlatformAdapter {
 
   startVmm(options: StartVmmOptions): Promise<ChildProcess>;
 
+  // Create a writable per-run copy of the base rootfs at destPath. Implementations use a
+  // copy-on-write clone where the filesystem supports it (APFS clonefile on macOS, reflink on
+  // Linux) so it is effectively instant and space-free, falling back to a full copy otherwise.
+  // Each VM boots from its own clone because the VMM requires exclusive read-write access to a
+  // disk image — attaching one shared image to concurrent VMs fails.
+  cloneRootfs(baseRootfsPath: string, destPath: string): Promise<void>;
+
   bootVm(apiSocketPath: string): Promise<void>;
   shutdownVm(apiSocketPath: string): Promise<void>;
   getVmInfo(apiSocketPath: string): Promise<VmInfo>;

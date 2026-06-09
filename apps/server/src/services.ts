@@ -119,6 +119,11 @@ const taskQueue = new DatabaseTaskQueue();
 const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
+
+// Logger is defined here (ahead of the services that need it at construction time) because
+// module-level const declarations are evaluated top-to-bottom.
+const logger: Logger = ConsoleLogger;
+
 const envHarnessAuthService = new EnvHarnessAuthService({
   OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
@@ -130,6 +135,7 @@ const harnessAuthService = new CompositeHarnessAuthService(
   envHarnessAuthService,
   userOAuthCredentialRepository,
   openAiCodexProvider,
+  logger,
 );
 const workspacesService = new DatabaseWorkspacesService(
   agentHarnessConfigRepository,
@@ -169,10 +175,6 @@ const workflowManager = new DatabaseWorkflowManager(
   forgeSecretRepository,
   agentHarnessConfigRepository,
 );
-
-// Logger is defined here (before VmSandboxService) rather than at the bottom because VmSandboxService
-// needs it at construction time and module-level const declarations are evaluated top-to-bottom.
-const logger: Logger = ConsoleLogger;
 
 // Choose the VMM adapter for the current platform. VfkitAdapter uses Apple's Virtualization.framework
 // on macOS (no separate virtiofsd); CloudHypervisorAdapter uses KVM + virtiofsd on Linux.

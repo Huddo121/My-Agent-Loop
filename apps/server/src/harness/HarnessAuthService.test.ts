@@ -9,6 +9,7 @@ import type {
   UserOAuthCredentialRepository,
   UserOAuthCredentialSummary,
 } from "../user-oauth-credentials";
+import { CapturingLogger } from "../test-fakes/CapturingLogger";
 import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
 import {
@@ -222,6 +223,7 @@ function createCompositeService(
     }),
     repo,
     provider,
+    new CapturingLogger(),
     () => new Date("2026-05-04T00:00:00.000Z"),
   );
 }

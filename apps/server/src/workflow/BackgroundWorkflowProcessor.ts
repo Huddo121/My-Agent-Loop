@@ -220,6 +220,14 @@ export class BackgroundWorkflowProcessor {
               );
 
             if (executionResult.success === false) {
+              // executeWorkflow returns a rich Error, but the run-level Result only carries a
+              // coarse reason. Log the underlying message here so the actual cause (e.g. a VM
+              // boot or sandbox failure) is recoverable from the logs rather than collapsed
+              // into the opaque "execution-failed" reason.
+              console.warn("Workflow execution failed", {
+                ...loggingContext,
+                error: executionResult.error.message,
+              });
               return { success: false, error: { reason: "execution-failed" } };
             }
 

@@ -17,7 +17,9 @@ describe("OpenAiCodexProvider", () => {
 
     const artifacts = provider.materializeForSandbox(tokens);
 
-    expect(artifacts.env).toEqual({});
+    // CODEX_HOME makes Codex find the auth.json regardless of HOME (HOME is not reliably /root in a
+    // VM guest, which otherwise leaves Codex with no token and the API returns "Missing bearer").
+    expect(artifacts.env).toEqual({ CODEX_HOME: "/root/.codex" });
     expect(artifacts.files).toHaveLength(1);
     expect(artifacts.files[0]).toEqual({
       containerPath: "/root/.codex/auth.json",

@@ -149,6 +149,11 @@ describe("generateVmMountSetupScript", () => {
         "# Export environment",
         `export AGENT_RUN_COMMAND='opencode run "..."'`,
         "",
+        "# Match the Docker image runtime environment (HOME, PATH, WORKDIR)",
+        'export HOME="${HOME:-/root}"',
+        'export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"',
+        "cd /code 2>/dev/null || cd /",
+        "",
         "# Run the lifecycle script, capturing its exit code for the host to read.",
         'if [ "$SETUP_EXIT_CODE" -eq 0 ]; then',
         "  /mnt/host/lifecycle.sh",
@@ -283,24 +288,37 @@ describe("generateVmMountSetupScript", () => {
     expect(script).toContain(`export WITH_QUOTES='it'"'"'s quoted'`);
   });
 
-  it("produces no export lines when env is undefined", () => {
+  // The script always exports HOME/PATH to mirror the Docker image; these two cases check that an
+  // empty/undefined env map adds nothing beyond those framework exports.
+  const frameworkExports = [
+    'export HOME="${HOME:-/root}"',
+    'export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"',
+  ];
+
+  it("produces no extra export lines when env is undefined", () => {
     const script = generateVmMountSetupScript(
       [],
       undefined,
       sharedDir,
       "lifecycle.sh",
     );
-    expect(script).not.toContain("export ");
+    const exportLines = script
+      .split("\n")
+      .filter((l) => l.startsWith("export "));
+    expect(exportLines).toEqual(frameworkExports);
   });
 
-  it("produces no export lines when env is empty", () => {
+  it("produces no extra export lines when env is empty", () => {
     const script = generateVmMountSetupScript(
       [],
       {},
       sharedDir,
       "lifecycle.sh",
     );
-    expect(script).not.toContain("export ");
+    const exportLines = script
+      .split("\n")
+      .filter((l) => l.startsWith("export "));
+    expect(exportLines).toEqual(frameworkExports);
   });
 
   it("computes relative paths correctly for a file nested one level under the shared dir", () => {
@@ -320,6 +338,24 @@ describe("generateVmMountSetupScript", () => {
     expect(script).toContain(
       "ln -s /mnt/host/harness/config.json /config.json",
     );
+  });
+
+  it("sets HOME and enters the /code working directory before running lifecycle", () => {
+    // The raw-disk boot does not apply the Docker image's HOME/WORKDIR, so the script must, or
+    // tools like nvm (→ //.nvm) and pnpm (→ cwd / has no package.json) fail as they did in practice.
+    const script = generateVmMountSetupScript(
+      [],
+      {},
+      sharedDir,
+      "lifecycle.sh",
+    );
+    const homeIndex = script.indexOf('export HOME="${HOME:-/root}"');
+    const cdIndex = script.indexOf("cd /code 2>/dev/null || cd /");
+    const lifecycleIndex = script.indexOf("/mnt/host/lifecycle.sh");
+    expect(homeIndex).toBeGreaterThan(-1);
+    expect(cdIndex).toBeGreaterThan(-1);
+    // Both must happen before the lifecycle (and thus the project setup script) runs.
+    expect(cdIndex).toBeLessThan(lifecycleIndex);
   });
 
   it("handles empty volumes and env gracefully", () => {

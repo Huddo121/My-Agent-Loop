@@ -175,6 +175,20 @@ export function generateVmMountSetupScript(
     lines.push(`export ${key}=${shellQuote(value)}`);
   }
 
+  // Booting the rootfs as a raw disk does not apply the Docker image's runtime config (its ENV and
+  // WORKDIR), so the guest would otherwise have no HOME and a cwd of /. That makes tools misbehave
+  // exactly as under Docker they would not: nvm installs into //.nvm and project setup scripts run
+  // `pnpm install` in / where there is no package.json. Replicate the parts the agent tooling needs.
+  // HOME/PATH mirror the Dockerfile (root user, /root/.opencode/bin etc.); /code is the repo mount,
+  // the same WORKDIR the image uses and the path the server always mounts the checkout at.
+  lines.push("");
+  lines.push(
+    "# Match the Docker image runtime environment (HOME, PATH, WORKDIR)",
+  );
+  lines.push('export HOME="${HOME:-/root}"');
+  lines.push('export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"');
+  lines.push("cd /code 2>/dev/null || cd /");
+
   // lifecycle.sh is copied into the shared dir by VmSandboxService.createNewSandbox, so it is
   // reachable through /mnt/host like everything else.
   //

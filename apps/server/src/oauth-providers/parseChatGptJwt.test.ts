@@ -38,6 +38,17 @@ async function createVerifierAndJwt(payload: Record<string, unknown>) {
 }
 
 describe("parseChatGptJwt", () => {
+  // These literals are load-bearing: OpenAI rejects nothing here, WE do, so they must match the
+  // claims OpenAI actually mints for ChatGPT/Codex tokens. They were verified against a real Codex
+  // access token. The previous legacy-Auth0 values ("https://auth0.openai.com/" and
+  // "https://api.openai.com/auth") caused every token refresh to fail with an "iss" claim mismatch.
+  // The surrounding round-trip tests sign with these same constants, so they cannot catch a wrong
+  // value on their own — this assertion is what pins them.
+  it("pins the issuer and audience to OpenAI's current values", () => {
+    expect(OPENAI_AUTH_ISSUER).toBe("https://auth.openai.com");
+    expect(OPENAI_CHATGPT_AUDIENCE).toBe("https://api.openai.com/v1");
+  });
+
   it("verifies the JWT and returns the ChatGPT account ID claim", async () => {
     const { jwt, verifyJwt } = await createVerifierAndJwt({
       "https://api.openai.com/auth": {

@@ -211,17 +211,21 @@ cleanup
 # Step 6: Build the initramfs
 # ---------------------------------------------------------------------------
 # vfkit's Linux bootloader requires an initrd, and Virtualization.framework does
-# not mount the root disk for us — so we ship a tiny busybox initramfs whose only
-# job is to mount the rootfs disk (/dev/vda) and switch_root into the baked-in
-# init (/sbin/vm-init). The kernel boots this first, then hands off to the rootfs.
+# not mount the root disk for us — so we ship a tiny busybox initramfs that mounts
+# the rootfs disk (/dev/vda), brings up DHCP networking, and switch_roots into the
+# baked-in init (/sbin/vm-init). The kernel boots this first, then hands off to the
+# rootfs. Networking is configured here, not in the rootfs, because the Ubuntu rootfs
+# ships no DHCP client and busybox (in this initramfs) provides udhcpc; the config
+# persists across switch_root into the rootfs.
 #
-# This initramfs is generic: it depends only on the disk appearing as /dev/vda
-# and the rootfs providing /sbin/vm-init, so it does not need rebuilding when the
-# rootfs contents change. We still build it here so all VM artifacts come from one
-# command.
+# This initramfs is generic: it depends only on the disk appearing as /dev/vda, a
+# virtio-net NIC at eth0, and the rootfs providing /sbin/vm-init — so it does not need
+# rebuilding when the rootfs contents change. We still build it here so all VM artifacts
+# come from one command.
 
 INITRAMFS_OUT="${OUTPUT_DIR_ABS}/initramfs.cpio.gz"
 INIT_SCRIPT="${OUTPUT_DIR_ABS}/.initramfs-init"
+UDHCPC_SCRIPT="${OUTPUT_DIR_ABS}/.initramfs-udhcpc"
 
 # Write the initramfs /init on the host with a quoted heredoc so none of the
 # runtime expansions ($(...), $i) are evaluated now — they must run inside the VM.
@@ -231,15 +235,47 @@ cat >"${INIT_SCRIPT}" <<'INITRAMFS_INIT'
 mount -t devtmpfs dev /dev 2>/dev/null
 mount -t proc proc /proc
 mount -t sysfs sys /sys
+mkdir -p /etc
+
+# Bring networking up here, in the initramfs, because the Ubuntu rootfs ships no DHCP client.
+# The interface, routes and resolv.conf configured now persist across switch_root into the rootfs
+# (switch_root swaps the root filesystem, not the network namespace), so the in-VM driver can reach
+# the host over NAT. eth0 is the kernel's default name for the single virtio-net NIC vfkit attaches.
+ifconfig eth0 up 2>/dev/null
+udhcpc -i eth0 -s /udhcpc.script -q -t 8 -n 2>/dev/null \
+  || echo "initramfs: DHCP failed; guest networking may be unavailable" >&2
+
 # The virtio-blk root disk can take a moment to appear; wait briefly for it.
 for _ in $(seq 1 25); do [ -b /dev/vda ] && break; sleep 0.2; done
 mkdir -p /mnt/root
 if mount -t ext4 /dev/vda /mnt/root; then
+  # Carry DNS config into the rootfs so the agent can resolve names over NAT.
+  [ -f /etc/resolv.conf ] && cp -f /etc/resolv.conf /mnt/root/etc/resolv.conf 2>/dev/null
   exec switch_root /mnt/root /sbin/vm-init
 fi
 echo "initramfs: failed to mount /dev/vda as ext4 root" >&2
 exec sh
 INITRAMFS_INIT
+
+# udhcpc has no built-in lease applier; it calls this script on each event. Only bound/renew carry
+# address data, which we apply with busybox's ifconfig/route. The "leased" line goes to the console
+# so `pnpm vm:smoke-test` can assert the guest actually obtained networking.
+cat >"${UDHCPC_SCRIPT}" <<'UDHCPC_SCRIPT_BODY'
+#!/bin/busybox sh
+case "$1" in
+  bound|renew)
+    ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}"
+    if [ -n "$router" ]; then
+      for r in $router; do
+        route add default gw "$r" dev "$interface" 2>/dev/null
+      done
+    fi
+    : > /etc/resolv.conf
+    for d in $dns; do echo "nameserver $d" >> /etc/resolv.conf; done
+    echo "initramfs: leased $ip on $interface (gw ${router:-none})"
+    ;;
+esac
+UDHCPC_SCRIPT_BODY
 
 log "Building initramfs..."
 docker run --rm \
@@ -250,16 +286,17 @@ docker run --rm \
     apt-get update -q >/dev/null
     apt-get install -y -q --no-install-recommends busybox-static cpio gzip >/dev/null
 
-    rm -rf /ird && mkdir -p /ird/bin /ird/dev /ird/proc /ird/sys /ird/mnt
+    rm -rf /ird && mkdir -p /ird/bin /ird/dev /ird/proc /ird/sys /ird/mnt /ird/etc
     cp "$(command -v busybox)" /ird/bin/busybox
     cp /out/.initramfs-init /ird/init
-    chmod +x /ird/init
+    cp /out/.initramfs-udhcpc /ird/udhcpc.script
+    chmod +x /ird/init /ird/udhcpc.script
 
     # newc is the cpio format the kernel expects for an initramfs.
     (cd /ird && find . | cpio -o -H newc 2>/dev/null | gzip) > /out/initramfs.cpio.gz
   '
 
-rm -f "${INIT_SCRIPT}"
+rm -f "${INIT_SCRIPT}" "${UDHCPC_SCRIPT}"
 log "initramfs created at ${INITRAMFS_OUT}"
 
 # ---------------------------------------------------------------------------

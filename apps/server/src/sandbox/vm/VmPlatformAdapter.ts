@@ -14,10 +14,12 @@ export interface VmInfo {
   state: VmState;
 }
 
-// Linux (cloud-hypervisor) needs a TAP device and MAC address to wire the VM into the bridge network.
-// macOS (vfkit) uses Virtualization.framework NAT, which requires no manual network config — so most
-// fields here are ignored on macOS. We keep them in a shared type so startVmm can accept one
-// unified networkConfig regardless of platform.
+// Linux (cloud-hypervisor) needs a TAP device and MAC address to wire the VM into the host bridge,
+// so these fields apply on Linux only. macOS (vfkit) uses Virtualization.framework NAT instead: the
+// adapter always attaches a `virtio-net,nat` NIC and the guest DHCPs an address (see VfkitAdapter
+// and the initramfs network bring-up), so it ignores these fields — but note that NAT still requires
+// that NIC and guest-side DHCP; it is not "no network config". We keep one shared type so startVmm
+// accepts a unified networkConfig regardless of platform.
 export interface VmNetworkConfig {
   tapDevice?: string;
   mac?: string;

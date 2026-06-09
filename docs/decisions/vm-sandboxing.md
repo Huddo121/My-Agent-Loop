@@ -57,19 +57,26 @@ the adapter, monitors the VMM process for exit, and tears everything down on sto
 
 ## Setup
 
-VM env vars are all optional; if they are unset the server runs Docker-only and
-`VmSandboxService` throws a clear error only if a run actually requests a VM. Relevant vars:
-`VM_KERNEL_PATH`, `VM_ROOTFS_PATH`, `VM_INITRD_PATH`, `VM_HOST_BRIDGE_IP`, and the binary paths
+VM env vars are all optional; if they are unset the server runs Docker-only and the VM run path
+fails with a clear error only if a run actually requests a VM. Relevant vars: `VM_KERNEL_PATH`,
+`VM_ROOTFS_PATH`, `VM_INITRD_PATH`, `VM_HOST_BRIDGE_IP`, and the binary paths
 (`CLOUD_HYPERVISOR_PATH`, `VIRTIOFSD_PATH` on Linux; `VFKIT_PATH` on macOS).
+
+`VM_HOST_BRIDGE_IP` is the host IP the in-VM guest uses to reach the driver host-API and MCP server.
+It is **platform-specific and has no default** — set it to the Linux bridge gateway, or on macOS to
+the vmnet/NAT gateway (`192.168.64.1` by default). A VM run without it fails with a clear error.
 
 ### macOS (Apple Silicon)
 
 1. `brew install vfkit`.
 2. `pnpm vm:build-rootfs` — produces `.vm/rootfs.raw`, `.vm/Image-arm64`, and
    `.vm/initramfs.cpio.gz` (requires Docker for the build steps).
-3. Set `VFKIT_PATH`, `VM_KERNEL_PATH`, `VM_ROOTFS_PATH`, `VM_INITRD_PATH` to those paths.
-4. Verify with `pnpm vm:smoke-test` (boots a VM and checks a host↔guest virtio-fs round-trip).
-   No networking setup is needed — vfkit uses Virtualization.framework's built-in NAT.
+3. Set `VFKIT_PATH`, `VM_KERNEL_PATH`, `VM_ROOTFS_PATH`, `VM_INITRD_PATH` to those paths, and
+   `VM_HOST_BRIDGE_IP=192.168.64.1` (Virtualization.framework's vmnet NAT gateway).
+4. Verify with `pnpm vm:smoke-test` (boots a VM and checks a host↔guest virtio-fs round-trip **and**
+   that the guest brought up NAT networking). No host-side bridge setup is needed on macOS — vfkit
+   uses Virtualization.framework's built-in NAT — but the VM still attaches a `virtio-net,nat` NIC
+   and the guest DHCPs an address in the initramfs so the in-VM driver can reach the host.
 
 ### Linux
 

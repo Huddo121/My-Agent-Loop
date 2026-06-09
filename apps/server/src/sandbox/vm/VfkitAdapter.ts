@@ -99,6 +99,12 @@ export function buildVfkitArgs(options: StartVmmOptions): string[] {
     `virtio-blk,path=${options.rootfsPath}`,
     "--device",
     `virtio-fs,sharedDir=${options.sharedDir},mountTag=${options.virtiofsTag}`,
+    // NAT networking via Virtualization.framework's built-in vmnet. Without a NIC the guest has no
+    // route at all and the in-VM driver fails with ENETUNREACH when calling back to the host. NAT
+    // needs no host-side setup; the guest reaches the host at the vmnet gateway (VM_HOST_BRIDGE_IP)
+    // after it DHCPs an address — see the initramfs network bring-up in scripts/build-vm-rootfs.sh.
+    "--device",
+    "virtio-net,nat",
     // Guest serial console written to a file (stdio console needs a TTY, unavailable when headless).
     "--device",
     `virtio-serial,logFilePath=${options.consoleLogPath}`,

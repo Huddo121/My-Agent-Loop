@@ -33,9 +33,10 @@ type SandboxEndpointConfig = {
 
 export type WorkflowExecutionServiceOptions = {
   docker: SandboxEndpointConfig;
-  // vm endpoints use the host bridge IP reachable from inside the VM guest;
-  // services.ts derives these from VM_HOST_BRIDGE_IP (services-wiring TODO)
-  vm: SandboxEndpointConfig;
+  // VM endpoints are derived from VM_HOST_BRIDGE_IP (services.ts). That IP is platform-specific
+  // and has no default, so this is undefined when the operator has not configured it — a VM run is
+  // then rejected with a clear error rather than dialing a bogus host.
+  vm: SandboxEndpointConfig | undefined;
 };
 
 const defaultOptions: WorkflowExecutionServiceOptions = {
@@ -43,12 +44,9 @@ const defaultOptions: WorkflowExecutionServiceOptions = {
     mcpServerUrl: "http://host.docker.internal:3050/mcp",
     driverHostApiBaseUrl: "http://host.docker.internal:3000",
   },
-  vm: {
-    // Linux bridge IP default; services.ts will override from env when wiring
-    // the real VmSandboxService (see the services-wiring TODO)
-    mcpServerUrl: "http://192.168.100.1:3050/mcp",
-    driverHostApiBaseUrl: "http://192.168.100.1:3000",
-  },
+  // No default VM host IP: it differs between the Linux bridge and the macOS vmnet/NAT gateway,
+  // so the operator must set VM_HOST_BRIDGE_IP for their platform (services.ts wires it in).
+  vm: undefined,
 };
 
 const formatTaskFile = (task: Task): string => {
@@ -220,6 +218,22 @@ export class WorkflowExecutionService {
       projectId: project.id,
       sandboxType,
     });
+
+    // VM endpoints are absent when VM_HOST_BRIDGE_IP was not configured. Fail here with a clear,
+    // actionable error rather than building a bogus host URL the in-guest driver cannot reach.
+    if (endpoints === undefined) {
+      this.logger.error("VM sandbox endpoints are not configured", {
+        runId,
+        projectId: project.id,
+        sandboxType,
+      });
+      return {
+        success: false,
+        error: new Error(
+          "VM sandbox requires VM_HOST_BRIDGE_IP to be configured (the host IP the guest reaches the driver and MCP server on).",
+        ),
+      };
+    }
 
     const { harnessId, modelId } =
       await this.harnessConfig.resolveHarnessConfig(

@@ -217,11 +217,16 @@ const workflowExecutionService = new WorkflowExecutionService(
       driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
     },
     // The in-VM guest cannot reach host.docker.internal (that's a Docker networking alias, not
-    // available inside a VM). It reaches the host via the bridge IP instead.
-    vm: {
-      mcpServerUrl: `http://${env.VM_HOST_BRIDGE_IP}:3050/mcp`,
-      driverHostApiBaseUrl: `http://${env.VM_HOST_BRIDGE_IP}:${env.PORT}`,
-    },
+    // available inside a VM). It reaches the host via the bridge/NAT gateway IP instead. That IP is
+    // platform-specific and has no default, so VM endpoints only exist once the operator sets
+    // VM_HOST_BRIDGE_IP; otherwise the VM run path reports a clear "not configured" error.
+    vm:
+      env.VM_HOST_BRIDGE_IP === undefined
+        ? undefined
+        : {
+            mcpServerUrl: `http://${env.VM_HOST_BRIDGE_IP}:3050/mcp`,
+            driverHostApiBaseUrl: `http://${env.VM_HOST_BRIDGE_IP}:${env.PORT}`,
+          },
   },
 );
 

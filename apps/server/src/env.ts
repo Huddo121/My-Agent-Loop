@@ -70,7 +70,12 @@ const envSchema = z
     VIRTIOFSD_PATH: z.string().optional(),
     CLOUD_HYPERVISOR_PATH: z.string().optional(),
     VFKIT_PATH: z.string().optional(),
-    VM_HOST_BRIDGE_IP: z.string().default("192.168.100.1"),
+    // The host IP the in-VM guest uses to reach the host (driver host-API and MCP server). This is
+    // platform-specific — the Linux bridge gateway vs. the macOS vmnet/NAT gateway (192.168.64.1
+    // by default) — so there is deliberately no default: the operator must set it for their VM
+    // platform. Optional here because VM sandboxes may be unconfigured; the VM run path validates
+    // its presence and fails with a clear error if a VM run is attempted without it.
+    VM_HOST_BRIDGE_IP: z.string().optional(),
   })
   .transform((env) => ({
     ...env,

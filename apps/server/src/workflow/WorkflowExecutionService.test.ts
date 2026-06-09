@@ -446,6 +446,54 @@ describe("WorkflowExecutionService", () => {
     expect(dockerSandboxService.lastDriverCliArgs).toBe("");
   });
 
+  it("fails a vm run with a clear error when VM host endpoints are not configured", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      { success: true, value: { exitCode: 0, reason: "completed" } },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    await sandboxTypeConfig.setProjectConfig(
+      "project-vm-unconfigured" as ProjectId,
+      "vm",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+      // VM host IP not configured (VM_HOST_BRIDGE_IP unset): the VM run must be rejected up front
+      // rather than dialing a bogus host the in-guest driver cannot reach.
+      workflowExecutionOptions: {
+        docker: {
+          mcpServerUrl: "http://host.docker.internal:3050/mcp",
+          driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        },
+        vm: undefined,
+      },
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-vm-unconfigured"),
+      createTask("task-vm-unconfigured"),
+      createProject("project-vm-unconfigured"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.message).toContain("VM_HOST_BRIDGE_IP");
+    }
+    // The run must be rejected before either sandbox service is engaged.
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
   it("routes to the docker sandbox service when neither project nor workspace is configured", async () => {
     const driverRunTokenStore = new RecordingDriverRunTokenStore();
     const dockerSandboxService = new RecordingSandboxService(
@@ -586,7 +634,19 @@ function createService(options: {
     options.driverRunTokenStore,
     createLiveEventsService(),
     { error() {}, warn() {}, info() {}, debug() {} },
-    options.workflowExecutionOptions,
+    // Default to configured VM endpoints so sandbox-routing tests exercise the VM path; the
+    // production default leaves vm undefined (no platform-agnostic host IP), which would otherwise
+    // make every VM-routing test hit the "not configured" guard.
+    options.workflowExecutionOptions ?? {
+      docker: {
+        mcpServerUrl: "http://host.docker.internal:3050/mcp",
+        driverHostApiBaseUrl: "http://host.docker.internal:3000",
+      },
+      vm: {
+        mcpServerUrl: "http://192.168.64.1:3050/mcp",
+        driverHostApiBaseUrl: "http://192.168.64.1:3000",
+      },
+    },
   );
 }
 

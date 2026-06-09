@@ -111,7 +111,7 @@ describe("buildVfkitArgs", () => {
     consoleLogPath: "/tmp/vm-console.log",
   };
 
-  it("builds the bootloader, virtio-blk/fs/serial devices and REST socket", () => {
+  it("builds the bootloader, virtio-blk/fs/net/serial devices and REST socket", () => {
     expect(buildVfkitArgs(base)).toEqual([
       "--cpus",
       "2",
@@ -123,6 +123,8 @@ describe("buildVfkitArgs", () => {
       "virtio-blk,path=/vm/rootfs.raw",
       "--device",
       "virtio-fs,sharedDir=/run/share,mountTag=hostshare",
+      "--device",
+      "virtio-net,nat",
       "--device",
       "virtio-serial,logFilePath=/tmp/vm-console.log",
       "--restful-uri",

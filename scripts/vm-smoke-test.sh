@@ -72,6 +72,7 @@ CONSOLE_LOG="${WORK_DIR}/console.log"
 VFKIT_LOG="${WORK_DIR}/vfkit.log"
 MARKER_NAME="vm-smoke-marker.txt"
 MARKER_TEXT="vm-smoke-ok-$$"
+NET_MARKER_NAME="vm-smoke-net.txt"
 mkdir -p "${SHARE_DIR}"
 
 cleanup() { rm -rf "${WORK_DIR}"; }
@@ -85,6 +86,15 @@ if echo "${MARKER_TEXT}" > /mnt/host/${MARKER_NAME}; then
   echo "VM-SMOKE: virtio-fs write ok"
 else
   echo "VM-SMOKE: virtio-fs write FAILED"
+fi
+# Verify the initramfs brought networking up. The rootfs has no ip/ifconfig, so we read
+# /proc/net/route directly: a default route (destination 00000000) means udhcpc obtained a
+# lease and installed a gateway. Recorded through virtio-fs so the host can assert on it.
+if grep -qiE '^[a-z0-9]+\s+00000000\s' /proc/net/route 2>/dev/null; then
+  echo "VM-SMOKE: default route present (networking up)"
+  echo "net-ok" > /mnt/host/${NET_MARKER_NAME}
+else
+  echo "VM-SMOKE: NO default route (networking down)"
 fi
 echo "VM-SMOKE: powering off"
 # Clean shutdown via magic sysrq; the host watchdog is the fallback.
@@ -103,6 +113,7 @@ vfkit \
   --bootloader "linux,kernel=${VM_KERNEL_PATH},initrd=${VM_INITRD_PATH},cmdline=\"console=hvc0\"" \
   --device virtio-blk,path="${VM_ROOTFS_PATH}" \
   --device virtio-fs,sharedDir="${SHARE_DIR}",mountTag=hostshare \
+  --device virtio-net,nat \
   --device virtio-serial,logFilePath="${CONSOLE_LOG}" \
   >"${VFKIT_LOG}" 2>&1 &
 VFKIT_PID=$!
@@ -118,15 +129,23 @@ kill "${WATCHDOG_PID}" 2>/dev/null || true
 # Verify
 # ---------------------------------------------------------------------------
 
-if [[ "$(cat "${SHARE_DIR}/${MARKER_NAME}" 2>/dev/null)" == "${MARKER_TEXT}" ]]; then
-  echo "==> PASS: VM booted, ran /sbin/vm-init, mounted virtio-fs, and the"
-  echo "          host<->guest write round-trip succeeded."
-  exit 0
+if [[ "$(cat "${SHARE_DIR}/${MARKER_NAME}" 2>/dev/null)" != "${MARKER_TEXT}" ]]; then
+  echo "==> FAIL: smoke marker was not written back through virtio-fs." >&2
+  echo "--- guest console ---" >&2
+  cat "${CONSOLE_LOG}" 2>/dev/null >&2 || echo "(no guest console output)" >&2
+  echo "--- vfkit log ---" >&2
+  cat "${VFKIT_LOG}" 2>/dev/null >&2 || true
+  exit 1
 fi
 
-echo "==> FAIL: smoke marker was not written back through virtio-fs." >&2
-echo "--- guest console ---" >&2
-cat "${CONSOLE_LOG}" 2>/dev/null >&2 || echo "(no guest console output)" >&2
-echo "--- vfkit log ---" >&2
-cat "${VFKIT_LOG}" 2>/dev/null >&2 || true
-exit 1
+if [[ "$(cat "${SHARE_DIR}/${NET_MARKER_NAME}" 2>/dev/null)" != "net-ok" ]]; then
+  echo "==> FAIL: guest did not bring up networking (no default route)." >&2
+  echo "          The in-VM driver needs this to reach the host; check the initramfs DHCP." >&2
+  echo "--- guest console ---" >&2
+  cat "${CONSOLE_LOG}" 2>/dev/null >&2 || echo "(no guest console output)" >&2
+  exit 1
+fi
+
+echo "==> PASS: VM booted, ran /sbin/vm-init, mounted virtio-fs, the host<->guest"
+echo "          write round-trip succeeded, and the guest brought up NAT networking."
+exit 0

@@ -107,9 +107,18 @@ export function findCommonParentDir(
  * 3. Runs lifecycle.sh, records its exit code on the shared mount, and powers the VM off.
  *
  * Mapping rules (mirroring the Docker bind-mount behaviour):
- * - Directory volumes → symlink: `ln -s /mnt/host/<rel> <containerPath>`
- * - File volumes at standard root paths (single path segment, e.g. /task.txt) → symlink
+ * - Directory volumes → symlink: `rm -rf <containerPath>` then `ln -s /mnt/host/<rel> <containerPath>`
+ * - File volumes at standard root paths (single path segment, e.g. /task.txt) → rm + symlink
  * - File volumes at non-standard nested paths (e.g. /root/.config/…) → mkdir -p + cp
+ *
+ * Each root-level target is removed before the symlink because the rootfs ships some of these paths
+ * (e.g. /code is the image WORKDIR) and the disk is attached read-write and reused across runs —
+ * `ln -s` into an existing directory would create <dir>/<name> and then fail on the next run.
+ *
+ * This script runs as PID 1 after switch_root, so it must NEVER use `set -e`: if PID 1 exits the
+ * kernel panics and the VMM process hangs (leaking it and holding the rootfs image, which blocks all
+ * later runs). Every step therefore falls through to the controlled power-off, and a setup failure is
+ * recorded as a non-zero exit code rather than aborting.
  *
  * @param volumes     The SandboxInitOptions volumes array (may be undefined/empty).
  * @param env         The SandboxInitOptions env map (may be undefined/empty).
@@ -124,8 +133,10 @@ export function generateVmMountSetupScript(
 ): string {
   const lines: string[] = [
     "#!/bin/sh",
-    "set -e",
+    "# No `set -e`: this runs as PID 1, so any uncaught error that exits the shell panics the kernel",
+    "# and hangs the VMM. We track failures instead and always reach the power-off below.",
     "# /mnt/host is already mounted by vm-init.sh",
+    "SETUP_EXIT_CODE=0",
     "",
     "# Map volumes",
   ];
@@ -144,11 +155,14 @@ export function generateVmMountSetupScript(
     const isAtRootLevel = path.dirname(containerPath) === "/";
 
     if (isAtRootLevel) {
-      lines.push(`ln -s ${vmSourcePath} ${containerPath}`);
+      // Remove any pre-existing target first so the mapping is idempotent across reused rootfs disks
+      // and does not collide with image-provided directories like /code.
+      lines.push(`rm -rf ${containerPath}`);
+      lines.push(`ln -s ${vmSourcePath} ${containerPath} || SETUP_EXIT_CODE=1`);
     } else {
       const parentDir = path.dirname(containerPath);
       lines.push(`mkdir -p ${parentDir}`);
-      lines.push(`cp ${vmSourcePath} ${containerPath}`);
+      lines.push(`cp ${vmSourcePath} ${containerPath} || SETUP_EXIT_CODE=1`);
     }
   }
 
@@ -162,20 +176,23 @@ export function generateVmMountSetupScript(
   // reachable through /mnt/host like everything else.
   //
   // We deliberately do NOT `exec` it: this script runs as PID 1 (after switch_root), and if PID 1
-  // exits the kernel panics and the VM hangs instead of shutting down. Instead we run lifecycle.sh,
-  // record its exit code on the shared mount (the VMM's own exit code can't carry it back), flush,
-  // and power the VM off cleanly via magic sysrq so the VMM process exits and the host detects
-  // completion.
+  // exits the kernel panics and the VM hangs instead of shutting down. Instead we run lifecycle.sh
+  // (only when volume setup succeeded — a broken mount would otherwise produce a misleading run
+  // failure), record its exit code on the shared mount (the VMM's own exit code can't carry it
+  // back), flush, and power the VM off cleanly via magic sysrq so the host detects completion.
   lines.push("");
   lines.push(
     "# Run the lifecycle script, capturing its exit code for the host to read.",
   );
+  lines.push('if [ "$SETUP_EXIT_CODE" -eq 0 ]; then');
+  lines.push(`  /mnt/host/${lifecycleRelativePath}`);
+  lines.push("  LIFECYCLE_EXIT_CODE=$?");
+  lines.push("else");
   lines.push(
-    "# Disable errexit first so a failing run still records its code and powers off.",
+    "  echo 'vm-mount-setup: volume mapping failed; skipping lifecycle' >&2",
   );
-  lines.push("set +e");
-  lines.push(`/mnt/host/${lifecycleRelativePath}`);
-  lines.push("LIFECYCLE_EXIT_CODE=$?");
+  lines.push("  LIFECYCLE_EXIT_CODE=$SETUP_EXIT_CODE");
+  lines.push("fi");
   lines.push(`echo "$LIFECYCLE_EXIT_CODE" > /mnt/host/${EXIT_CODE_FILENAME}`);
   lines.push("sync");
   lines.push("");

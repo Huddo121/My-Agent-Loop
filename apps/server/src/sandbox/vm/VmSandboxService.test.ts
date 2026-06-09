@@ -131,24 +131,32 @@ describe("generateVmMountSetupScript", () => {
     expect(script).toBe(
       [
         "#!/bin/sh",
-        "set -e",
+        "# No `set -e`: this runs as PID 1, so any uncaught error that exits the shell panics the kernel",
+        "# and hangs the VMM. We track failures instead and always reach the power-off below.",
         "# /mnt/host is already mounted by vm-init.sh",
+        "SETUP_EXIT_CODE=0",
         "",
         "# Map volumes",
-        "ln -s /mnt/host/code /code",
-        "ln -s /mnt/host/task.txt /task.txt",
+        "rm -rf /code",
+        "ln -s /mnt/host/code /code || SETUP_EXIT_CODE=1",
+        "rm -rf /task.txt",
+        "ln -s /mnt/host/task.txt /task.txt || SETUP_EXIT_CODE=1",
         "mkdir -p /root/.config/opencode",
-        "cp /mnt/host/harness/harness-0-opencode.json /root/.config/opencode/opencode.json",
-        "ln -s /mnt/host/harness-setup.sh /harness-setup.sh",
+        "cp /mnt/host/harness/harness-0-opencode.json /root/.config/opencode/opencode.json || SETUP_EXIT_CODE=1",
+        "rm -rf /harness-setup.sh",
+        "ln -s /mnt/host/harness-setup.sh /harness-setup.sh || SETUP_EXIT_CODE=1",
         "",
         "# Export environment",
         `export AGENT_RUN_COMMAND='opencode run "..."'`,
         "",
         "# Run the lifecycle script, capturing its exit code for the host to read.",
-        "# Disable errexit first so a failing run still records its code and powers off.",
-        "set +e",
-        "/mnt/host/lifecycle.sh",
-        "LIFECYCLE_EXIT_CODE=$?",
+        'if [ "$SETUP_EXIT_CODE" -eq 0 ]; then',
+        "  /mnt/host/lifecycle.sh",
+        "  LIFECYCLE_EXIT_CODE=$?",
+        "else",
+        "  echo 'vm-mount-setup: volume mapping failed; skipping lifecycle' >&2",
+        "  LIFECYCLE_EXIT_CODE=$SETUP_EXIT_CODE",
+        "fi",
         'echo "$LIFECYCLE_EXIT_CODE" > /mnt/host/.vm-exit-code',
         "sync",
         "",
@@ -159,7 +167,7 @@ describe("generateVmMountSetupScript", () => {
     );
   });
 
-  it("starts with #!/bin/sh and set -e", () => {
+  it("never uses `set -e` so a setup error cannot panic PID 1", () => {
     const script = generateVmMountSetupScript(
       [],
       {},
@@ -168,7 +176,11 @@ describe("generateVmMountSetupScript", () => {
     );
     const lines = script.split("\n");
     expect(lines[0]).toBe("#!/bin/sh");
-    expect(lines[1]).toBe("set -e");
+    // `set -e` would let any failed command exit the shell; as PID 1 that panics the kernel and
+    // leaks the VMM holding the rootfs image, so it must never appear as a command. (A comment may
+    // still mention it, hence the exact-line check rather than a substring search.)
+    expect(lines.map((line) => line.trim())).not.toContain("set -e");
+    expect(script).toContain("SETUP_EXIT_CODE=0");
   });
 
   it("runs lifecycle (without exec) and records its exit code before powering off", () => {
@@ -211,7 +223,12 @@ describe("generateVmMountSetupScript", () => {
       sharedDir,
       "lifecycle.sh",
     );
-    expect(script).toContain("ln -s /mnt/host/code /code");
+    // The target is removed before the symlink: /code is the image WORKDIR and the rootfs is reused
+    // across runs, so `ln -s` into the existing directory would create /code/code and fail next run
+    // (which, under PID 1, kernel-panics the guest and leaks the VMM).
+    expect(script).toContain(
+      "rm -rf /code\nln -s /mnt/host/code /code || SETUP_EXIT_CODE=1",
+    );
   });
 
   it("emits symlinks for standard root-level file volumes", () => {

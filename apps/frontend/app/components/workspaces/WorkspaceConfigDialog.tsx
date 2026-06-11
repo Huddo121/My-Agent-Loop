@@ -104,16 +104,19 @@ export function WorkspaceConfigDialog({
             modelId: parseModelValue(modelValue),
           };
 
-    setWorkspaceSandboxType.mutate({
-      sandboxType: parseSandboxTypeValue(displayedSandboxTypeValue),
-    });
-
-    updateWorkspace.mutate(
-      { name: name.trim(), agentConfig },
-      {
-        onSuccess: () => onOpenChange(false),
-      },
-    );
+    // Close only once BOTH saves succeed. Closing on the workspace update alone would hide the
+    // error paragraph below while the sandbox-type save was still pending or had failed.
+    Promise.all([
+      setWorkspaceSandboxType.mutateAsync({
+        sandboxType: parseSandboxTypeValue(displayedSandboxTypeValue),
+      }),
+      updateWorkspace.mutateAsync({ name: name.trim(), agentConfig }),
+    ])
+      .then(() => onOpenChange(false))
+      .catch(() => {
+        // The failure is already surfaced through each mutation's error state rendered below;
+        // keeping the dialog open is the handling.
+      });
   };
 
   const canSubmit = name.trim().length > 0;

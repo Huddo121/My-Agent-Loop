@@ -53,8 +53,12 @@ export function WorkspaceConfigDialog({
   const [modelValue, setModelValue] = useState<string>(
     workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE,
   );
-  const [sandboxTypeValue, setSandboxTypeValue] = useState<string>(
-    SANDBOX_TYPE_DEFAULT_VALUE,
+  // null = the user has not touched the select yet, so it displays whatever the query returns.
+  // Keeping the query data out of the reset effect below matters: making the effect depend on it
+  // would re-run the reset when the query resolves after the dialog opened, wiping any name or
+  // harness edits the user made in the meantime.
+  const [sandboxTypeValue, setSandboxTypeValue] = useState<string | null>(
+    null,
   );
 
   const { data: harnessesData, isLoading: isLoadingHarnesses } =
@@ -81,16 +85,13 @@ export function WorkspaceConfigDialog({
       setName(workspace.name);
       setHarnessValue(workspace.agentConfig?.harnessId ?? INHERIT_VALUE);
       setModelValue(workspace.agentConfig?.modelId ?? HARNESS_DEFAULT_VALUE);
-      setSandboxTypeValue(
-        sandboxTypeData?.sandboxType ?? SANDBOX_TYPE_DEFAULT_VALUE,
-      );
+      // Back to "untouched": display follows the query data again.
+      setSandboxTypeValue(null);
     }
-  }, [
-    open,
-    workspace.name,
-    workspace.agentConfig,
-    sandboxTypeData?.sandboxType,
-  ]);
+  }, [open, workspace.name, workspace.agentConfig]);
+
+  const displayedSandboxTypeValue =
+    sandboxTypeValue ?? sandboxTypeData?.sandboxType ?? SANDBOX_TYPE_DEFAULT_VALUE;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +105,7 @@ export function WorkspaceConfigDialog({
           };
 
     setWorkspaceSandboxType.mutate({
-      sandboxType: parseSandboxTypeValue(sandboxTypeValue),
+      sandboxType: parseSandboxTypeValue(displayedSandboxTypeValue),
     });
 
     updateWorkspace.mutate(
@@ -206,7 +207,7 @@ export function WorkspaceConfigDialog({
               <div className="mt-1">
                 <SandboxTypeSelect
                   id="workspace-config-sandbox-type"
-                  value={sandboxTypeValue}
+                  value={displayedSandboxTypeValue}
                   onValueChange={setSandboxTypeValue}
                   isLoading={isLoadingSandboxType}
                   nullOptionLabel="System default (Docker)"

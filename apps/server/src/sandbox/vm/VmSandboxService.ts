@@ -192,6 +192,7 @@ export function generateVmMountSetupScript(
   lines.push(
     "# Match the Docker image runtime environment (HOME, PATH, WORKDIR)",
   );
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion syntax, not a JS template literal
   lines.push('export HOME="${HOME:-/root}"');
   lines.push('export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"');
   lines.push("cd /code 2>/dev/null || cd /");

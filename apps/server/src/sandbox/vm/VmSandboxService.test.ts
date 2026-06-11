@@ -150,6 +150,7 @@ describe("generateVmMountSetupScript", () => {
         `export AGENT_RUN_COMMAND='opencode run "..."'`,
         "",
         "# Match the Docker image runtime environment (HOME, PATH, WORKDIR)",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion syntax, not a JS template literal
         'export HOME="${HOME:-/root}"',
         'export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"',
         "cd /code 2>/dev/null || cd /",
@@ -291,6 +292,7 @@ describe("generateVmMountSetupScript", () => {
   // The script always exports HOME/PATH to mirror the Docker image; these two cases check that an
   // empty/undefined env map adds nothing beyond those framework exports.
   const frameworkExports = [
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion syntax, not a JS template literal
     'export HOME="${HOME:-/root}"',
     'export PATH="/root/.local/bin:/root/.opencode/bin:$PATH"',
   ];
@@ -377,6 +379,7 @@ describe("generateVmMountSetupScript", () => {
       sharedDir,
       "lifecycle.sh",
     );
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion syntax, not a JS template literal
     const homeIndex = script.indexOf('export HOME="${HOME:-/root}"');
     const cdIndex = script.indexOf("cd /code 2>/dev/null || cd /");
     const lifecycleIndex = script.indexOf("/mnt/host/lifecycle.sh");

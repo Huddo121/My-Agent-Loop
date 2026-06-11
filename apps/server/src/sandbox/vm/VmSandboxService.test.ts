@@ -525,7 +525,11 @@ describe("VmSandboxService lifecycle", () => {
   // withVirtiofsd emulates the Linux adapter, which runs a separate virtiofsd process the service
   // must terminate when the sandbox ends.
   function makeService(
-    opts: { bootShouldThrow?: boolean; withVirtiofsd?: boolean } = {},
+    opts: {
+      bootShouldThrow?: boolean;
+      withVirtiofsd?: boolean;
+      startVmmShouldThrow?: boolean;
+    } = {},
   ) {
     const vmmProcesses: FakeVmmProcess[] = [];
     const virtiofsdProcesses: FakeVmmProcess[] = [];
@@ -542,6 +546,9 @@ describe("VmSandboxService lifecycle", () => {
         return proc as unknown as ChildProcess;
       },
       startVmm: async () => {
+        if (opts.startVmmShouldThrow) {
+          throw new Error("vmm spawn failed");
+        }
         const proc = new FakeVmmProcess();
         vmmProcesses.push(proc);
         return proc as unknown as ChildProcess;
@@ -829,6 +836,38 @@ describe("VmSandboxService lifecycle", () => {
         error: { reason: "container-not-running" },
       });
       expect(cloneFiles(baseDir)).toHaveLength(0);
+    });
+
+    it("releases partial resources when the VMM fails to start", async () => {
+      const { service, virtiofsdProcesses, baseDir } = makeService({
+        withVirtiofsd: true,
+        startVmmShouldThrow: true,
+      });
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-svc-"));
+      tmpDirs.push(tmpDir);
+
+      await expect(
+        service.createNewSandbox({
+          volumes: [
+            {
+              hostPath: `${tmpDir}/code` as AbsoluteFilePath,
+              containerPath: "/code",
+            },
+            {
+              hostPath: `${tmpDir}/task.txt` as AbsoluteFilePath,
+              containerPath: "/task.txt",
+            },
+          ],
+          env: {},
+        }),
+      ).rejects.toThrow("vmm spawn failed");
+
+      // The sandbox was never registered, so stopSandbox could never reclaim these — creation
+      // itself must: the rootfs clone, the started virtiofsd, and the shared-dir files.
+      expect(cloneFiles(baseDir)).toHaveLength(0);
+      expect(virtiofsdProcesses[0].killSignal).toBe("SIGTERM");
+      expect(fs.existsSync(path.join(tmpDir, "vm-mount-setup.sh"))).toBe(false);
+      expect(fs.existsSync(path.join(tmpDir, "lifecycle.sh"))).toBe(false);
     });
 
     it("terminates the virtiofsd process when the sandbox finishes on its own", async () => {

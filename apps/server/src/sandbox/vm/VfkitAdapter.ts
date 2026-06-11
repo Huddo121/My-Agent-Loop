@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
 import { promisify } from "node:util";
+import { waitForProcessSpawn } from "./processSpawn";
 import { unixSocketRequest } from "./unixSocketHttp";
 
 const execFileAsync = promisify(execFile);
@@ -51,7 +52,10 @@ export class VfkitAdapter implements VmPlatformAdapter {
     }
 
     const args = buildVfkitArgs(options);
-    return spawn(this.vfkitPath, args, { stdio: "pipe" });
+    return waitForProcessSpawn(
+      spawn(this.vfkitPath, args, { stdio: "pipe" }),
+      "vfkit",
+    );
   }
 
   // `cp -c` requests an APFS clonefile: a copy-on-write clone that is near-instant and shares blocks

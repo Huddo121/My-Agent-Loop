@@ -35,8 +35,9 @@ interface VmSandboxState {
   sharedDir: string;
   // File the guest serial console is written to, for debugging and (future) log streaming.
   consoleLogPath: string;
-  // Per-run copy-on-write clone of the base rootfs this VM boots from. Deleted on stop. Each VM gets
-  // its own so concurrent runs don't contend for exclusive read-write access to one disk image.
+  // Per-run copy-on-write clone of the base rootfs this VM boots from. Deleted when the sandbox's
+  // resources are released (after it finishes or is stopped). Each VM gets its own so concurrent
+  // runs don't contend for exclusive read-write access to one disk image.
   runRootfsPath: string;
 }
 
@@ -314,58 +315,94 @@ export class VmSandboxService implements SandboxService {
 
     const uuid = randomUUID();
     const shortId = uuid.slice(0, 8);
+    const id = `vm-sandbox-${uuid}` as SandboxId;
 
     // Socket paths under the OS temp dir — one per sandbox to avoid conflicts between concurrent VMs.
     const apiSocketPath = path.join(os.tmpdir(), `ch-${uuid}.sock`);
     const virtiofsdSocketPath = path.join(os.tmpdir(), `virtiofs-${uuid}.sock`);
     // The VMM writes the guest serial console here (vfkit cannot use a stdio console headless).
     const consoleLogPath = path.join(os.tmpdir(), `vm-console-${uuid}.log`);
-
-    // Start virtiofsd first so the socket is ready before the VMM connects to it.
-    // On macOS this returns null (vfkit handles virtio-fs via Virtualization.framework).
-    const virtiofsdProcess = await this.adapter.startVirtiofsd({
-      socketPath: virtiofsdSocketPath,
-      sharedDir,
-    });
-
-    // Write the per-run setup script into the shared directory so vm-init.sh can exec it.
-    const setupScriptPath = path.join(sharedDir, "vm-mount-setup.sh");
-    const scriptContent = generateVmMountSetupScript(
-      volumes,
-      options.env,
-      sharedDir,
-      lifecycleRelativePath,
-    );
-    fs.writeFileSync(setupScriptPath, scriptContent, { mode: 0o755 });
-
-    // Give each VM its own writable disk. Virtualization.framework (and KVM) require exclusive
-    // read-write access to a disk image, so attaching the single base rootfs.raw to more than one VM
-    // at once fails with "storage device attachment is invalid" and serialises every run. The adapter
-    // clones the base per sandbox using a platform copy-on-write clone (APFS clonefile / reflink) so
-    // it is effectively instant and space-free. The clone lives beside the base so it lands on the
-    // same filesystem (CoW only works within one volume); stopSandbox deletes it.
+    // Per-run writable disk; see the comment ahead of cloneRootfs below.
     const runRootfsPath = path.join(
       path.dirname(rootfsPath),
       `.vm-rootfs-${uuid}.raw`,
     );
-    await this.adapter.cloneRootfs(rootfsPath, runRootfsPath);
 
-    const vmmProcess = await this.adapter.startVmm({
-      apiSocketPath,
-      kernelPath,
-      rootfsPath: runRootfsPath,
-      initrdPath,
-      virtiofsSocketPath: virtiofsdSocketPath,
-      // VIRTIOFS_TAG must match the tag in vm-init.sh; mismatches cause a silent mount failure.
-      virtiofsTag: VIRTIOFS_TAG,
-      memorySizeMb: this.memorySizeMb,
-      cpuCount: this.cpuCount,
-      networkConfig: this.networkConfig,
-      sharedDir,
-      consoleLogPath,
-    });
+    // Everything from here to startVmm creates host-side resources before the sandbox is
+    // registered in knownSandboxes — so on failure, stopSandbox can never reach them. Reclaim
+    // them here and rethrow rather than leaking a process, a rootfs clone, or shared-dir files.
+    let virtiofsdProcess: ChildProcess | null = null;
+    let vmmProcess: ChildProcess;
+    try {
+      // Start virtiofsd first so the socket is ready before the VMM connects to it.
+      // On macOS this returns null (vfkit handles virtio-fs via Virtualization.framework).
+      virtiofsdProcess = await this.adapter.startVirtiofsd({
+        socketPath: virtiofsdSocketPath,
+        sharedDir,
+      });
 
-    const id = `vm-sandbox-${uuid}` as SandboxId;
+      // Write the per-run setup script into the shared directory so vm-init.sh can exec it.
+      const setupScriptPath = path.join(sharedDir, "vm-mount-setup.sh");
+      const scriptContent = generateVmMountSetupScript(
+        volumes,
+        options.env,
+        sharedDir,
+        lifecycleRelativePath,
+      );
+      fs.writeFileSync(setupScriptPath, scriptContent, { mode: 0o755 });
+
+      // Give each VM its own writable disk. Virtualization.framework (and KVM) require exclusive
+      // read-write access to a disk image, so attaching the single base rootfs.raw to more than one VM
+      // at once fails with "storage device attachment is invalid" and serialises every run. The adapter
+      // clones the base per sandbox using a platform copy-on-write clone (APFS clonefile / reflink) so
+      // it is effectively instant and space-free. The clone lives beside the base so it lands on the
+      // same filesystem (CoW only works within one volume); resource release deletes it.
+      await this.adapter.cloneRootfs(rootfsPath, runRootfsPath);
+
+      vmmProcess = await this.adapter.startVmm({
+        apiSocketPath,
+        kernelPath,
+        rootfsPath: runRootfsPath,
+        initrdPath,
+        virtiofsSocketPath: virtiofsdSocketPath,
+        // VIRTIOFS_TAG must match the tag in vm-init.sh; mismatches cause a silent mount failure.
+        virtiofsTag: VIRTIOFS_TAG,
+        memorySizeMb: this.memorySizeMb,
+        cpuCount: this.cpuCount,
+        networkConfig: this.networkConfig,
+        sharedDir,
+        consoleLogPath,
+      });
+    } catch (error) {
+      this.releaseSandboxResources(id, {
+        virtiofsdProcess,
+        apiSocketPath,
+        virtiofsdSocketPath,
+        sharedDir,
+        consoleLogPath,
+        runRootfsPath,
+      });
+      this.logger.error(
+        "Failed to create VM sandbox, released partial resources",
+        {
+          sandboxId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      throw error;
+    }
+
+    // A post-spawn "error" event (e.g. a later failed kill) with no listener is an unhandled
+    // EventEmitter error that would crash the whole server, so route it to the logger instead.
+    const logProcessError = (processName: string) => (error: Error) => {
+      this.logger.warn("VM sandbox process emitted an error", {
+        sandboxId: id,
+        processName,
+        error: error.message,
+      });
+    };
+    vmmProcess.on("error", logProcessError("vmm"));
+    virtiofsdProcess?.on("error", logProcessError("virtiofsd"));
 
     this.knownSandboxes.set(id, {
       virtiofsdProcess,
@@ -572,8 +609,14 @@ export class VmSandboxService implements SandboxService {
    *
    * The rootfs clone matters most: even CoW-backed it grows as the guest writes, and on
    * filesystems without reflink support it is a full copy of the base image per run.
+   *
+   * Takes the state without the VMM process so createNewSandbox can also use it to tear down a
+   * sandbox that failed before its VMM ever spawned.
    */
-  private releaseSandboxResources(id: SandboxId, state: VmSandboxState): void {
+  private releaseSandboxResources(
+    id: SandboxId,
+    state: Omit<VmSandboxState, "vmmProcess">,
+  ): void {
     // Kill virtiofsd (Linux only; null on macOS where vfkit serves virtio-fs itself).
     if (state.virtiofsdProcess !== null) {
       try {

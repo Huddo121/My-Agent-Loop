@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
 import { promisify } from "node:util";
+import { waitForProcessSpawn } from "./processSpawn";
 import { unixSocketRequest } from "./unixSocketHttp";
 
 const execFileAsync = promisify(execFile);
@@ -54,7 +55,10 @@ export class CloudHypervisorAdapter implements VmPlatformAdapter {
     }
 
     const args = buildVirtiofsdArgs(options.socketPath, options.sharedDir);
-    return spawn(this.virtiofsdPath, args, { stdio: "pipe" });
+    return waitForProcessSpawn(
+      spawn(this.virtiofsdPath, args, { stdio: "pipe" }),
+      "virtiofsd",
+    );
   }
 
   async startVmm(options: StartVmmOptions): Promise<ChildProcess> {
@@ -63,7 +67,10 @@ export class CloudHypervisorAdapter implements VmPlatformAdapter {
     }
 
     const args = buildCloudHypervisorArgs(options);
-    return spawn(this.cloudHypervisorPath, args, { stdio: "pipe" });
+    return waitForProcessSpawn(
+      spawn(this.cloudHypervisorPath, args, { stdio: "pipe" }),
+      "cloud-hypervisor",
+    );
   }
 
   // `cp --reflink=auto` makes a copy-on-write clone on filesystems that support reflinks (btrfs, xfs)

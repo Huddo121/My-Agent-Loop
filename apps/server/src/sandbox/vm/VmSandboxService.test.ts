@@ -137,14 +137,14 @@ describe("generateVmMountSetupScript", () => {
         "SETUP_EXIT_CODE=0",
         "",
         "# Map volumes",
-        "rm -rf /code",
-        "ln -s /mnt/host/code /code || SETUP_EXIT_CODE=1",
-        "rm -rf /task.txt",
-        "ln -s /mnt/host/task.txt /task.txt || SETUP_EXIT_CODE=1",
-        "mkdir -p /root/.config/opencode",
-        "cp /mnt/host/harness/harness-0-opencode.json /root/.config/opencode/opencode.json || SETUP_EXIT_CODE=1",
-        "rm -rf /harness-setup.sh",
-        "ln -s /mnt/host/harness-setup.sh /harness-setup.sh || SETUP_EXIT_CODE=1",
+        "rm -rf '/code'",
+        "ln -s '/mnt/host/code' '/code' || SETUP_EXIT_CODE=1",
+        "rm -rf '/task.txt'",
+        "ln -s '/mnt/host/task.txt' '/task.txt' || SETUP_EXIT_CODE=1",
+        "mkdir -p '/root/.config/opencode'",
+        "cp '/mnt/host/harness/harness-0-opencode.json' '/root/.config/opencode/opencode.json' || SETUP_EXIT_CODE=1",
+        "rm -rf '/harness-setup.sh'",
+        "ln -s '/mnt/host/harness-setup.sh' '/harness-setup.sh' || SETUP_EXIT_CODE=1",
         "",
         "# Export environment",
         `export AGENT_RUN_COMMAND='opencode run "..."'`,
@@ -156,7 +156,7 @@ describe("generateVmMountSetupScript", () => {
         "",
         "# Run the lifecycle script, capturing its exit code for the host to read.",
         'if [ "$SETUP_EXIT_CODE" -eq 0 ]; then',
-        "  /mnt/host/lifecycle.sh",
+        "  '/mnt/host/lifecycle.sh'",
         "  LIFECYCLE_EXIT_CODE=$?",
         "else",
         "  echo 'vm-mount-setup: volume mapping failed; skipping lifecycle' >&2",
@@ -232,7 +232,7 @@ describe("generateVmMountSetupScript", () => {
     // across runs, so `ln -s` into the existing directory would create /code/code and fail next run
     // (which, under PID 1, kernel-panics the guest and leaks the VMM).
     expect(script).toContain(
-      "rm -rf /code\nln -s /mnt/host/code /code || SETUP_EXIT_CODE=1",
+      "rm -rf '/code'\nln -s '/mnt/host/code' '/code' || SETUP_EXIT_CODE=1",
     );
   });
 
@@ -249,7 +249,7 @@ describe("generateVmMountSetupScript", () => {
       sharedDir,
       "lifecycle.sh",
     );
-    expect(script).toContain("ln -s /mnt/host/task.txt /task.txt");
+    expect(script).toContain("ln -s '/mnt/host/task.txt' '/task.txt'");
   });
 
   it("emits mkdir -p and cp for a nested-path file volume", () => {
@@ -267,9 +267,9 @@ describe("generateVmMountSetupScript", () => {
       sharedDir,
       "lifecycle.sh",
     );
-    expect(script).toContain("mkdir -p /root/.config/opencode");
+    expect(script).toContain("mkdir -p '/root/.config/opencode'");
     expect(script).toContain(
-      "cp /mnt/host/harness/harness-0-opencode.json /root/.config/opencode/opencode.json",
+      "cp '/mnt/host/harness/harness-0-opencode.json' '/root/.config/opencode/opencode.json'",
     );
   });
 
@@ -336,7 +336,34 @@ describe("generateVmMountSetupScript", () => {
     );
     // containerPath is at root level → symlink; source is /mnt/host/harness/config.json
     expect(script).toContain(
-      "ln -s /mnt/host/harness/config.json /config.json",
+      "ln -s '/mnt/host/harness/config.json' '/config.json'",
+    );
+  });
+
+  it("quotes path operands so paths containing spaces survive word splitting", () => {
+    const spacedSharedDir = "/abs/My Runs/abc 123";
+    const vol = [
+      {
+        hostPath: `${spacedSharedDir}/code` as AbsoluteFilePath,
+        containerPath: "/code",
+      },
+      {
+        hostPath: `${spacedSharedDir}/harness/with space.json` as AbsoluteFilePath,
+        containerPath: "/root/.config/some tool/config.json",
+      },
+    ];
+    const script = generateVmMountSetupScript(
+      vol,
+      {},
+      spacedSharedDir,
+      "lifecycle.sh",
+    );
+    // The shared-dir-relative source and the container target are both single-quoted, so an
+    // embedded space cannot split `rm -rf` or `cp` into extra arguments.
+    expect(script).toContain("ln -s '/mnt/host/code' '/code'");
+    expect(script).toContain("mkdir -p '/root/.config/some tool'");
+    expect(script).toContain(
+      "cp '/mnt/host/harness/with space.json' '/root/.config/some tool/config.json'",
     );
   });
 

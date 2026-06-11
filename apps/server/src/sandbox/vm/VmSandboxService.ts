@@ -158,15 +158,21 @@ export function generateVmMountSetupScript(
     // parent directory exists before the file is placed.
     const isAtRootLevel = path.dirname(containerPath) === "/";
 
+    // Quote every path operand: the run temp dir (and so the /mnt/host-relative source paths) can
+    // contain spaces or other shell-special characters, and an unquoted, word-split path argument
+    // to `rm -rf` is the worst place to find that out.
+    const quotedSource = shellQuote(vmSourcePath);
+    const quotedTarget = shellQuote(containerPath);
+
     if (isAtRootLevel) {
       // Remove any pre-existing target first so the mapping is idempotent across reused rootfs disks
       // and does not collide with image-provided directories like /code.
-      lines.push(`rm -rf ${containerPath}`);
-      lines.push(`ln -s ${vmSourcePath} ${containerPath} || SETUP_EXIT_CODE=1`);
+      lines.push(`rm -rf ${quotedTarget}`);
+      lines.push(`ln -s ${quotedSource} ${quotedTarget} || SETUP_EXIT_CODE=1`);
     } else {
       const parentDir = path.dirname(containerPath);
-      lines.push(`mkdir -p ${parentDir}`);
-      lines.push(`cp ${vmSourcePath} ${containerPath} || SETUP_EXIT_CODE=1`);
+      lines.push(`mkdir -p ${shellQuote(parentDir)}`);
+      lines.push(`cp ${quotedSource} ${quotedTarget} || SETUP_EXIT_CODE=1`);
     }
   }
 
@@ -203,7 +209,7 @@ export function generateVmMountSetupScript(
     "# Run the lifecycle script, capturing its exit code for the host to read.",
   );
   lines.push('if [ "$SETUP_EXIT_CODE" -eq 0 ]; then');
-  lines.push(`  /mnt/host/${lifecycleRelativePath}`);
+  lines.push(`  ${shellQuote(`/mnt/host/${lifecycleRelativePath}`)}`);
   lines.push("  LIFECYCLE_EXIT_CODE=$?");
   lines.push("else");
   lines.push(

@@ -76,6 +76,12 @@ const envSchema = z
     // platform. Optional here because VM sandboxes may be unconfigured; the VM run path validates
     // its presence and fails with a clear error if a VM run is attempted without it.
     VM_HOST_BRIDGE_IP: z.string().optional(),
+    // Linux/cloud-hypervisor only: the host TAP device (attached to the bridge from
+    // scripts/setup-vm-networking.sh) and the guest MAC address. Without a TAP device the VM has
+    // no NIC at all, so the in-guest driver cannot reach the host; CloudHypervisorAdapter refuses
+    // to start a VM without one. macOS/vfkit ignores these — it uses built-in vmnet NAT.
+    VM_TAP_DEVICE: z.string().optional(),
+    VM_MAC: z.string().optional(),
   })
   .transform((env) => ({
     ...env,

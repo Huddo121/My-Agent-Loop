@@ -66,6 +66,15 @@ export class CloudHypervisorAdapter implements VmPlatformAdapter {
       throw new Error("CLOUD_HYPERVISOR_PATH is not configured");
     }
 
+    // Without a TAP device the VM boots with no NIC at all, so the in-guest driver can never
+    // reach the host — the run would limp along until the workflow timeout instead of failing
+    // with a cause. (vfkit does not need this: it attaches built-in vmnet NAT unconditionally.)
+    if (options.networkConfig.tapDevice === undefined) {
+      throw new Error(
+        "VM networking is not configured: set VM_TAP_DEVICE to a host TAP device attached to the VM bridge (see scripts/setup-vm-networking.sh)",
+      );
+    }
+
     const args = buildCloudHypervisorArgs(options);
     return waitForProcessSpawn(
       spawn(this.cloudHypervisorPath, args, { stdio: "pipe" }),

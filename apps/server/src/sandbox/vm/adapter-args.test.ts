@@ -3,6 +3,7 @@ import {
   buildCloudHypervisorArgs,
   buildNetArg,
   buildVirtiofsdArgs,
+  CloudHypervisorAdapter,
 } from "./CloudHypervisorAdapter";
 import { buildVfkitArgs } from "./VfkitAdapter";
 
@@ -92,6 +93,16 @@ describe("buildCloudHypervisorArgs", () => {
 
   it("omits --net when network config is empty", () => {
     expect(buildCloudHypervisorArgs(base)).not.toContain("--net");
+  });
+
+  it("startVmm refuses to boot a VM without a TAP device", async () => {
+    // A NIC-less VM cannot reach the host driver API, so the run would only fail at the workflow
+    // timeout. The adapter must fail fast — before spawning anything — naming the missing config.
+    const adapter = new CloudHypervisorAdapter(
+      "/usr/local/bin/cloud-hypervisor",
+      "/usr/local/bin/virtiofsd",
+    );
+    await expect(adapter.startVmm(base)).rejects.toThrow("VM_TAP_DEVICE");
   });
 });
 

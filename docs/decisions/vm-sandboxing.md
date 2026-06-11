@@ -59,8 +59,9 @@ the adapter, monitors the VMM process for exit, and tears everything down on sto
 
 VM env vars are all optional; if they are unset the server runs Docker-only and the VM run path
 fails with a clear error only if a run actually requests a VM. Relevant vars: `VM_KERNEL_PATH`,
-`VM_ROOTFS_PATH`, `VM_INITRD_PATH`, `VM_HOST_BRIDGE_IP`, and the binary paths
-(`CLOUD_HYPERVISOR_PATH`, `VIRTIOFSD_PATH` on Linux; `VFKIT_PATH` on macOS).
+`VM_ROOTFS_PATH`, `VM_INITRD_PATH`, `VM_HOST_BRIDGE_IP`, the binary paths
+(`CLOUD_HYPERVISOR_PATH`, `VIRTIOFSD_PATH` on Linux; `VFKIT_PATH` on macOS), and on Linux the
+guest NIC wiring (`VM_TAP_DEVICE`, optionally `VM_MAC`).
 
 `VM_HOST_BRIDGE_IP` is the host IP the in-VM guest uses to reach the driver host-API and MCP server.
 It is **platform-specific and has no default** — set it to the Linux bridge gateway, or on macOS to
@@ -87,6 +88,9 @@ the vmnet/NAT gateway (`192.168.64.1` by default). A VM run without it fails wit
    forwarding, and sets up NAT so VMs reach the host MCP server and the internet.
 4. Set `VM_HOST_BRIDGE_IP` to the bridge gateway so the in-VM driver and MCP client reach the host
    (no default — see the Setup note above).
+5. Create a TAP device attached to the bridge and set `VM_TAP_DEVICE` (and optionally `VM_MAC`).
+   Without it the VM would have no NIC, so `CloudHypervisorAdapter` refuses to start a VM rather
+   than letting the run fail opaquely at the workflow timeout.
 
 ## Consequences
 

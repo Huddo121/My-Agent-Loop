@@ -194,6 +194,15 @@ const vmSandboxService = new VmSandboxService(
   env.VM_ROOTFS_PATH,
   env.VM_INITRD_PATH,
   logger,
+  {
+    // Linux-only TAP/MAC wiring for cloud-hypervisor; vfkit ignores this and uses vmnet NAT.
+    // CloudHypervisorAdapter fails fast at startVmm time when the TAP device is missing, rather
+    // than booting a VM with no NIC that the in-guest driver can never reach the host from.
+    networkConfig: {
+      tapDevice: env.VM_TAP_DEVICE,
+      mac: env.VM_MAC,
+    },
+  },
 );
 
 const workflowExecutionService = new WorkflowExecutionService(

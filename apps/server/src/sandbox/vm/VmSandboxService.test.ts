@@ -522,13 +522,25 @@ describe("VmSandboxService lifecycle", () => {
 
   // A service wired to a fake adapter. startVmm hands back a fresh FakeVmmProcess per sandbox, so
   // multiple sandboxes can be tracked independently; bootVm/shutdownVm calls are counted.
-  function makeService(opts: { bootShouldThrow?: boolean } = {}) {
+  // withVirtiofsd emulates the Linux adapter, which runs a separate virtiofsd process the service
+  // must terminate when the sandbox ends.
+  function makeService(
+    opts: { bootShouldThrow?: boolean; withVirtiofsd?: boolean } = {},
+  ) {
     const vmmProcesses: FakeVmmProcess[] = [];
+    const virtiofsdProcesses: FakeVmmProcess[] = [];
     const calls = { boot: 0, shutdown: 0 };
     const adapter: VmPlatformAdapter = {
       platform: "macos",
       isAvailable: async () => true,
-      startVirtiofsd: async () => null,
+      startVirtiofsd: async () => {
+        if (!opts.withVirtiofsd) {
+          return null;
+        }
+        const proc = new FakeVmmProcess();
+        virtiofsdProcesses.push(proc);
+        return proc as unknown as ChildProcess;
+      },
       startVmm: async () => {
         const proc = new FakeVmmProcess();
         vmmProcesses.push(proc);
@@ -563,7 +575,7 @@ describe("VmSandboxService lifecycle", () => {
       "/initrd.cpio.gz",
       noopLogger,
     );
-    return { service, vmmProcesses, calls, baseDir };
+    return { service, vmmProcesses, virtiofsdProcesses, calls, baseDir };
   }
 
   async function addSandbox(service: VmSandboxService) {
@@ -779,6 +791,59 @@ describe("VmSandboxService lifecycle", () => {
       expect(cloneFiles(baseDir)).toHaveLength(0);
       // The base image is untouched.
       expect(fs.existsSync(path.join(baseDir, "rootfs.raw"))).toBe(true);
+    });
+
+    // The orchestrator does NOT call stopSandbox after a completed wait, so the wait path itself
+    // must reclaim the per-run resources — otherwise every successful run leaks a disk image.
+    it("deletes the rootfs clone when the sandbox finishes on its own", async () => {
+      const { service, vmmProcesses, baseDir } = makeService();
+      const { sandbox, tmpDir } = await addSandbox(service);
+      fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "0\n");
+      expect(cloneFiles(baseDir)).toHaveLength(1);
+
+      const waitPromise = service.waitForSandboxToFinish(sandbox.id);
+      vmmProcesses[0].simulateExit(0);
+      const result = await waitPromise;
+
+      // The wait still reports the guest's exit code (read before the file is cleaned up)...
+      expect(result).toEqual({
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      });
+      // ...and the per-run clone and shared-dir files are reclaimed.
+      expect(cloneFiles(baseDir)).toHaveLength(0);
+      expect(fs.existsSync(path.join(tmpDir, ".vm-exit-code"))).toBe(false);
+      expect(fs.existsSync(path.join(baseDir, "rootfs.raw"))).toBe(true);
+    });
+
+    it("deletes the rootfs clone when the VMM exited before the wait started", async () => {
+      const { service, vmmProcesses, baseDir } = makeService();
+      const { sandbox } = await addSandbox(service);
+      expect(cloneFiles(baseDir)).toHaveLength(1);
+
+      vmmProcesses[0].exitCode = 1;
+      const result = await service.waitForSandboxToFinish(sandbox.id);
+
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-running" },
+      });
+      expect(cloneFiles(baseDir)).toHaveLength(0);
+    });
+
+    it("terminates the virtiofsd process when the sandbox finishes on its own", async () => {
+      const { service, vmmProcesses, virtiofsdProcesses } = makeService({
+        withVirtiofsd: true,
+      });
+      const { sandbox, tmpDir } = await addSandbox(service);
+      fs.writeFileSync(path.join(tmpDir, ".vm-exit-code"), "0\n");
+
+      const waitPromise = service.waitForSandboxToFinish(sandbox.id);
+      vmmProcesses[0].simulateExit(0);
+      await waitPromise;
+
+      // On Linux the per-run virtiofsd would otherwise outlive the VM as an orphan process.
+      expect(virtiofsdProcesses[0].killSignal).toBe("SIGTERM");
     });
   });
 

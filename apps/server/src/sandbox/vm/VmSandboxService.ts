@@ -466,6 +466,7 @@ export class VmSandboxService implements SandboxService {
     // This mirrors Docker's behaviour of returning container-not-running when the container
     // is in "exited" state before wait() is called.
     if (state.vmmProcess.exitCode !== null) {
+      this.releaseSandboxResources(id, state);
       this.knownSandboxes.delete(id);
       this.logger.warn("VM sandbox already exited before wait started", {
         sandboxId: id,
@@ -478,13 +479,19 @@ export class VmSandboxService implements SandboxService {
       state.vmmProcess.once("exit", (code) => resolve(code ?? -1));
     });
 
-    this.knownSandboxes.delete(id);
-
     // The VMM exit code only reports that the hypervisor stopped, not how the agent finished —
     // vm-mount-setup.sh powers the VM off cleanly regardless of the lifecycle result. The real
     // exit code is what the guest wrote to the shared dir; its absence means the run did not finish
-    // normally (crash, kill, or panic), which we treat as an error.
+    // normally (crash, kill, or panic), which we treat as an error. Read it before releasing the
+    // sandbox resources, which deletes the exit-code file along with everything else.
     const guestExitCode = readGuestExitCode(state.sharedDir);
+
+    // This is the happy-path end of a run: the orchestrator only calls stopSandbox when a wait
+    // did NOT complete, so the per-run resources (rootfs clone, virtiofsd, socket and log files)
+    // must be reclaimed here or every successful run leaks them. Mirrors Docker's
+    // waitForSandboxToFinish removing the container once it has exited.
+    this.releaseSandboxResources(id, state);
+    this.knownSandboxes.delete(id);
     // "timeout" is part of the shared success union but the VM path never produces it — the caller
     // enforces the timeout. Typing the result lets the narrower ternary assign without a cast.
     const exitResult: WaitForSandboxToFinishSuccess = {
@@ -548,7 +555,26 @@ export class VmSandboxService implements SandboxService {
       }
     }
 
-    // Step 4: kill virtiofsd (Linux only; null on macOS).
+    // Step 4: release the per-run resources (virtiofsd, sockets, console log, rootfs clone,
+    // shared-dir files) and remove the sandbox from the tracking map.
+    this.releaseSandboxResources(id, state);
+    this.knownSandboxes.delete(id);
+
+    this.logger.info("Stopped VM sandbox", { sandboxId: id });
+  }
+
+  /**
+   * Reclaims everything a run accumulated on the host: the virtiofsd process (Linux only), the
+   * VMM API/virtiofsd sockets, the console log, the per-run rootfs clone, and the files written
+   * into the shared dir. Called from BOTH end-of-life paths — waitForSandboxToFinish when the VM
+   * exits on its own (the orchestrator does not call stopSandbox after a completed wait), and
+   * stopSandbox for aborted runs — so neither path leaks.
+   *
+   * The rootfs clone matters most: even CoW-backed it grows as the guest writes, and on
+   * filesystems without reflink support it is a full copy of the base image per run.
+   */
+  private releaseSandboxResources(id: SandboxId, state: VmSandboxState): void {
+    // Kill virtiofsd (Linux only; null on macOS where vfkit serves virtio-fs itself).
     if (state.virtiofsdProcess !== null) {
       try {
         state.virtiofsdProcess.kill("SIGTERM");
@@ -560,8 +586,7 @@ export class VmSandboxService implements SandboxService {
       }
     }
 
-    // Step 5: clean up socket files, the console log, and the per-run rootfs clone.
-    // The rootfs clone matters most: even CoW-backed, leaving one per run accumulates on disk.
+    // Clean up socket files, the console log, and the per-run rootfs clone.
     // Ignore errors — these may not exist if the VMM failed to start.
     for (const tempPath of [
       state.apiSocketPath,
@@ -589,11 +614,6 @@ export class VmSandboxService implements SandboxService {
         // file may not exist if createNewSandbox failed partway through
       }
     }
-
-    // Step 6: remove from the tracking map.
-    this.knownSandboxes.delete(id);
-
-    this.logger.info("Stopped VM sandbox", { sandboxId: id });
   }
 
   async stopAllSandboxes(): Promise<void> {

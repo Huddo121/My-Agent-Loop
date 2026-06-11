@@ -57,9 +57,7 @@ export function WorkspaceConfigDialog({
   // Keeping the query data out of the reset effect below matters: making the effect depend on it
   // would re-run the reset when the query resolves after the dialog opened, wiping any name or
   // harness edits the user made in the meantime.
-  const [sandboxTypeValue, setSandboxTypeValue] = useState<string | null>(
-    null,
-  );
+  const [sandboxTypeValue, setSandboxTypeValue] = useState<string | null>(null);
 
   const { data: harnessesData, isLoading: isLoadingHarnesses } =
     useHarnessesQuery(workspace.id);
@@ -91,7 +89,9 @@ export function WorkspaceConfigDialog({
   }, [open, workspace.name, workspace.agentConfig]);
 
   const displayedSandboxTypeValue =
-    sandboxTypeValue ?? sandboxTypeData?.sandboxType ?? SANDBOX_TYPE_DEFAULT_VALUE;
+    sandboxTypeValue ??
+    sandboxTypeData?.sandboxType ??
+    SANDBOX_TYPE_DEFAULT_VALUE;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

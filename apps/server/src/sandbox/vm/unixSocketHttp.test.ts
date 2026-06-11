@@ -11,7 +11,8 @@ describe("unixSocketRequest", () => {
   afterEach(async () => {
     await Promise.all(
       servers.map(
-        (server) => new Promise<void>((resolve) => server.close(() => resolve())),
+        (server) =>
+          new Promise<void>((resolve) => server.close(() => resolve())),
       ),
     );
     servers.length = 0;
@@ -36,9 +37,9 @@ describe("unixSocketRequest", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ state: "Running" }));
     });
-    await expect(unixSocketRequest(socketPath, "GET", "/vm/state")).resolves.toEqual(
-      { state: "Running" },
-    );
+    await expect(
+      unixSocketRequest(socketPath, "GET", "/vm/state"),
+    ).resolves.toEqual({ state: "Running" });
   });
 
   it("rejects on a non-2xx status", async () => {

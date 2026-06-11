@@ -348,7 +348,8 @@ describe("generateVmMountSetupScript", () => {
         containerPath: "/code",
       },
       {
-        hostPath: `${spacedSharedDir}/harness/with space.json` as AbsoluteFilePath,
+        hostPath:
+          `${spacedSharedDir}/harness/with space.json` as AbsoluteFilePath,
         containerPath: "/root/.config/some tool/config.json",
       },
     ];

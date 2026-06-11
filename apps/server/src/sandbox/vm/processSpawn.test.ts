@@ -20,10 +20,7 @@ describe("waitForProcessSpawn", () => {
 
   it("resolves when the spawn event fires", async () => {
     const proc = new FakeSpawningProcess();
-    const promise = waitForProcessSpawn(
-      proc as unknown as ChildProcess,
-      "vmm",
-    );
+    const promise = waitForProcessSpawn(proc as unknown as ChildProcess, "vmm");
     proc.emit("spawn");
     await expect(promise).resolves.toBe(proc);
   });

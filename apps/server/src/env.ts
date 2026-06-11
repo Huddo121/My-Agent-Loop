@@ -62,6 +62,26 @@ const envSchema = z
 
     // OAuth credential blobs at rest (32-byte key; distinct from FORGE_ENCRYPTION_KEY)
     OAUTH_CREDENTIALS_ENCRYPTION_KEY: z.string().nonempty(),
+
+    // VM sandbox configuration
+    VM_KERNEL_PATH: z.string().optional(),
+    VM_ROOTFS_PATH: z.string().optional(),
+    VM_INITRD_PATH: z.string().optional(),
+    VIRTIOFSD_PATH: z.string().optional(),
+    CLOUD_HYPERVISOR_PATH: z.string().optional(),
+    VFKIT_PATH: z.string().optional(),
+    // The host IP the in-VM guest uses to reach the host (driver host-API and MCP server). This is
+    // platform-specific — the Linux bridge gateway vs. the macOS vmnet/NAT gateway (192.168.64.1
+    // by default) — so there is deliberately no default: the operator must set it for their VM
+    // platform. Optional here because VM sandboxes may be unconfigured; the VM run path validates
+    // its presence and fails with a clear error if a VM run is attempted without it.
+    VM_HOST_BRIDGE_IP: z.string().optional(),
+    // Linux/cloud-hypervisor only: the host TAP device (attached to the bridge from
+    // scripts/setup-vm-networking.sh) and the guest MAC address. Without a TAP device the VM has
+    // no NIC at all, so the in-guest driver cannot reach the host; CloudHypervisorAdapter refuses
+    // to start a VM without one. macOS/vfkit ignores these — it uses built-in vmnet NAT.
+    VM_TAP_DEVICE: z.string().optional(),
+    VM_MAC: z.string().optional(),
   })
   .transform((env) => ({
     ...env,

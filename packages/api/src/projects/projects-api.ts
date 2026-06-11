@@ -7,6 +7,10 @@ import {
 } from "../common-schemas";
 import { agentConfigSchema } from "../harnesses/harnesses-model";
 import { runIdSchema } from "../runs/runs-model";
+import {
+  sandboxTypeConfigResponseSchema,
+  setSandboxTypeRequestSchema,
+} from "../sandbox/sandbox-model";
 import { tasksApi } from "../tasks/tasks-api";
 import { workspaceIdSchema } from "../workspaces/workspaces-model";
 import { projectIdSchema, shortCodeCodec } from "./projects-model";
@@ -166,6 +170,18 @@ export const projectsApi = Endpoint.multi({
         .output(404, notFoundSchema),
       children: {
         tasks: tasksApi,
+        "sandbox-type": Endpoint.multi({
+          GET: Endpoint.get()
+            .output(200, sandboxTypeConfigResponseSchema)
+            .output(401, unauthenticatedSchema)
+            .output(404, notFoundSchema),
+          PUT: Endpoint.put()
+            .input(setSandboxTypeRequestSchema)
+            .output(200, sandboxTypeConfigResponseSchema)
+            .output(400, badUserInputSchema)
+            .output(401, unauthenticatedSchema)
+            .output(404, notFoundSchema),
+        }),
         run: Endpoint.post()
           .input(startRunRequestSchema)
           .output(200, runStartedResponseSchema)

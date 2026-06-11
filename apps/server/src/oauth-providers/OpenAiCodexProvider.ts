@@ -9,7 +9,12 @@ import type {
 } from "./types";
 
 const OPENAI_CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const OPENAI_CODEX_AUTH_JSON_PATH = "/root/.codex/auth.json";
+// Codex looks for auth.json (and config.toml) under CODEX_HOME, falling back to ~/.codex. We set
+// CODEX_HOME explicitly so it finds the auth file regardless of what HOME is in the sandbox — in a
+// VM guest HOME is not reliably /root, which left Codex unable to find the token and the API
+// rejected the request with "Missing bearer authentication".
+const OPENAI_CODEX_HOME = "/root/.codex";
+const OPENAI_CODEX_AUTH_JSON_PATH = `${OPENAI_CODEX_HOME}/auth.json`;
 
 const openAiCodexRefreshResponseSchema = z.object({
   access_token: z.string().min(1),
@@ -118,6 +123,10 @@ export class OpenAiCodexProvider implements OAuthProvider {
           containerPath: OPENAI_CODEX_AUTH_JSON_PATH,
           contents: JSON.stringify(
             {
+              // Codex reads auth_mode to decide how to authenticate. Without "chatgpt" it does not
+              // use the OAuth tokens below and the API rejects the connection with 401, even though
+              // the tokens are valid. This mirrors the auth.json the Codex CLI writes itself.
+              auth_mode: "chatgpt",
               OPENAI_API_KEY: null,
               tokens: {
                 access_token: stored.access_token,
@@ -132,7 +141,8 @@ export class OpenAiCodexProvider implements OAuthProvider {
           ),
         },
       ],
-      env: {},
+      // Point Codex at the directory the auth.json above is written to, independent of HOME.
+      env: { CODEX_HOME: OPENAI_CODEX_HOME },
     };
   }
 }

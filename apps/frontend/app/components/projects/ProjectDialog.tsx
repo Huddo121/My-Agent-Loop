@@ -5,6 +5,7 @@ import {
   shortCodeCodec,
   type UpdateProjectRequest,
   type WorkflowConfigurationDto,
+  type WorkspaceId,
 } from "@mono/api";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -28,6 +29,11 @@ import {
   parseModelValue,
 } from "~/components/ui/ModelSelect";
 import {
+  parseSandboxTypeValue,
+  SANDBOX_TYPE_DEFAULT_VALUE,
+  SandboxTypeSelect,
+} from "~/components/ui/SandboxTypeSelect";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -36,6 +42,10 @@ import {
 } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
+import {
+  useProjectSandboxTypeQuery,
+  useSetProjectSandboxType,
+} from "~/lib/sandbox/useSandboxType";
 import { useCurrentWorkspace, useHarnessesQuery } from "~/lib/workspaces";
 import type { ForgeTypeDto, Project } from "~/types";
 
@@ -96,6 +106,43 @@ const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
 const defaultForgeBaseUrl = (forgeType: ForgeTypeDto) =>
   forgeType === "gitlab" ? "https://gitlab.com" : "https://github.com";
 
+type ProjectSandboxTypeSelectProps = {
+  workspaceId: WorkspaceId;
+  projectId: ProjectId;
+};
+
+// Separate connected component so hooks are only called when the project ID is
+// known (update mode). Keeps the main dialog's hook calls unconditional.
+function ProjectSandboxTypeSelect({
+  workspaceId,
+  projectId,
+}: ProjectSandboxTypeSelectProps) {
+  const { data, isLoading } = useProjectSandboxTypeQuery(
+    workspaceId,
+    projectId,
+  );
+  const setProjectSandboxType = useSetProjectSandboxType(
+    workspaceId,
+    projectId,
+  );
+
+  const value = data?.sandboxType ?? SANDBOX_TYPE_DEFAULT_VALUE;
+
+  return (
+    <SandboxTypeSelect
+      id="project-sandbox-type"
+      value={value}
+      onValueChange={(next) => {
+        setProjectSandboxType.mutate({
+          sandboxType: parseSandboxTypeValue(next),
+        });
+      }}
+      isLoading={isLoading}
+      nullOptionLabel="Inherit from workspace"
+    />
+  );
+}
+
 function BaseProjectDialog(props: BaseProjectDialogProps) {
   const {
     open,
@@ -109,7 +156,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     initialForgeType,
     initialForgeBaseUrl,
     initialHasForgeToken = false,
-    initialProjectId: _initialProjectId,
+    initialProjectId,
     initialAgentConfig = null,
   } = props;
 
@@ -460,6 +507,26 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
                   </div>
                 )}
               </div>
+              {initialProjectId !== undefined && (
+                <div>
+                  <label
+                    htmlFor="project-sandbox-type"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Sandbox type
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+                    Overrides the workspace sandbox type for tasks in this
+                    project.
+                  </p>
+                  <div className="mt-1">
+                    <ProjectSandboxTypeSelect
+                      workspaceId={workspace.id}
+                      projectId={initialProjectId}
+                    />
+                  </div>
+                </div>
+              )}
               <hr />
               <h2 className="text-lg font-medium mb-1">
                 Workflow Configuration

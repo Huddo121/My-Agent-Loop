@@ -4,6 +4,7 @@ export { FakeForgeSecretRepository } from "./FakeForgeSecretRepository";
 export { FakeLiveEventsSseRegistry } from "./FakeLiveEventsSseRegistry";
 export { FakeProjectsService } from "./FakeProjectsService";
 export { FakeRunsService } from "./FakeRunsService";
+export { FakeSandboxTypeConfigRepository } from "./FakeSandboxTypeConfigRepository";
 export { FakeTaskQueue } from "./FakeTaskQueue";
 export { FakeWorkspaceMembershipsService } from "./FakeWorkspaceMembershipsService";
 export { FakeWorkspacesService } from "./FakeWorkspacesService";

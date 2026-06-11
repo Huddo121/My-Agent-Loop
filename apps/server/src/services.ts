@@ -41,6 +41,13 @@ import {
   DockerSandboxService,
   type SandboxService,
 } from "./sandbox/SandboxService";
+import { CloudHypervisorAdapter } from "./sandbox/vm/CloudHypervisorAdapter";
+import { VfkitAdapter } from "./sandbox/vm/VfkitAdapter";
+import { VmSandboxService } from "./sandbox/vm/VmSandboxService";
+import {
+  DatabaseSandboxTypeConfigRepository,
+  type SandboxTypeConfigRepository,
+} from "./sandbox-config";
 import { DatabaseTaskQueue, type TaskQueue } from "./task-queue";
 import {
   DefaultUserOAuthCredentialRepository,
@@ -67,6 +74,8 @@ export interface Services {
   taskQueue: TaskQueue;
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  vmSandboxService: SandboxService;
+  sandboxTypeConfigRepository: SandboxTypeConfigRepository;
   gitService: GitService;
   workflowQueues: WorkflowQueues;
   workflowManager: WorkflowManager;
@@ -110,6 +119,11 @@ const taskQueue = new DatabaseTaskQueue();
 const driverRunTokenStore = new InMemoryDriverRunTokenStore();
 const agentHarnessConfigRepository = new DatabaseAgentHarnessConfigRepository();
 const workspaceMembershipsService = new DatabaseWorkspaceMembershipsService();
+
+// Logger is defined here (ahead of the services that need it at construction time) because
+// module-level const declarations are evaluated top-to-bottom.
+const logger: Logger = ConsoleLogger;
+
 const envHarnessAuthService = new EnvHarnessAuthService({
   OPENROUTER_API_KEY: env.OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
@@ -121,6 +135,7 @@ const harnessAuthService = new CompositeHarnessAuthService(
   envHarnessAuthService,
   userOAuthCredentialRepository,
   openAiCodexProvider,
+  logger,
 );
 const workspacesService = new DatabaseWorkspacesService(
   agentHarnessConfigRepository,
@@ -161,10 +176,41 @@ const workflowManager = new DatabaseWorkflowManager(
   agentHarnessConfigRepository,
 );
 
+// Choose the VMM adapter for the current platform. VfkitAdapter uses Apple's Virtualization.framework
+// on macOS (no separate virtiofsd); CloudHypervisorAdapter uses KVM + virtiofsd on Linux.
+const vmPlatformAdapter =
+  process.platform === "darwin"
+    ? new VfkitAdapter(env.VFKIT_PATH)
+    : new CloudHypervisorAdapter(env.CLOUD_HYPERVISOR_PATH, env.VIRTIOFSD_PATH);
+
+const sandboxTypeConfigRepository = new DatabaseSandboxTypeConfigRepository();
+
+// VM path env vars are optional — VM sandbox support may not be configured on all deployments.
+// VmSandboxService accepts undefined here and throws a descriptive error at createNewSandbox time
+// if a run actually requests a VM sandbox without the paths being set.
+const vmSandboxService = new VmSandboxService(
+  vmPlatformAdapter,
+  env.VM_KERNEL_PATH,
+  env.VM_ROOTFS_PATH,
+  env.VM_INITRD_PATH,
+  logger,
+  {
+    // Linux-only TAP/MAC wiring for cloud-hypervisor; vfkit ignores this and uses vmnet NAT.
+    // CloudHypervisorAdapter fails fast at startVmm time when the TAP device is missing, rather
+    // than booting a VM with no NIC that the in-guest driver can never reach the host from.
+    networkConfig: {
+      tapDevice: env.VM_TAP_DEVICE,
+      mac: env.VM_MAC,
+    },
+  },
+);
+
 const workflowExecutionService = new WorkflowExecutionService(
   taskQueue,
   gitService,
   sandboxService,
+  vmSandboxService,
+  sandboxTypeConfigRepository,
   fileSystemService,
   harnesses,
   agentHarnessConfigRepository,
@@ -173,9 +219,23 @@ const workflowExecutionService = new WorkflowExecutionService(
   forgeSecretRepository,
   driverRunTokenStore,
   liveEventsService,
+  logger,
   {
-    mcpServerUrl: env.MCP_SERVER_URL,
-    driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+    docker: {
+      mcpServerUrl: env.MCP_SERVER_URL,
+      driverHostApiBaseUrl: env.DRIVER_HOST_API_BASE_URL,
+    },
+    // The in-VM guest cannot reach host.docker.internal (that's a Docker networking alias, not
+    // available inside a VM). It reaches the host via the bridge/NAT gateway IP instead. That IP is
+    // platform-specific and has no default, so VM endpoints only exist once the operator sets
+    // VM_HOST_BRIDGE_IP; otherwise the VM run path reports a clear "not configured" error.
+    vm:
+      env.VM_HOST_BRIDGE_IP === undefined
+        ? undefined
+        : {
+            mcpServerUrl: `http://${env.VM_HOST_BRIDGE_IP}:3050/mcp`,
+            driverHostApiBaseUrl: `http://${env.VM_HOST_BRIDGE_IP}:${env.PORT}`,
+          },
   },
 );
 
@@ -193,13 +253,13 @@ const backgroundWorkflowProcessor = new BackgroundWorkflowProcessor(
   agentHarnessConfigRepository,
 );
 
-const logger: Logger = ConsoleLogger;
-
 export const services: Services = {
   db,
   taskQueue,
   driverRunTokenStore,
   sandboxService,
+  vmSandboxService,
+  sandboxTypeConfigRepository,
   gitService,
   workflowManager,
   workflowExecutionService,

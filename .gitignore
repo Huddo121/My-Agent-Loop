@@ -10,6 +10,12 @@ node_modules/
 .vite/
 .devloop/
 
+# VM rootfs build artifacts (multi-GB disk image + kernel), produced by pnpm vm:build-rootfs
+.vm/
+
+# Transient runtime lock from the agent harness's scheduled-task mechanism
+.claude/scheduled_tasks.lock
+
 *.log
 
 .env

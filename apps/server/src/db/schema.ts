@@ -220,6 +220,33 @@ export const agentHarnessConfigurationTable = pg.pgTable(
   }),
 );
 
+export const sandboxTypeEnum = pg.pgEnum("sandbox_type", ["docker", "vm"]);
+
+/** One row per workspace or project. Exactly one of the FKs is non-null. */
+export const sandboxTypeConfigurationTable = pg.pgTable(
+  "sandbox_type_configuration",
+  {
+    id: pg.uuid().primaryKey().default(sql`uuidv7()`),
+    workspaceId: pg
+      .uuid()
+      .references(() => workspacesTable.id)
+      .unique()
+      .$type<WorkspaceId>(),
+    projectId: pg
+      .uuid()
+      .references(() => projectsTable.id)
+      .unique()
+      .$type<ProjectId>(),
+    sandboxType: sandboxTypeEnum().notNull(),
+  },
+  (table) => ({
+    exactlyOneTarget: check(
+      "sandbox_type_config_exactly_one_target",
+      sql`(num_nonnulls(${table.workspaceId}, ${table.projectId}) = 1)`,
+    ),
+  }),
+);
+
 export const runStateEnum = pg.pgEnum("run_state", [
   /** The run record is created, but not yet picked up for processing by a worker */
   "pending",

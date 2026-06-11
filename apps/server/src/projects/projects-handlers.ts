@@ -25,6 +25,7 @@ import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
 import { ProtectedString } from "../utils/ProtectedString";
 import { withNewTransaction } from "../utils/transaction-context";
+import { projectSandboxTypeHandlers } from "./project-sandbox-type-handlers";
 
 type WorkspaceProjectsApi =
   MyAgentLoopApi["workspaces"]["children"][":workspaceId"]["children"]["projects"];
@@ -281,6 +282,7 @@ export const projectsHandlers: HonoHandlersFor<
       });
     },
     tasks: tasksHandlers,
+    "sandbox-type": projectSandboxTypeHandlers,
     "test-forge-connection": async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
       const authSession = await requireAuthSession(ctx.hono.req.raw);

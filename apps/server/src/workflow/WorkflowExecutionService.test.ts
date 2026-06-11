@@ -40,6 +40,7 @@ import type {
   WaitForSandboxToFinishSuccess,
 } from "../sandbox/SandboxService";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
+import { FakeSandboxTypeConfigRepository } from "../test-fakes/FakeSandboxTypeConfigRepository";
 import { FakeWorkspaceMembershipsService } from "../test-fakes/FakeWorkspaceMembershipsService";
 import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
@@ -140,8 +141,14 @@ describe("WorkflowExecutionService", () => {
       driverRunTokenStore,
       sandboxService,
       workflowExecutionOptions: {
-        mcpServerUrl: "http://host.docker.internal:3050/mcp",
-        driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        docker: {
+          mcpServerUrl: "http://host.docker.internal:3050/mcp",
+          driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        },
+        vm: {
+          mcpServerUrl: "http://192.168.100.1:3050/mcp",
+          driverHostApiBaseUrl: "http://192.168.100.1:3000",
+        },
       },
     });
 
@@ -363,6 +370,208 @@ describe("WorkflowExecutionService", () => {
     expect(driverRunTokenStore.lastIssuedToken).toBeUndefined();
   });
 
+  it("routes to the vm sandbox service when the project resolves to vm", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    await sandboxTypeConfig.setProjectConfig("project-vm" as ProjectId, "vm");
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-vm"),
+      createTask("task-vm"),
+      createProject("project-vm"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    // The vm service should have been selected: it created the sandbox and waited
+    expect(vmSandboxService.lastDriverCliArgs).not.toBe("");
+    // The docker service should not have been used
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
+  it("routes to the vm sandbox service when only the workspace resolves to vm", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    // No project-level config — the workspace tier must drive the selection.
+    await sandboxTypeConfig.setWorkspaceConfig(
+      "workspace-1" as WorkspaceId,
+      "vm",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-workspace-vm"),
+      createTask("task-workspace-vm"),
+      createProject("project-workspace-vm"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(vmSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
+  it("fails a vm run with a clear error when VM host endpoints are not configured", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      { success: true, value: { exitCode: 0, reason: "completed" } },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    await sandboxTypeConfig.setProjectConfig(
+      "project-vm-unconfigured" as ProjectId,
+      "vm",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+      // VM host IP not configured (VM_HOST_BRIDGE_IP unset): the VM run must be rejected up front
+      // rather than dialing a bogus host the in-guest driver cannot reach.
+      workflowExecutionOptions: {
+        docker: {
+          mcpServerUrl: "http://host.docker.internal:3050/mcp",
+          driverHostApiBaseUrl: "http://host.docker.internal:3000",
+        },
+        vm: undefined,
+      },
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-vm-unconfigured"),
+      createTask("task-vm-unconfigured"),
+      createProject("project-vm-unconfigured"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.message).toContain("VM_HOST_BRIDGE_IP");
+    }
+    // The run must be rejected before either sandbox service is engaged.
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+    expect(dockerSandboxService.lastDriverCliArgs).toBe("");
+  });
+
+  it("routes to the docker sandbox service when neither project nor workspace is configured", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    // Empty config — resolveSandboxType must fall back to the "docker" default.
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-default-docker"),
+      createTask("task-default-docker"),
+      createProject("project-default-docker"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(dockerSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+  });
+
+  it("lets a project docker override beat a workspace vm setting", async () => {
+    const driverRunTokenStore = new RecordingDriverRunTokenStore();
+    const dockerSandboxService = new RecordingSandboxService(
+      driverRunTokenStore,
+      {
+        success: true,
+        value: { exitCode: 0, reason: "completed" },
+      },
+    );
+    const vmSandboxService = new RecordingSandboxService(driverRunTokenStore, {
+      success: true,
+      value: { exitCode: 0, reason: "completed" },
+    });
+    const sandboxTypeConfig = new FakeSandboxTypeConfigRepository();
+    // Project says docker, workspace says vm — the project tier must win.
+    await sandboxTypeConfig.setWorkspaceConfig(
+      "workspace-1" as WorkspaceId,
+      "vm",
+    );
+    await sandboxTypeConfig.setProjectConfig(
+      "project-precedence" as ProjectId,
+      "docker",
+    );
+
+    const service = createService({
+      driverRunTokenStore,
+      sandboxService: dockerSandboxService,
+      vmSandboxService,
+      sandboxTypeConfig,
+    });
+
+    const result = await service.executeWorkflow(
+      createRunId("run-precedence"),
+      createTask("task-precedence"),
+      createProject("project-precedence"),
+      createWorkflow(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(dockerSandboxService.lastDriverCliArgs).not.toBe("");
+    expect(vmSandboxService.lastDriverCliArgs).toBe("");
+  });
+
   it("allows Codex to use env fallback auth when no workspace creator is recorded", async () => {
     const driverRunTokenStore = new RecordingDriverRunTokenStore();
     const sandboxService = new RecordingSandboxService(driverRunTokenStore, {
@@ -402,6 +611,8 @@ describe("WorkflowExecutionService", () => {
 function createService(options: {
   driverRunTokenStore: DriverRunTokenStore;
   sandboxService: SandboxService;
+  vmSandboxService?: SandboxService;
+  sandboxTypeConfig?: FakeSandboxTypeConfigRepository;
   harness?: AgentHarness;
   harnessConfigRepository?: AgentHarnessConfigRepository;
   harnessAuthService?: RecordingHarnessAuthService;
@@ -412,6 +623,8 @@ function createService(options: {
     createTaskQueue(),
     createGitService(),
     options.sandboxService,
+    options.vmSandboxService ?? options.sandboxService,
+    options.sandboxTypeConfig ?? new FakeSandboxTypeConfigRepository(),
     createFileSystemService(),
     [options.harness ?? createHarness()],
     options.harnessConfigRepository ?? createHarnessConfigRepository(),
@@ -420,7 +633,20 @@ function createService(options: {
     createForgeSecretRepository(),
     options.driverRunTokenStore,
     createLiveEventsService(),
-    options.workflowExecutionOptions,
+    { error() {}, warn() {}, info() {}, debug() {} },
+    // Default to configured VM endpoints so sandbox-routing tests exercise the VM path; the
+    // production default leaves vm undefined (no platform-agnostic host IP), which would otherwise
+    // make every VM-routing test hit the "not configured" guard.
+    options.workflowExecutionOptions ?? {
+      docker: {
+        mcpServerUrl: "http://host.docker.internal:3050/mcp",
+        driverHostApiBaseUrl: "http://host.docker.internal:3000",
+      },
+      vm: {
+        mcpServerUrl: "http://192.168.64.1:3050/mcp",
+        driverHostApiBaseUrl: "http://192.168.64.1:3000",
+      },
+    },
   );
 }
 

@@ -6,6 +6,7 @@ import {
   MAL_TASK_ID_HEADER,
 } from "./harness/OpenCodeHarness";
 import { projectsMcpTools } from "./projects/projects-mcp-handlers";
+import { sandboxMcpTools } from "./sandbox-config/sandbox-mcp-handlers";
 import type { Services } from "./services";
 import { tasksMcpTools } from "./tasks/tasks-mcp-handlers";
 import { withMcpServices } from "./utils/mcp-service-context";
@@ -48,6 +49,7 @@ const mcpServer = new FastMCP<McpSessionData>({
 mcpServer.addTools(tasksMcpTools);
 mcpServer.addTools(projectsMcpTools);
 mcpServer.addTools(forgeMcpTools);
+mcpServer.addTools(sandboxMcpTools);
 
 export const startMcp = (services: Services) =>
   withMcpServices(services, () =>

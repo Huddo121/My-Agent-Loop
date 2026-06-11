@@ -1,5 +1,10 @@
 import http from "node:http";
 
+// The VMM REST APIs answer locally and immediately; a request that takes this long means the VMM
+// is wedged. Bounding it matters most for shutdownVm — stopSandbox awaits that call before its
+// 30s force-kill grace period starts, so an unbounded hang here would stall teardown forever.
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+
 /**
  * Makes an HTTP request over a Unix domain socket.
  *
@@ -12,6 +17,7 @@ export function unixSocketRequest(
   method: string,
   path: string,
   body?: unknown,
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const bodyStr = body !== undefined ? JSON.stringify(body) : undefined;
@@ -62,6 +68,16 @@ export function unixSocketRequest(
     });
 
     req.on("error", reject);
+
+    // Destroying the request makes it emit "error" with the passed reason, which rejects above.
+    // Covers both a connect that never completes and a response that never arrives.
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(
+        new Error(
+          `Unix socket HTTP ${method} ${path} timed out after ${timeoutMs}ms`,
+        ),
+      );
+    });
 
     if (bodyStr !== undefined) {
       req.write(bodyStr);

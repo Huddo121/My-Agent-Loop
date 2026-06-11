@@ -494,6 +494,8 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
 // the "exit" event, the stdout/stderr streams it attaches log forwarding to, and kill().
 class FakeVmmProcess extends EventEmitter {
   exitCode: number | null = null;
+  // Like a real ChildProcess: stays null unless the process died from a signal.
+  signalCode: NodeJS.Signals | null = null;
   readonly stdout = new EventEmitter();
   readonly stderr = new EventEmitter();
   killSignal: NodeJS.Signals | number | undefined;
@@ -507,6 +509,12 @@ class FakeVmmProcess extends EventEmitter {
   simulateExit(code: number): void {
     this.exitCode = code;
     this.emit("exit", code);
+  }
+
+  // Mirrors a signal death: Node leaves exitCode null and sets signalCode instead.
+  simulateSignalExit(signal: NodeJS.Signals): void {
+    this.signalCode = signal;
+    this.emit("exit", null, signal);
   }
 }
 
@@ -667,6 +675,18 @@ describe("VmSandboxService lifecycle", () => {
       });
     });
 
+    it("returns container-not-running when the VMM was signal-killed before waiting", async () => {
+      const { service, vmmProcesses } = makeService();
+      const { sandbox } = await addSandbox(service);
+      // A signal death leaves exitCode null; only signalCode reveals the process is gone.
+      vmmProcesses[0].simulateSignalExit("SIGKILL");
+      const result = await service.waitForSandboxToFinish(sandbox.id);
+      expect(result).toEqual({
+        success: false,
+        error: { reason: "container-not-running" },
+      });
+    });
+
     it("reports completed with the guest exit code when the guest recorded 0", async () => {
       const { service, vmmProcesses } = makeService();
       const { sandbox, tmpDir } = await addSandbox(service);
@@ -750,6 +770,19 @@ describe("VmSandboxService lifecycle", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("resolves promptly when the VMM was signal-killed, without waiting out the grace period", async () => {
+      // Regression: checking exitCode alone misses signal deaths, so stop would attach an exit
+      // listener to a process that already exited and eat the full 30s grace period (the test
+      // would then fail by exceeding its own timeout).
+      const { service, vmmProcesses, calls } = makeService();
+      const { sandbox } = await addSandbox(service);
+      vmmProcesses[0].simulateSignalExit("SIGKILL");
+      await service.stopSandbox(sandbox.id);
+      expect(calls.shutdown).toBe(1);
+      // Already dead — no further kill attempt.
+      expect(vmmProcesses[0].killSignal).toBeUndefined();
     });
 
     it("force-kills the VMM when it does not exit within the grace period", async () => {

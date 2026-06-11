@@ -225,6 +225,15 @@ export function generateVmMountSetupScript(
 }
 
 /**
+ * Whether the child process has already terminated, however it terminated. Node leaves exitCode
+ * null when a process dies from a signal (signalCode is set instead), so checking exitCode alone
+ * misses signal-killed VMMs — and then waits on an "exit" event that already fired.
+ */
+function hasProcessExited(process: ChildProcess): boolean {
+  return process.exitCode !== null || process.signalCode !== null;
+}
+
+/**
  * Reads the lifecycle exit code the guest wrote to the shared dir before powering off.
  * Returns undefined when the file is missing or unparseable (the run did not finish normally).
  */
@@ -440,10 +449,14 @@ export class VmSandboxService implements SandboxService {
 
     // Check whether the VMM process has already exited — that would mean the VM
     // was never in a startable state (e.g. failed to spawn).
-    if (state.vmmProcess.exitCode !== null) {
+    if (hasProcessExited(state.vmmProcess)) {
       this.logger.warn(
         "Could not start VM sandbox, VMM process already exited",
-        { sandboxId: id, exitCode: state.vmmProcess.exitCode },
+        {
+          sandboxId: id,
+          exitCode: state.vmmProcess.exitCode,
+          signalCode: state.vmmProcess.signalCode,
+        },
       );
       return {
         success: false,
@@ -502,12 +515,13 @@ export class VmSandboxService implements SandboxService {
     // If the process already exited before we started waiting, treat it as not-running.
     // This mirrors Docker's behaviour of returning container-not-running when the container
     // is in "exited" state before wait() is called.
-    if (state.vmmProcess.exitCode !== null) {
+    if (hasProcessExited(state.vmmProcess)) {
       this.releaseSandboxResources(id, state);
       this.knownSandboxes.delete(id);
       this.logger.warn("VM sandbox already exited before wait started", {
         sandboxId: id,
         exitCode: state.vmmProcess.exitCode,
+        signalCode: state.vmmProcess.signalCode,
       });
       return { success: false, error: { reason: "container-not-running" } };
     }
@@ -565,7 +579,7 @@ export class VmSandboxService implements SandboxService {
 
     // Step 2: wait up to 30 s for the VMM process to exit on its own.
     await new Promise<void>((resolve) => {
-      if (state.vmmProcess.exitCode !== null) {
+      if (hasProcessExited(state.vmmProcess)) {
         resolve();
         return;
       }
@@ -581,7 +595,7 @@ export class VmSandboxService implements SandboxService {
     });
 
     // Step 3: force-kill if still running after the grace period.
-    if (state.vmmProcess.exitCode === null) {
+    if (!hasProcessExited(state.vmmProcess)) {
       try {
         state.vmmProcess.kill("SIGKILL");
       } catch (error) {

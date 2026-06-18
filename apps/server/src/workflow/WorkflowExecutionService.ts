@@ -276,6 +276,7 @@ export class WorkflowExecutionService {
     };
 
     const sandbox = await this.sandboxService.createNewSandbox({
+      workingDirectory: taskTempDirectory,
       volumes,
       env,
     });

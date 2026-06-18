@@ -42,6 +42,12 @@ const envSchema = z
     DRIVER_HOST_API_BASE_URL: z.string().url().optional(),
     BETTER_AUTH_SECRET: z.string().nonempty(),
 
+    // Host directory that per-run working directories (repo checkout, task.txt,
+    // harness config, lifecycle.sh) are created under. When the server runs in a
+    // container this must be a host path mounted in at the identical path, so the
+    // bind mounts the server requests for each sandbox resolve on the host.
+    MAL_RUNS_DIR: z.string().nonempty().default("./.devloop/runs"),
+
     OPENROUTER_API_KEY: harnessKey("OpenRouterApiKey"),
     ANTHROPIC_API_KEY: harnessKey("AnthropicApiKey"),
     CURSOR_API_KEY: harnessKey("CursorApiKey"),

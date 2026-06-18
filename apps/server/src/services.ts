@@ -9,7 +9,10 @@ import {
   InMemoryDriverRunTokenStore,
 } from "./driver-api/DriverRunTokenStore";
 import { env } from "./env";
-import type { RelativeFilePath } from "./file-system/FilePath";
+import type {
+  AbsoluteFilePath,
+  RelativeFilePath,
+} from "./file-system/FilePath";
 import { LocalFileSystemService } from "./file-system/FileSystemService";
 import {
   DefaultForgeSecretRepository,
@@ -130,8 +133,10 @@ const projectsService = new DatabaseProjectService(
   agentHarnessConfigRepository,
 );
 
+// MAL_RUNS_DIR may be absolute (prod, mounted at an identical host path) or
+// relative (dev default); LocalFileSystemService resolves either via isAbsolute.
 const fileSystemService = new LocalFileSystemService(
-  "./.devloop/runs" as RelativeFilePath,
+  env.MAL_RUNS_DIR as RelativeFilePath | AbsoluteFilePath,
 );
 
 const runsService = new DatabaseRunsService();

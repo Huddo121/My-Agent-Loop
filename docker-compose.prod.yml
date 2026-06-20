@@ -41,9 +41,13 @@ volumes:
 
 services:
   server:
+    # The build context is the prepared pnpm deploy bundle, not the repo root.
+    # Prepare it on the host before `docker compose -f docker-compose.prod.yml build`:
+    #   pnpm --filter @mono/server build
+    #   pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
     build:
-      context: .
-      dockerfile: apps/server/Dockerfile # NOTE: this Dockerfile does not exist yet (pending)
+      context: apps/server/deploy
+      dockerfile: ../Dockerfile
     restart: unless-stopped
     depends_on:
       my-agent-loop-db:

@@ -19,5 +19,8 @@ node_modules/
 .pnpm-store/
 *.tsbuildinfo
 
+# Prepared pnpm deploy bundle used as the server image build context
+apps/server/deploy/
+
 
 .moon/cache

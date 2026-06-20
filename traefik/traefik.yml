@@ -12,7 +12,7 @@ entryPoints:
 
 providers:
   file:
-    filename: /etc/traefik/dynamic.yml
+    filename: /tmp/dynamic.yml
     watch: true
 
 certificatesResolvers:

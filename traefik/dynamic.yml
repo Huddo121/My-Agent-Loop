@@ -3,7 +3,7 @@ http:
     block-internal:
       entryPoints:
         - websecure
-      rule: "Path(`/api/internal`) || PathPrefix(`/api/internal/`)"
+      rule: "Host(`${APP_DOMAIN}`) && (Path(`/api/internal`) || PathPrefix(`/api/internal/`))"
       priority: 300
       middlewares:
         - deny-internal
@@ -14,7 +14,7 @@ http:
     api:
       entryPoints:
         - websecure
-      rule: "PathPrefix(`/api`)"
+      rule: "Host(`${APP_DOMAIN}`) && PathPrefix(`/api`)"
       priority: 200
       service: server
       tls:
@@ -23,7 +23,7 @@ http:
     frontend:
       entryPoints:
         - websecure
-      rule: "PathPrefix(`/`)"
+      rule: "Host(`${APP_DOMAIN}`) && PathPrefix(`/`)"
       priority: 100
       service: frontend
       tls:

@@ -34,8 +34,10 @@ The jobs:
 - **Lint & format** — `pnpm check` (Biome).
 - **Typecheck** — `pnpm typecheck`.
 - **Tests** — `pnpm test`. The frontend runs Storybook stories in a real
-  Chromium via Playwright, so the job installs that browser first
-  (`playwright install --with-deps chromium`).
+  Chromium via Playwright, so the job runs inside the official Playwright
+  container image (browsers and their system libraries preinstalled). The image
+  tag tracks the `playwright` version in `apps/frontend`; downloading the
+  browser per run stalled intermittently on the runner's network and apt locks.
 - **Native build allow-list** — `pnpm check:native-builds` (see below).
 - **Moon sync** — `pnpm sync` followed by `git diff --exit-code`, mirroring the
   `sync-agents` drift check, so committed tsconfig project references can't go

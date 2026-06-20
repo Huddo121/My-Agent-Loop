@@ -11,9 +11,9 @@
 #   - A host runs directory exists and is exported as MAL_RUNS_DIR (see below)
 #   - A .env file beside this compose provides the ${...} secrets referenced here
 #
-# Reverse proxy (Traefik) and the frontend service are intentionally NOT in this
-# file yet — they're the separate reverse-proxy-and-deploy plan. This file is
-# scoped to the server + datastores and the two-network isolation topology.
+# Traefik is the only service that publishes host ports. The server, static
+# frontend, datastores, and sandbox containers are reachable only on their
+# Docker networks.
 
 name: my-agent-loop
 
@@ -38,8 +38,38 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  letsencrypt:
 
 services:
+  traefik:
+    image: traefik:v3.5
+    restart: unless-stopped
+    depends_on:
+      - server
+      - frontend-static
+    networks:
+      - mal-sandbox-net
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      # lego's Cloudflare provider reads this scoped Zone:DNS:Edit token.
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+    volumes:
+      - ./traefik:/etc/traefik:ro
+      - letsencrypt:/letsencrypt
+    entrypoint:
+      - /bin/sh
+      - /etc/traefik/render-static-config.sh
+
+  frontend-static:
+    build:
+      context: apps/frontend
+    restart: unless-stopped
+    networks:
+      - mal-sandbox-net
+
   server:
     # The build context is the prepared pnpm deploy bundle, not the repo root.
     # Prepare it on the host before `docker compose -f docker-compose.prod.yml build`:
@@ -73,8 +103,6 @@ services:
       # here. It MUST be a host path mounted into this container at the SAME
       # absolute path (see volumes below) so the bind mounts the server asks the
       # host daemon to make for each sandbox resolve on the host, not in here.
-      # NOTE: SandboxService/FileSystemService must read this (pending) — today
-      # the runs dir is hard-coded to ./.devloop/runs in services.ts.
       MAL_RUNS_DIR: ${MAL_RUNS_DIR}
     volumes:
       # The server creates sibling sandbox containers via the host Docker daemon.

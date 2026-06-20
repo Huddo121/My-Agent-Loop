@@ -10,13 +10,13 @@ todos:
     status: completed
   - id: traefik_static
     content: Add traefik/traefik.yml (static config) - entrypoints (web, websecure), file provider, single ACME resolver using Cloudflare DNS-01 for the apex
-    status: pending
+    status: completed
   - id: traefik_dynamic
     content: Add traefik/dynamic.yml (file provider) - the deny-internal middleware plus apex routers/services for /api/* -> server and / -> frontend
-    status: pending
+    status: completed
   - id: compose
     content: "Update docker-compose.yml: add traefik + server + frontend-static services, attach production services to shared internal/proxy networks, remove the host port bindings on db/redis/adminer (move dev-only bindings to a docker-compose.dev.yml), and avoid Traefik docker labels"
-    status: pending
+    status: completed
   - id: env_docs
     content: Document required production env vars (APP_BASE_URL, MCP_SERVER_URL, DRIVER_HOST_API_BASE_URL, ACME_EMAIL, CF_DNS_API_TOKEN) and update apps/server/src/env.ts comments to flag host.docker.internal as a dev-only default
     status: pending

@@ -5,7 +5,6 @@ import * as esbuild from "esbuild";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outdir = path.join(here, "dist");
-const outfile = path.join(outdir, "index.js");
 
 fs.rmSync(outdir, { recursive: true, force: true });
 fs.mkdirSync(outdir, { recursive: true });
@@ -23,12 +22,18 @@ const workspaceSrc = (pkg) =>
 // pulls in native .node addons (ssh2, cpu-features) and some validation
 // libraries dynamically import optional packages that aren't installed.
 await esbuild.build({
-  entryPoints: [path.join(here, "src", "index.ts")],
+  // Two entrypoints: the server (index.js) and the standalone one-shot DB
+  // migrator (migrate.js). The migrate container reuses this same image and
+  // runs `node dist/migrate.js`, so the migrator must be bundled here too.
+  entryPoints: {
+    index: path.join(here, "src", "index.ts"),
+    migrate: path.join(here, "src", "db", "migrate.ts"),
+  },
   bundle: true,
   platform: "node",
   target: "node24",
   format: "esm",
-  outfile,
+  outdir,
   packages: "external",
   alias: {
     "@mono/api": workspaceSrc("api"),
@@ -50,4 +55,11 @@ fs.copyFileSync(
   path.join(outdir, "lifecycle.sh"),
 );
 
-console.log(`Bundled to ${outfile}`);
+// The committed SQL migrations are read at runtime by dist/migrate.js relative
+// to its own URL, so copy the whole drizzle/ tree (SQL + meta) next to it. This
+// keeps raw TypeScript and the drizzle-kit CLI out of the production image.
+fs.cpSync(path.join(here, "drizzle"), path.join(outdir, "drizzle"), {
+  recursive: true,
+});
+
+console.log(`Bundled to ${outdir}`);

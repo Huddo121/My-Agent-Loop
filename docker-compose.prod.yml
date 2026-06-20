@@ -71,11 +71,37 @@ services:
     networks:
       - mal-sandbox-net
 
+  # One-shot forward migrator. Reuses the exact server image (it bundles
+  # dist/migrate.js and the committed drizzle/ migrations) so there is no second
+  # image to keep in sync. The `tools` profile keeps it out of a plain
+  # `docker compose up`; the deployer runs it explicitly after Postgres is
+  # healthy and before replacing the app containers:
+  #   docker compose -f docker-compose.prod.yml run --rm migrate
+  migrate:
+    image: my-agent-loop-server
+    build:
+      context: apps/server/deploy
+      dockerfile: ../Dockerfile
+    profiles: ["tools"]
+    restart: "no"
+    command: ["node", "dist/migrate.js"]
+    depends_on:
+      my-agent-loop-db:
+        condition: service_healthy
+    networks:
+      - app-net
+    environment:
+      # The migrator needs only the database location, nothing else from the
+      # server env. Keep its blast radius small.
+      DATABASE_URL: postgres://my_agent_loop:${POSTGRES_PASSWORD}@my-agent-loop-db:5432/my_agent_loop
+
   server:
     # The build context is the prepared pnpm deploy bundle, not the repo root.
     # Prepare it on the host before `docker compose -f docker-compose.prod.yml build`:
     #   pnpm --filter @mono/server build
     #   pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
+    # Named explicitly so the `migrate` service can reuse the same built image.
+    image: my-agent-loop-server
     build:
       context: apps/server/deploy
       dockerfile: ../Dockerfile

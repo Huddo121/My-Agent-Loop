@@ -24,4 +24,8 @@ COPY . .
 # both on internal networks rather than publishing them.
 EXPOSE 3000 3050
 
+# Default command runs the server. The same image also bundles the one-shot
+# forward migrator (dist/migrate.js + dist/drizzle); the compose `migrate`
+# service overrides the command to `node dist/migrate.js` to apply migrations
+# before the server starts. See docs/decisions/production-migrations.md.
 CMD ["node", "dist/index.js"]

@@ -48,11 +48,11 @@ Create the production environment file and replace every placeholder:
 
 ```bash
 cp .env.example .env
-mkdir -p /srv/my-agent-loop/runs
-chmod 700 /srv/my-agent-loop/runs
+mkdir -p /home/services/mal/runs
+chmod 700 /home/services/mal/runs
 ```
 
-Required values are `APP_BASE_URL`, `MCP_SERVER_URL`,
+Required values are `MAL_IMAGE_TAG`, `APP_BASE_URL`, `MCP_SERVER_URL`,
 `DRIVER_HOST_API_BASE_URL`, `MAL_RUNS_DIR`, `POSTGRES_PASSWORD`,
 `BETTER_AUTH_SECRET`, `FORGE_ENCRYPTION_KEY`,
 `OAUTH_CREDENTIALS_ENCRYPTION_KEY`, `ACME_EMAIL`, and `CF_DNS_API_TOKEN`.
@@ -60,29 +60,51 @@ Keep the two encryption keys distinct. The example uses service DNS for MCP and
 driver-host traffic; do not replace those production URLs with
 `host.docker.internal`.
 
-### Build and start
+### Deploy (pull prebuilt images)
 
-Production Dockerfiles package prebuilt artifacts; they do not compile source.
-From the repository root:
+The host runs immutable images pulled from GHCR; it never builds from source.
+The `Publish production` workflow builds linux/amd64 images tagged with the
+commit SHA. Set `MAL_IMAGE_TAG` in `.env` to that SHA, then pull and start the
+datastores:
+
+```bash
+docker compose -f docker-compose.prod.yml config   # validates required env
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d my-agent-loop-db my-agent-loop-redis
+```
+
+The server creates agent sandboxes from `MAL_SANDBOX_IMAGE`, which the compose
+file pins to the same SHA. VM sandboxes additionally need the rootfs and kernel
+from `my-agent-loop-sandbox-vm:<sha>` extracted into the host VM cache directory
+that `VM_ROOTFS_PATH` / `VM_KERNEL_PATH` point at.
+
+<details>
+<summary>Local smoke test without GHCR</summary>
+
+To exercise the production compose against locally built images, build and tag
+the image refs and point `MAL_IMAGE_TAG` at that tag (then skip `pull`):
 
 ```bash
 pnpm install --frozen-lockfile
+export MAL_IMAGE_TAG=local
 
-# The server image copies a production pnpm deploy bundle.
+# Server: packaging-only image over a prepared pnpm deploy bundle.
 pnpm --filter @mono/server build
 rm -rf apps/server/deploy
 pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
+docker build -f apps/server/Dockerfile \
+  -t ghcr.io/huddo121/my-agent-loop-server:local apps/server/deploy
 
-# The frontend image copies the static SPA output.
+# Frontend: static SPA over nginx.
 pnpm --filter @mono/frontend build
+docker build -t ghcr.io/huddo121/my-agent-loop-frontend:local apps/frontend
 
-# Sandboxes are created from this separate host image through docker.sock.
-pnpm docker:build
-
-docker compose -f docker-compose.prod.yml config
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d my-agent-loop-db my-agent-loop-redis
+# Docker sandbox image (prebuilt Linux driver first).
+pnpm driver:build:linux
+docker build -t ghcr.io/huddo121/my-agent-loop-sandbox:local .
 ```
+
+</details>
 
 Apply the committed migrations before starting the server. The one-shot
 `migrate` service runs inside the private `app-net` using the same server image

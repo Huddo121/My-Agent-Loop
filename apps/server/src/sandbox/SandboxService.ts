@@ -80,6 +80,10 @@ export class DockerSandboxService implements SandboxService {
   constructor(
     private readonly docker: Dockerode,
     private readonly dockerLoggingService: DockerLoggingService,
+    // The image agent containers are created from. Resolved from env at the
+    // composition edge (MAL_SANDBOX_IMAGE) rather than hard-coded, so production
+    // can run a published, versioned image instead of a local `my-agent-loop` tag.
+    private readonly sandboxImage: string,
     private readonly sandboxNetworkName: string = DEFAULT_SANDBOX_NETWORK_NAME,
   ) {}
 
@@ -228,7 +232,7 @@ export class DockerSandboxService implements SandboxService {
     await this.ensureSandboxNetwork();
 
     const container = await this.docker.createContainer({
-      Image: "my-agent-loop",
+      Image: this.sandboxImage,
       name: options.containerName,
       Volumes: volumes,
       HostConfig: {

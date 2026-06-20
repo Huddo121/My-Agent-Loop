@@ -62,6 +62,12 @@ const app = createHonoServer(
   services,
 );
 
+// Unauthenticated liveness check. Consumed by the container healthcheck and the
+// production deployer's external HTTPS smoke test, so it must not require a
+// session. It is a liveness probe (the process is up and serving), not a deep
+// readiness check of Postgres/Redis, and reveals nothing sensitive.
+app.get("/api/health", (ctx) => ctx.json({ status: "ok" }));
+
 app.on(["GET", "POST"], "/api/auth/*", async (ctx) => {
   return auth.handler(ctx.req.raw);
 });

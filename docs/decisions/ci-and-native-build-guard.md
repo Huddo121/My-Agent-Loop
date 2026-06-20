@@ -58,6 +58,11 @@ Router `+types` are generated and git-ignored. The root `typecheck` and `test`
 scripts now run a `typegen` step first, so both work identically for a developer
 and in CI.
 
+The `test` script additionally builds the workspace libraries first
+(`build:packages`), because the apps import `@mono/api` / `@mono/driver-api`
+through their built `dist/` entry points — without that step, vitest can't
+resolve those packages on a clean checkout.
+
 ### A native-build guard with explicit classification
 
 Every dependency that declares a gated build script

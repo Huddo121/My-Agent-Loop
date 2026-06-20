@@ -6,6 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@10.8.0",
   "scripts": {
+    "build:packages": "pnpm --filter \"./packages/*\" run build",
     "check": "biome check .",
     "check:fix": "biome check . --write",
     "check:native-builds": "pnpm --filter @mono/scripts check-native-builds",
@@ -41,7 +42,7 @@
     "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
     "sync": "moon sync",
     "sync-agents": "pnpm --filter=@mono/scripts sync-agents",
-    "test": "pnpm typegen && pnpm -r run test",
+    "test": "pnpm build:packages && pnpm typegen && pnpm -r run test",
     "typecheck": "pnpm typegen && tsc --build",
     "typegen": "pnpm --filter @mono/frontend exec react-router typegen"
   },

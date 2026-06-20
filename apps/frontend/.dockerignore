@@ -1,4 +1,6 @@
 .react-router
-build
+build/*
+!build/client/
+!build/client/**
 node_modules
 README.md

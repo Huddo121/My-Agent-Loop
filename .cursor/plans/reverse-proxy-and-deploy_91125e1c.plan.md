@@ -4,10 +4,10 @@ overview: Add Traefik as a reverse proxy in docker-compose with Cloudflare DNS-0
 todos:
   - id: server_image
     content: Add apps/server/Dockerfile as a runtime/packaging image only; build apps/packages outside Docker first, then copy a prepared server deployment artifact into the image
-    status: pending
+    status: completed
   - id: frontend_build
     content: Replace the existing apps/frontend/Dockerfile with a runtime/packaging image that serves prebuilt static SPA assets via nginx with an index.html fallback
-    status: pending
+    status: completed
   - id: traefik_static
     content: Add traefik/traefik.yml (static config) - entrypoints (web, websecure), file provider, single ACME resolver using Cloudflare DNS-01 for the apex
     status: pending

@@ -1,4 +1,6 @@
+import path from "node:path";
 import z from "zod";
+import type { AbsoluteFilePath } from "./file-system/FilePath";
 import type { Branded } from "./utils/Branded";
 import { ProtectedString } from "./utils/ProtectedString";
 
@@ -44,13 +46,29 @@ const envSchema = z
       .enum(["development", "production", "test"])
       .default("development"),
 
+    // Development defaults only. Production must use the public HTTPS origin.
     APP_BASE_URL: z.string().default("http://localhost:5173"),
+    // Sandboxes use host.docker.internal during local development. Production
+    // overrides both URLs with the server's mal-sandbox-net service DNS name.
     MCP_SERVER_URL: z
       .string()
       .url()
       .default("http://host.docker.internal:3050/mcp"),
     DRIVER_HOST_API_BASE_URL: z.string().url().optional(),
     BETTER_AUTH_SECRET: z.string().nonempty(),
+
+    // Host directory that per-run working directories (repo checkout, task.txt,
+    // harness config, lifecycle.sh) are created under. When the server runs in a
+    // container this must be a host path mounted in at the identical path, so the
+    // bind mounts the server requests for each sandbox resolve on the host.
+    MAL_RUNS_DIR: z
+      .string()
+      .nonempty()
+      .default("./.devloop/runs")
+      .transform(
+        (runsDirectory): AbsoluteFilePath =>
+          path.resolve(runsDirectory) as AbsoluteFilePath,
+      ),
 
     OPENROUTER_API_KEY: harnessKey("OpenRouterApiKey"),
     ANTHROPIC_API_KEY: harnessKey("AnthropicApiKey"),

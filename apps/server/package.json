@@ -2,10 +2,14 @@
   "name": "@mono/server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx --env-file=.env.local --env-file-if-exists=.env --env-file-if-exists=.env.portless.local --watch --inspect=0 src/index.ts",
+    "build": "node build.mjs",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
@@ -22,6 +26,7 @@
     "@types/dockerode": "4.0.0",
     "@types/node": "25.0.9",
     "@vitest/ui": "^4.0.18",
+    "esbuild": "0.25.1",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
     "vitest": "^4.0.18"

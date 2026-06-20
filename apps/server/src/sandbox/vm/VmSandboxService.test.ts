@@ -461,6 +461,8 @@ const noopLogger: Logger = {
   debug: () => {},
 };
 
+const testWorkingDirectory = "/tmp/mal-vm-test-run" as AbsoluteFilePath;
+
 describe("VmSandboxService.createNewSandbox — missing path guard", () => {
   it("rejects when all three paths are undefined", async () => {
     const service = new VmSandboxService(
@@ -471,7 +473,11 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
       noopLogger,
     );
     await expect(
-      service.createNewSandbox({ volumes: [], env: {} }),
+      service.createNewSandbox({
+        workingDirectory: testWorkingDirectory,
+        volumes: [],
+        env: {},
+      }),
     ).rejects.toThrow(
       "VM sandbox requires VM_KERNEL_PATH, VM_ROOTFS_PATH and VM_INITRD_PATH to be configured",
     );
@@ -486,7 +492,11 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
       noopLogger,
     );
     await expect(
-      service.createNewSandbox({ volumes: [], env: {} }),
+      service.createNewSandbox({
+        workingDirectory: testWorkingDirectory,
+        volumes: [],
+        env: {},
+      }),
     ).rejects.toThrow("VM_KERNEL_PATH");
   });
 
@@ -499,7 +509,11 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
       noopLogger,
     );
     await expect(
-      service.createNewSandbox({ volumes: [], env: {} }),
+      service.createNewSandbox({
+        workingDirectory: testWorkingDirectory,
+        volumes: [],
+        env: {},
+      }),
     ).rejects.toThrow("VM_ROOTFS_PATH");
   });
 
@@ -512,7 +526,11 @@ describe("VmSandboxService.createNewSandbox — missing path guard", () => {
       noopLogger,
     );
     await expect(
-      service.createNewSandbox({ volumes: [], env: {} }),
+      service.createNewSandbox({
+        workingDirectory: testWorkingDirectory,
+        volumes: [],
+        env: {},
+      }),
     ).rejects.toThrow("VM_INITRD_PATH");
   });
 });
@@ -630,6 +648,7 @@ describe("VmSandboxService lifecycle", () => {
     // Two volumes whose common parent is tmpDir, so tmpDir becomes the shared dir the service
     // reads the guest exit code back from.
     const sandbox = await service.createNewSandbox({
+      workingDirectory: tmpDir as AbsoluteFilePath,
       volumes: [
         {
           hostPath: `${tmpDir}/code` as AbsoluteFilePath,
@@ -912,6 +931,7 @@ describe("VmSandboxService lifecycle", () => {
 
       await expect(
         service.createNewSandbox({
+          workingDirectory: tmpDir as AbsoluteFilePath,
           volumes: [
             {
               hostPath: `${tmpDir}/code` as AbsoluteFilePath,

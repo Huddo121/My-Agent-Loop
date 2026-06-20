@@ -1,0 +1,47 @@
+http:
+  routers:
+    block-internal:
+      entryPoints:
+        - websecure
+      rule: "Host(`${APP_DOMAIN}`) && (Path(`/api/internal`) || PathPrefix(`/api/internal/`))"
+      priority: 300
+      middlewares:
+        - deny-internal
+      service: server
+      tls:
+        certResolver: letsencrypt
+
+    api:
+      entryPoints:
+        - websecure
+      rule: "Host(`${APP_DOMAIN}`) && PathPrefix(`/api`)"
+      priority: 200
+      service: server
+      tls:
+        certResolver: letsencrypt
+
+    frontend:
+      entryPoints:
+        - websecure
+      rule: "Host(`${APP_DOMAIN}`) && PathPrefix(`/`)"
+      priority: 100
+      service: frontend
+      tls:
+        certResolver: letsencrypt
+
+  middlewares:
+    deny-internal:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32
+          - "::1/128"
+
+  services:
+    server:
+      loadBalancer:
+        servers:
+          - url: http://server:3000
+    frontend:
+      loadBalancer:
+        servers:
+          - url: http://frontend-static:80

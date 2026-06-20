@@ -25,10 +25,10 @@ todos:
     status: pending
   - id: traefik_static
     content: Add traefik/traefik.yml (static config) - entrypoints (web, websecure), file provider, single ACME resolver using Cloudflare DNS-01 for the apex
-    status: pending
+    status: completed
   - id: traefik_dynamic
     content: Add traefik/dynamic.yml (file provider) - the deny-internal middleware plus apex routers/services for /api/* -> server and / -> frontend
-    status: pending
+    status: completed
   - id: compose_prod
     content: Add docker-compose.prod.yml for production: separate traefik, server, frontend-static, Postgres, and Redis services; no host ports for Postgres/Redis; prebuilt image references instead of local source builds by default
     status: pending

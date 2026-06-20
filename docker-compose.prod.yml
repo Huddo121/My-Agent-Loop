@@ -1,0 +1,143 @@
+# Production topology for My Agent Loop.
+#
+# The sibling `docker-compose.yml` stays the *dev* stack (host-port bindings,
+# .devloop volumes, adminer). This file is the production stack and is run
+# explicitly:
+#
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Prerequisites on the host (run once, manually):
+#   - The agent sandbox image is built:  pnpm docker:build  (tag: my-agent-loop)
+#   - A host runs directory exists and is exported as MAL_RUNS_DIR (see below)
+#   - A .env file beside this compose provides the ${...} secrets referenced here
+#
+# Traefik is the only service that publishes host ports. The server, static
+# frontend, datastores, and sandbox containers are reachable only on their
+# Docker networks.
+
+name: my-agent-loop
+
+networks:
+  # Long-lived app services (server <-> Postgres/Redis). Marked internal so the
+  # datastores have no route off this bridge at all. The server still reaches
+  # the internet (git checkouts, LLM/forge APIs) via its mal-sandbox-net leg.
+  app-net:
+    driver: bridge
+    internal: true
+
+  # Shared by the server and the agent sandboxes it spawns. Sandboxes are created
+  # imperatively by the server (dockerode) and attach by name, so the name here
+  # must match DEFAULT_SANDBOX_NETWORK_NAME in SandboxService.ts. Declaring it in
+  # compose lets the server dual-home onto it at boot; the server's own
+  # ensureSandboxNetwork() then becomes a no-op safety net. Postgres/Redis are
+  # deliberately NOT on this network, so a misbehaving sandbox has no path to them.
+  mal-sandbox-net:
+    name: mal-sandbox-net
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  letsencrypt:
+
+services:
+  traefik:
+    image: traefik:v3.5
+    restart: unless-stopped
+    depends_on:
+      - server
+      - frontend-static
+    networks:
+      - mal-sandbox-net
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      APP_BASE_URL: ${APP_BASE_URL}
+      # lego's Cloudflare provider reads this scoped Zone:DNS:Edit token.
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+    volumes:
+      - ./traefik:/etc/traefik:ro
+      - letsencrypt:/letsencrypt
+    entrypoint:
+      - /bin/sh
+      - /etc/traefik/render-static-config.sh
+
+  frontend-static:
+    build:
+      context: apps/frontend
+    restart: unless-stopped
+    networks:
+      - mal-sandbox-net
+
+  server:
+    # The build context is the prepared pnpm deploy bundle, not the repo root.
+    # Prepare it on the host before `docker compose -f docker-compose.prod.yml build`:
+    #   pnpm --filter @mono/server build
+    #   pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
+    build:
+      context: apps/server/deploy
+      dockerfile: ../Dockerfile
+    restart: unless-stopped
+    depends_on:
+      my-agent-loop-db:
+        condition: service_healthy
+      my-agent-loop-redis:
+        condition: service_started
+    networks:
+      - app-net # reach Postgres/Redis
+      - mal-sandbox-net # be reachable by sandboxes + get outbound internet
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://my_agent_loop:${POSTGRES_PASSWORD}@my-agent-loop-db:5432/my_agent_loop
+      REDIS_HOST: my-agent-loop-redis
+      APP_BASE_URL: ${APP_BASE_URL}
+      # Sandboxes share mal-sandbox-net with this service, so they reach it by
+      # compose service DNS — no host.docker.internal in prod.
+      DRIVER_HOST_API_BASE_URL: ${DRIVER_HOST_API_BASE_URL}
+      MCP_SERVER_URL: ${MCP_SERVER_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      FORGE_ENCRYPTION_KEY: ${FORGE_ENCRYPTION_KEY}
+      OAUTH_CREDENTIALS_ENCRYPTION_KEY: ${OAUTH_CREDENTIALS_ENCRYPTION_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Per-run temp dirs (repo checkout, task.txt, harness config) are created
+      # here. It MUST be a host path mounted into this container at the SAME
+      # absolute path (see volumes below) so the bind mounts the server asks the
+      # host daemon to make for each sandbox resolve on the host, not in here.
+      MAL_RUNS_DIR: ${MAL_RUNS_DIR}
+    volumes:
+      # The server creates sibling sandbox containers via the host Docker daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Identical host:container path so per-sandbox bind mounts line up (DinD).
+      - ${MAL_RUNS_DIR}:${MAL_RUNS_DIR}
+
+  my-agent-loop-db:
+    image: postgres:18.1
+    restart: unless-stopped
+    networks:
+      - app-net
+    environment:
+      POSTGRES_DB: my_agent_loop
+      POSTGRES_USER: my_agent_loop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    # No `ports:` — reachable only on app-net.
+
+  my-agent-loop-redis:
+    image: redis:8.2.0
+    restart: unless-stopped
+    networks:
+      - app-net
+    volumes:
+      - redis-data:/data
+    # No `ports:` — reachable only on app-net.

@@ -1,9 +1,28 @@
+import fs from "node:fs";
 import type * as Dockerode from "dockerode";
-import type { AbsoluteFilePath } from "../file-system/FilePath";
+import z from "zod";
+import { AbsoluteFilePath } from "../file-system/FilePath";
 import { absolutePath } from "../utils/absolutePath";
 import type { Branded } from "../utils/Branded";
 import type { Result } from "../utils/Result";
 import type { DockerLoggingService } from "./DockerLoggingService";
+
+/**
+ * Agent sandboxes run on their own bridge network, deliberately separate from
+ * the network hosting the app and its database. A misbehaving container can
+ * still reach the internet (it needs to clone repos and install packages) but
+ * has no route to Postgres/Redis — the server is the only thing bridging the
+ * two sides, and it only exposes the driver API and MCP ports the agent needs.
+ */
+export const DEFAULT_SANDBOX_NETWORK_NAME = "mal-sandbox-net";
+
+/** Docker returns 409 Conflict when asked to create a network that already exists. */
+const networkConflictErrorSchema = z.object({
+  statusCode: z.literal(409),
+});
+
+const isNetworkConflictError = (error: unknown): boolean =>
+  networkConflictErrorSchema.safeParse(error).success;
 
 export type SandboxId = Branded<string, "SandboxId">;
 
@@ -14,6 +33,12 @@ export interface Sandbox {
 
 export type SandboxInitOptions = {
   containerName?: string;
+  /**
+   * Host directory for this run, under the shared runs dir. The sandbox's own
+   * mounts (e.g. lifecycle.sh) are staged here so their host-side paths are
+   * visible to the Docker daemon even when the server itself runs in a container.
+   */
+  workingDirectory: AbsoluteFilePath;
   volumes?: {
     hostPath: AbsoluteFilePath;
     containerPath: string;
@@ -50,11 +75,52 @@ export interface SandboxService {
 
 export class DockerSandboxService implements SandboxService {
   private readonly knownSandboxes = new Set<SandboxId>();
+  private sandboxNetworkReady: Promise<void> | undefined;
 
   constructor(
     private readonly docker: Dockerode,
     private readonly dockerLoggingService: DockerLoggingService,
+    private readonly sandboxNetworkName: string = DEFAULT_SANDBOX_NETWORK_NAME,
   ) {}
+
+  /**
+   * Ensures the isolated sandbox bridge network exists before a container is
+   * attached to it. Memoised so concurrent sandbox creations don't each pay the
+   * lookup cost or race to create the same network.
+   */
+  private ensureSandboxNetwork(): Promise<void> {
+    if (this.sandboxNetworkReady === undefined) {
+      this.sandboxNetworkReady = this.createSandboxNetworkIfMissing();
+    }
+    return this.sandboxNetworkReady;
+  }
+
+  private async createSandboxNetworkIfMissing(): Promise<void> {
+    // List all networks and match by exact name rather than using the Docker
+    // `name` filter, which matches substrings (and would treat e.g.
+    // "mal-sandbox-net-old" as a match).
+    const existingNetworks = await this.docker.listNetworks();
+    const alreadyExists = existingNetworks.some(
+      (network) => network.Name === this.sandboxNetworkName,
+    );
+    if (alreadyExists) {
+      return;
+    }
+
+    try {
+      await this.docker.createNetwork({
+        Name: this.sandboxNetworkName,
+        Driver: "bridge",
+      });
+    } catch (error) {
+      // A concurrent creator may have won the race between our check and create;
+      // an existing network is the state we wanted, so treat that as success.
+      if (isNetworkConflictError(error)) {
+        return;
+      }
+      throw error;
+    }
+  }
 
   /**
    * Runs the teardown script ahead of schedule in the agent container.
@@ -115,10 +181,22 @@ export class DockerSandboxService implements SandboxService {
   }
 
   async createNewSandbox(options: SandboxInitOptions): Promise<Sandbox> {
-    // Get path to lifecycle.sh script
-    // Always resolve to absolute path for Docker volume mounting
-    const lifecycleScriptPath = absolutePath(import.meta.url, "lifecycle.sh");
     const lifecycleScriptContainerPath = "/lifecycle.sh";
+
+    // Stage lifecycle.sh inside the run's working directory rather than mounting
+    // it straight from the server's source tree. The host Docker daemon can only
+    // bind-mount paths it can see on the host; the working directory is mounted
+    // in at an identical path, but the server's own files are not when the server
+    // itself runs in a container.
+    const lifecycleScriptSourcePath = absolutePath(
+      import.meta.url,
+      "lifecycle.sh",
+    );
+    const lifecycleScriptPath = AbsoluteFilePath.joinPath(
+      options.workingDirectory,
+      "lifecycle.sh",
+    );
+    fs.copyFileSync(lifecycleScriptSourcePath, lifecycleScriptPath);
 
     // Build volumes declaration (for Docker API)
     const volumes = {
@@ -147,12 +225,21 @@ export class DockerSandboxService implements SandboxService {
         ? undefined
         : Object.entries(options.env).map(([k, v]) => `${k}=${v}`);
 
+    await this.ensureSandboxNetwork();
+
     const container = await this.docker.createContainer({
       Image: "my-agent-loop",
       name: options.containerName,
       Volumes: volumes,
       HostConfig: {
         Binds: binds,
+        // Map host.docker.internal to the host so the agent can reach the
+        // server's driver API and MCP endpoints. Docker Desktop provides this
+        // automatically, but on native Linux it must be requested explicitly.
+        ExtraHosts: ["host.docker.internal:host-gateway"],
+        // Keep the sandbox on its own bridge, off the app/DB network, so a
+        // misbehaving agent container cannot reach Postgres/Redis directly.
+        NetworkMode: this.sandboxNetworkName,
       },
       Env: envArray,
       Cmd: [lifecycleScriptContainerPath],

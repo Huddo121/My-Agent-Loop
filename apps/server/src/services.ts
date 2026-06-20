@@ -9,7 +9,6 @@ import {
   InMemoryDriverRunTokenStore,
 } from "./driver-api/DriverRunTokenStore";
 import { env } from "./env";
-import type { RelativeFilePath } from "./file-system/FilePath";
 import { LocalFileSystemService } from "./file-system/FileSystemService";
 import {
   DefaultForgeSecretRepository,
@@ -145,9 +144,7 @@ const projectsService = new DatabaseProjectService(
   agentHarnessConfigRepository,
 );
 
-const fileSystemService = new LocalFileSystemService(
-  "./.devloop/runs" as RelativeFilePath,
-);
+const fileSystemService = new LocalFileSystemService(env.MAL_RUNS_DIR);
 
 const runsService = new DatabaseRunsService();
 

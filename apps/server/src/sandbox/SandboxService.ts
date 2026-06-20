@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import type * as Dockerode from "dockerode";
+import z from "zod";
 import { AbsoluteFilePath } from "../file-system/FilePath";
 import { absolutePath } from "../utils/absolutePath";
 import type { Branded } from "../utils/Branded";
@@ -16,11 +17,12 @@ import type { DockerLoggingService } from "./DockerLoggingService";
 export const DEFAULT_SANDBOX_NETWORK_NAME = "mal-sandbox-net";
 
 /** Docker returns 409 Conflict when asked to create a network that already exists. */
+const networkConflictErrorSchema = z.object({
+  statusCode: z.literal(409),
+});
+
 const isNetworkConflictError = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  "statusCode" in error &&
-  (error as { statusCode?: number }).statusCode === 409;
+  networkConflictErrorSchema.safeParse(error).success;
 
 export type SandboxId = Branded<string, "SandboxId">;
 

@@ -1,4 +1,6 @@
+import path from "node:path";
 import z from "zod";
+import type { AbsoluteFilePath } from "./file-system/FilePath";
 import type { Branded } from "./utils/Branded";
 import { ProtectedString } from "./utils/ProtectedString";
 
@@ -59,7 +61,14 @@ const envSchema = z
     // harness config, lifecycle.sh) are created under. When the server runs in a
     // container this must be a host path mounted in at the identical path, so the
     // bind mounts the server requests for each sandbox resolve on the host.
-    MAL_RUNS_DIR: z.string().nonempty().default("./.devloop/runs"),
+    MAL_RUNS_DIR: z
+      .string()
+      .nonempty()
+      .default("./.devloop/runs")
+      .transform(
+        (runsDirectory): AbsoluteFilePath =>
+          path.resolve(runsDirectory) as AbsoluteFilePath,
+      ),
 
     OPENROUTER_API_KEY: harnessKey("OpenRouterApiKey"),
     ANTHROPIC_API_KEY: harnessKey("AnthropicApiKey"),

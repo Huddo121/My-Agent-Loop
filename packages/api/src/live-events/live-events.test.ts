@@ -137,6 +137,7 @@ describe("live-events shared contract", () => {
           description: "Desc",
           completedOn: null,
           position: 0,
+          activeRunState: null,
           agentConfig: null,
           subtasks: [],
         },
@@ -160,6 +161,7 @@ describe("live-events shared contract", () => {
           description: "",
           completedOn: "2025-01-15T12:00:00.000Z",
           position: 0,
+          activeRunState: null,
           agentConfig: null,
           subtasks: [
             {

@@ -11,6 +11,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pin moon to the version used locally; setup-toolchain otherwise installs the
+  # latest, whose config schema rejects this repo's moon.yml files.
+  MOON_VERSION: "1.38.3"
+
 jobs:
   lint:
     name: Lint & format
@@ -55,6 +60,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: moonrepo/setup-toolchain@v0
         with:
+          moon-version: ${{ env.MOON_VERSION }}
           auto-install: false
       - run: pnpm sync
       - name: Verify project references are in sync
@@ -85,4 +91,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - uses: moonrepo/setup-toolchain@v0
+        with:
+          moon-version: ${{ env.MOON_VERSION }}
       - run: moon ci

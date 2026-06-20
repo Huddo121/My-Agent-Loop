@@ -44,8 +44,10 @@ The jobs:
   builds only the affected projects. This is why the job checks out with
   `fetch-depth: 0`.
 
-`moon` is pinned to the locally-used version via `.prototools` so CI doesn't
-silently jump to a newer major.
+`moon` is pinned to the locally-used version via the `moon-version` input on
+`setup-toolchain` (a workflow-level `MOON_VERSION`), because the action
+otherwise installs the latest moon, whose config schema rejects this repo's
+moon.yml files (which use the 1.x `local` task field).
 
 ### Typecheck and tests are made reproducible from a clean checkout
 

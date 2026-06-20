@@ -94,11 +94,15 @@ services:
       APP_BASE_URL: ${APP_BASE_URL}
       # Sandboxes share mal-sandbox-net with this service, so they reach it by
       # compose service DNS — no host.docker.internal in prod.
-      DRIVER_HOST_API_BASE_URL: http://server:3000
-      MCP_SERVER_URL: http://server:3050/mcp
+      DRIVER_HOST_API_BASE_URL: ${DRIVER_HOST_API_BASE_URL}
+      MCP_SERVER_URL: ${MCP_SERVER_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       FORGE_ENCRYPTION_KEY: ${FORGE_ENCRYPTION_KEY}
       OAUTH_CREDENTIALS_ENCRYPTION_KEY: ${OAUTH_CREDENTIALS_ENCRYPTION_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Per-run temp dirs (repo checkout, task.txt, harness config) are created
       # here. It MUST be a host path mounted into this container at the SAME
       # absolute path (see volumes below) so the bind mounts the server asks the

@@ -34,7 +34,10 @@ const envSchema = z
       .enum(["development", "production", "test"])
       .default("development"),
 
+    // Development defaults only. Production must use the public HTTPS origin.
     APP_BASE_URL: z.string().default("http://localhost:5173"),
+    // Sandboxes use host.docker.internal during local development. Production
+    // overrides both URLs with the server's mal-sandbox-net service DNS name.
     MCP_SERVER_URL: z
       .string()
       .url()

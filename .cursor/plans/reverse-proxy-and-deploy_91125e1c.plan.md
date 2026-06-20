@@ -19,16 +19,16 @@ todos:
     status: completed
   - id: env_docs
     content: Document required production env vars (APP_BASE_URL, MCP_SERVER_URL, DRIVER_HOST_API_BASE_URL, ACME_EMAIL, CF_DNS_API_TOKEN) and update apps/server/src/env.ts comments to flag host.docker.internal as a dev-only default
-    status: pending
+    status: completed
   - id: dockerignore
     content: Add a root .dockerignore so Docker packaging contexts exclude caches/local state but keep the prepared server artifact and frontend static build output
-    status: pending
+    status: completed
   - id: decision_doc
     content: Write docs/decisions/reverse-proxy.md capturing tech choice (Traefik), the deny-internal policy, the DNS-01-from-day-one rationale, and the future sandbox-routing use case (documented, not implemented) that drove these choices
-    status: pending
+    status: completed
   - id: readme
     content: Add a Production deployment section to README.md covering port-forward, DNS (apex only - wildcard deferred until sandbox routing lands), Cloudflare API token, env vars, build/package steps, and `docker compose up --build`
-    status: pending
+    status: completed
   - id: verify
     content: Run pnpm typecheck and pnpm check, and smoke-test routing locally with Traefik in `--api.insecure=true` + a self-signed/staging ACME mode and a /etc/hosts override
     status: pending

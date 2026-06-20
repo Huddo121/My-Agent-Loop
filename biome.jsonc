@@ -3,6 +3,11 @@
   "formatter": {
     "indentStyle": "space"
   },
+  "files": {
+    // `.sc` holds local tool state, not source. It is excluded via a global
+    // gitignore that `useIgnoreFile` does not read, so exclude it explicitly.
+    "includes": ["**", "!.sc"]
+  },
   "vcs": {
     "enabled": true,
     "clientKind": "git",

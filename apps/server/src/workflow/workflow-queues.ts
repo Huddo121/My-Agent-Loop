@@ -13,8 +13,8 @@ export class WorkflowQueues {
   public readonly runQueue: Queue<RunQueueJobPayload>;
   public readonly redisConnectionOptions: ConnectionOptions;
 
-  constructor(redisHost: string) {
-    this.redisConnectionOptions = { host: redisHost };
+  constructor(redisHost: string, redisPort: number) {
+    this.redisConnectionOptions = { host: redisHost, port: redisPort };
     const redisConnection = {
       connection: this.redisConnectionOptions,
     } as const;

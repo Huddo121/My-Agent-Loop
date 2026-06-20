@@ -3,8 +3,12 @@ import z from "zod";
 
 import type { Result } from "../utils/Result";
 
-export const OPENAI_AUTH_ISSUER = "https://auth0.openai.com/";
-export const OPENAI_CHATGPT_AUDIENCE = "https://api.openai.com/auth";
+// OpenAI issues ChatGPT/Codex tokens from its own auth service (auth.openai.com), not the
+// legacy Auth0 tenant. The issuer claim is the bare origin with no trailing slash and the
+// audience is the v1 API, matching what the Codex CLI itself receives — verified against a
+// real token. The chatgpt_account_id still lives under the /auth namespaced claim below.
+export const OPENAI_AUTH_ISSUER = "https://auth.openai.com";
+export const OPENAI_CHATGPT_AUDIENCE = "https://api.openai.com/v1";
 const OPENAI_AUTH_JWKS_URL = "https://auth.openai.com/.well-known/jwks.json";
 
 const chatGptJwtPayloadSchema = z.object({

@@ -48,7 +48,8 @@ export type SandboxInitOptions = {
 
 export type StartSandboxFailure =
   | { reason: "container-not-found" }
-  | { reason: "container-already-started" };
+  | { reason: "container-already-started" }
+  | { reason: "boot-failed" };
 
 export type WaitForSandboxToFinishSuccess = {
   exitCode: number;

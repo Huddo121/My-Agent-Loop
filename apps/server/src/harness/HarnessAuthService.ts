@@ -1,7 +1,9 @@
 import type { AgentHarnessId } from "@mono/api";
 import type { UserId } from "../auth/UserId";
+import type { Logger } from "../logger/Logger";
 import type {
   OAuthProvider,
+  OAuthProviderRefreshError,
   StoredOAuthTokens,
 } from "../oauth-providers/types";
 import type { UserOAuthCredentialRepository } from "../user-oauth-credentials";
@@ -109,11 +111,31 @@ export class EnvHarnessAuthService implements HarnessAuthService {
 const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 const OAUTH_REFRESH_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Flattens an OAuthProviderRefreshError into a structured, secret-free shape for logging.
+ * The token endpoint's error body and the cause message can be logged safely (they describe
+ * why the refresh was rejected, e.g. an expired refresh token) but never contain token material.
+ */
+function summariseRefreshError(
+  error: OAuthProviderRefreshError,
+): Record<string, unknown> {
+  switch (error.reason) {
+    case "token-endpoint-unreachable":
+      return { reason: error.reason, cause: error.cause.message };
+    case "token-endpoint-rejected":
+      return { reason: error.reason, status: error.status, body: error.body };
+    case "invalid-token-response":
+    case "invalid-access-token":
+      return { reason: error.reason, issues: error.issues };
+  }
+}
+
 export class CompositeHarnessAuthService implements HarnessAuthService {
   constructor(
     private readonly fallbackAuthService: EnvHarnessAuthService,
     private readonly userOAuthCredentialRepository: UserOAuthCredentialRepository,
     private readonly openAiCodexProvider: OAuthProvider,
+    private readonly logger: Logger,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -170,6 +192,12 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
     );
 
     if (credential === undefined) {
+      // No stored OAuth credential — the run will fall back to env-based auth. Logged so the
+      // "no credentials" outcome distinguishes "owner never connected Codex" from a later failure.
+      this.logger.info("No Codex OAuth credential stored for workspace owner", {
+        workspaceOwnerUserId: context.workspaceOwnerUserId,
+        providerId: OPENAI_CODEX_PROVIDER_ID,
+      });
       return { kind: "none" };
     }
 
@@ -177,6 +205,11 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
       credential.tokens.getSecretValue(),
     );
     if (parsedTokens === undefined) {
+      // The credential exists but its decrypted token bundle did not match the expected shape.
+      this.logger.warn("Stored Codex OAuth tokens could not be parsed", {
+        workspaceOwnerUserId: context.workspaceOwnerUserId,
+        providerId: OPENAI_CODEX_PROVIDER_ID,
+      });
       return { kind: "none" };
     }
 
@@ -186,6 +219,7 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
       credential.lastRefresh,
     );
     if (tokens === undefined) {
+      // refreshIfStale has already logged the specific refresh failure reason.
       return { kind: "none" };
     }
 
@@ -226,6 +260,14 @@ export class CompositeHarnessAuthService implements HarnessAuthService {
 
     const refreshed = await this.openAiCodexProvider.refreshTokens(tokens);
     if (!refreshed.success) {
+      // A stale credential that fails to refresh is the most common cause of a Codex run
+      // resolving to "no credentials" (e.g. the refresh token itself expired). Log why the
+      // refresh failed so it is diagnosable; the summary deliberately omits token material.
+      this.logger.warn("Codex OAuth token refresh failed", {
+        workspaceOwnerUserId,
+        providerId: OPENAI_CODEX_PROVIDER_ID,
+        ...summariseRefreshError(refreshed.error),
+      });
       return undefined;
     }
 

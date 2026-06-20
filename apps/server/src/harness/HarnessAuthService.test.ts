@@ -5,6 +5,7 @@ import type {
   OAuthProviderRefreshError,
   StoredOAuthTokens,
 } from "../oauth-providers";
+import { CapturingLogger } from "../test-fakes/CapturingLogger";
 import type {
   UserOAuthCredentialRepository,
   UserOAuthCredentialSummary,
@@ -222,6 +223,7 @@ function createCompositeService(
     }),
     repo,
     provider,
+    new CapturingLogger(),
     () => new Date("2026-05-04T00:00:00.000Z"),
   );
 }

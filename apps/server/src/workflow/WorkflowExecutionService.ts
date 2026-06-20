@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { match } from "ts-pattern";
 import { stringify } from "yaml";
 import type { WorkspaceMembershipsService } from "../auth/WorkspaceMembershipsService";
 import type { DriverRunTokenStore } from "../driver-api/DriverRunTokenStore";
@@ -14,23 +15,38 @@ import type { AgentHarness } from "../harness";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
 import type { HarnessAuthService } from "../harness/HarnessAuthService";
 import type { LiveEventsService } from "../live-events";
+import type { Logger } from "../logger/Logger";
 import type { Project } from "../projects/ProjectsService";
 import type { RunId } from "../runs/RunId";
 import type { Sandbox, SandboxService } from "../sandbox/SandboxService";
+import type { SandboxTypeConfigRepository } from "../sandbox-config";
 import type { Task, TaskQueue } from "../task-queue/TaskQueue";
 import { toTaskDto } from "../tasks/tasks-handlers";
 import type { Result } from "../utils/Result";
 import { timeout } from "../utils/timeout";
 import type { Workflow } from "./Workflow";
 
-export type WorkflowExecutionServiceOptions = {
+type SandboxEndpointConfig = {
   mcpServerUrl: string;
   driverHostApiBaseUrl: string;
 };
 
+export type WorkflowExecutionServiceOptions = {
+  docker: SandboxEndpointConfig;
+  // VM endpoints are derived from VM_HOST_BRIDGE_IP (services.ts). That IP is platform-specific
+  // and has no default, so this is undefined when the operator has not configured it — a VM run is
+  // then rejected with a clear error rather than dialing a bogus host.
+  vm: SandboxEndpointConfig | undefined;
+};
+
 const defaultOptions: WorkflowExecutionServiceOptions = {
-  mcpServerUrl: "http://host.docker.internal:3050/mcp",
-  driverHostApiBaseUrl: "http://host.docker.internal:3000",
+  docker: {
+    mcpServerUrl: "http://host.docker.internal:3050/mcp",
+    driverHostApiBaseUrl: "http://host.docker.internal:3000",
+  },
+  // No default VM host IP: it differs between the Linux bridge and the macOS vmnet/NAT gateway,
+  // so the operator must set VM_HOST_BRIDGE_IP for their platform (services.ts wires it in).
+  vm: undefined,
 };
 
 const formatTaskFile = (task: Task): string => {
@@ -91,7 +107,9 @@ export class WorkflowExecutionService {
   constructor(
     private readonly taskQueue: TaskQueue,
     private readonly gitService: GitService,
-    private readonly sandboxService: SandboxService,
+    private readonly dockerSandboxService: SandboxService,
+    private readonly vmSandboxService: SandboxService,
+    private readonly sandboxTypeConfig: SandboxTypeConfigRepository,
     private readonly fileSystemService: FileSystemService,
     private readonly harnesses: readonly AgentHarness[],
     private readonly harnessConfig: AgentHarnessConfigRepository,
@@ -100,6 +118,7 @@ export class WorkflowExecutionService {
     private readonly forgeSecretRepository: ForgeSecretRepository,
     private readonly driverRunTokenStore: DriverRunTokenStore,
     private readonly liveEventsService: LiveEventsService,
+    private readonly logger: Logger,
     private readonly options: WorkflowExecutionServiceOptions = defaultOptions,
   ) {}
 
@@ -123,7 +142,16 @@ export class WorkflowExecutionService {
     runId: RunId,
     task: Task,
     driverToken: string,
-  ): Promise<Result<{ repository: GitRepository; sandbox: Sandbox }, Error>> {
+  ): Promise<
+    Result<
+      {
+        repository: GitRepository;
+        sandbox: Sandbox;
+        sandboxService: SandboxService;
+      },
+      Error
+    >
+  > {
     const taskTempDirectory =
       await this.fileSystemService.createTemporaryDirectory(runId);
 
@@ -150,10 +178,10 @@ export class WorkflowExecutionService {
     });
 
     if (checkoutResult.success === false) {
-      console.error(
-        `Failed to checkout repository for task ${task.id}:`,
-        checkoutResult.error.message,
-      );
+      this.logger.error("Failed to checkout repository for task", {
+        taskId: task.id,
+        error: checkoutResult.error.message,
+      });
       return { success: false, error: checkoutResult.error };
     }
 
@@ -165,6 +193,47 @@ export class WorkflowExecutionService {
       "task.txt",
     );
     fs.writeFileSync(taskFilePath, formatTaskFile(task));
+
+    // Resolve which sandbox type applies to this project, then pick the
+    // matching service and endpoint config. Follows the same direct-call
+    // pattern used by harnessConfig.resolveHarnessConfig below.
+    const sandboxType = await this.sandboxTypeConfig.resolveSandboxType(
+      project.id,
+      project.workspaceId,
+    );
+    // Exhaustive match so adding a new SandboxType is a compile error here rather
+    // than silently routing to the VM service via a fall-through ternary.
+    const { sandboxService, endpoints } = match(sandboxType)
+      .with("docker", () => ({
+        sandboxService: this.dockerSandboxService,
+        endpoints: this.options.docker,
+      }))
+      .with("vm", () => ({
+        sandboxService: this.vmSandboxService,
+        endpoints: this.options.vm,
+      }))
+      .exhaustive();
+    this.logger.info("Resolved sandbox type for task", {
+      runId,
+      projectId: project.id,
+      sandboxType,
+    });
+
+    // VM endpoints are absent when VM_HOST_BRIDGE_IP was not configured. Fail here with a clear,
+    // actionable error rather than building a bogus host URL the in-guest driver cannot reach.
+    if (endpoints === undefined) {
+      this.logger.error("VM sandbox endpoints are not configured", {
+        runId,
+        projectId: project.id,
+        sandboxType,
+      });
+      return {
+        success: false,
+        error: new Error(
+          "VM sandbox requires VM_HOST_BRIDGE_IP to be configured (the host IP the guest reaches the driver and MCP server on).",
+        ),
+      };
+    }
 
     const { harnessId, modelId } =
       await this.harnessConfig.resolveHarnessConfig(
@@ -209,7 +278,7 @@ export class WorkflowExecutionService {
     const preparation = harness.prepare({
       projectId: project.id,
       taskId: task.id,
-      mcpServerUrl: this.options.mcpServerUrl,
+      mcpServerUrl: endpoints.mcpServerUrl,
       auth,
       modelId,
     });
@@ -268,20 +337,20 @@ export class WorkflowExecutionService {
       MAL_DRIVER_CLI_ARGS: buildDriverCliArgs({
         runId,
         taskId: task.id,
-        hostApiBaseUrl: this.options.driverHostApiBaseUrl,
+        hostApiBaseUrl: endpoints.driverHostApiBaseUrl,
         driverToken,
         harnessCommand: preparation.runCommand,
       }),
       ...preparation.env,
     };
 
-    const sandbox = await this.sandboxService.createNewSandbox({
+    const sandbox = await sandboxService.createNewSandbox({
       workingDirectory: taskTempDirectory,
       volumes,
       env,
     });
 
-    return { success: true, value: { repository, sandbox } };
+    return { success: true, value: { repository, sandbox, sandboxService } };
   }
 
   private async processTask(
@@ -295,15 +364,13 @@ export class WorkflowExecutionService {
     if (prepareResult.success === false) {
       return { success: false, error: prepareResult.error };
     }
-    const { repository, sandbox } = prepareResult.value;
+    const { repository, sandbox, sandboxService } = prepareResult.value;
 
     this.driverRunTokenStore.setToken(runId, driverToken);
     let sandboxFinished = false;
 
     try {
-      const startSandboxResult = await this.sandboxService.startSandbox(
-        sandbox.id,
-      );
+      const startSandboxResult = await sandboxService.startSandbox(sandbox.id);
       if (startSandboxResult.success === false) {
         return {
           success: false,
@@ -314,7 +381,7 @@ export class WorkflowExecutionService {
       }
       const oneHourInMs = 3600000;
       const result = await timeout(
-        this.sandboxService.waitForSandboxToFinish(sandbox.id),
+        sandboxService.waitForSandboxToFinish(sandbox.id),
         oneHourInMs,
       ).catch(
         () => ({ success: false, error: { reason: "timeout" } }) as const,
@@ -330,9 +397,11 @@ export class WorkflowExecutionService {
       }
       sandboxFinished = true;
 
-      console.log(
-        `Container ${sandbox.id} exited with code ${result.value.exitCode}, reason: ${result.value.reason}`,
-      );
+      this.logger.info("Sandbox finished", {
+        sandboxId: sandbox.id,
+        exitCode: result.value.exitCode,
+        reason: result.value.reason,
+      });
 
       if (result.value.reason === "completed") {
         const workflowOnTaskCompletedResult = await workflow.onTaskCompleted(
@@ -341,10 +410,10 @@ export class WorkflowExecutionService {
         );
 
         if (workflowOnTaskCompletedResult.success === false) {
-          console.error(
-            `Failed to complete task ${task.id}:`,
-            workflowOnTaskCompletedResult.error.message,
-          );
+          this.logger.error("Failed to complete task", {
+            taskId: task.id,
+            error: workflowOnTaskCompletedResult.error.message,
+          });
           return { success: false, error: workflowOnTaskCompletedResult.error };
         }
 
@@ -366,7 +435,7 @@ export class WorkflowExecutionService {
             projectId: project.id,
             task: dto,
           });
-          console.info("Marked task as completed", {
+          this.logger.info("Marked task as completed", {
             taskId: task.id,
             task: completedTask,
           });
@@ -384,7 +453,7 @@ export class WorkflowExecutionService {
       return { success: true, value: undefined };
     } finally {
       if (sandboxFinished === false) {
-        await this.sandboxService.stopSandbox(sandbox.id);
+        await sandboxService.stopSandbox(sandbox.id);
       }
       this.driverRunTokenStore.clearToken(runId);
     }

@@ -12,6 +12,10 @@ import {
   harnessModelSchema,
 } from "../harnesses/harnesses-model";
 import { projectsApi } from "../projects/projects-api";
+import {
+  sandboxTypeConfigResponseSchema,
+  setSandboxTypeRequestSchema,
+} from "../sandbox/sandbox-model";
 import { workspaceIdSchema } from "./workspaces-model";
 
 export const workspaceDtoSchema = z.object({
@@ -63,6 +67,18 @@ export const workspacesApi = Endpoint.multi({
         harnesses: Endpoint.multi({
           GET: Endpoint.get()
             .output(200, harnessesResponseSchema)
+            .output(401, unauthenticatedSchema)
+            .output(404, notFoundSchema),
+        }),
+        "sandbox-type": Endpoint.multi({
+          GET: Endpoint.get()
+            .output(200, sandboxTypeConfigResponseSchema)
+            .output(401, unauthenticatedSchema)
+            .output(404, notFoundSchema),
+          PUT: Endpoint.put()
+            .input(setSandboxTypeRequestSchema)
+            .output(200, sandboxTypeConfigResponseSchema)
+            .output(400, badUserInputSchema)
             .output(401, unauthenticatedSchema)
             .output(404, notFoundSchema),
         }),

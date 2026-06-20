@@ -4,43 +4,43 @@ overview: Add VM-based sandboxes alongside existing Docker sandboxes, using Clou
 todos:
   - id: env-config
     content: "Add VM env vars to `apps/server/src/env.ts`. Read the existing file to see how env vars are defined (Zod validation pattern). Add these optional vars: VM_KERNEL_PATH, VM_ROOTFS_PATH, VIRTIOFSD_PATH, CLOUD_HYPERVISOR_PATH, VFKIT_PATH, VM_HOST_BRIDGE_IP (default 192.168.100.1). All should be optional strings. See plan section 9 for details."
-    status: pending
+    status: completed
   - id: sandbox-type-db
     content: Add sandbox type configuration to the DB layer. (1) Add `sandboxTypeEnum` and `sandboxTypeConfigurationTable` to `apps/server/src/db/schema.ts` -- see the exact schema in plan section 6. (2) Create `apps/server/src/sandbox/SandboxTypeConfigRepository.ts` with a `DatabaseSandboxTypeConfigRepository` class. Read `apps/server/src/harness/AgentHarnessConfigRepository.ts` as the pattern to follow -- it has the same hierarchical resolution logic (task -> project -> workspace -> default), but sandbox type only uses project -> workspace -> default 'docker'. Do NOT generate a DB migration; a human will do that.
-    status: pending
+    status: completed
   - id: vm-init-script
     content: Create `apps/server/src/sandbox/vm/vm-init.sh`. This is a minimal shell script that will be baked into the VM rootfs at /sbin/vm-init. It mounts /proc, /sys, /dev, then mounts virtio-fs at /mnt/host using tag 'hostshare', then execs /mnt/host/vm-mount-setup.sh. See the exact script in plan section 3.
-    status: pending
+    status: completed
   - id: vm-platform-adapter
     content: Create the VM platform abstraction layer under `apps/server/src/sandbox/vm/`. (1) Define `VmPlatformAdapter` interface in VmPlatformAdapter.ts -- see plan section 1 for the full interface. (2) Implement `CloudHypervisorAdapter` -- spawns virtiofsd and cloud-hypervisor as child processes, talks to Cloud Hypervisor REST API over Unix socket (PUT /api/v1/vm.boot, PUT /api/v1/vm.shutdown, GET /api/v1/vm.info). Use Node.js http.request with socketPath option for Unix socket HTTP. (3) Implement `VfkitAdapter` -- spawns vfkit with --device virtio-fs,sharedDir=...,mountTag=... and --restful-uri unix://..., talks to vfkit REST API. vfkit handles virtio-fs natively (no separate virtiofsd). Binary paths come from env vars added in the env-config todo. See plan section 1 for full details.
-    status: pending
+    status: completed
   - id: vm-sandbox-service
     content: "Implement `VmSandboxService` in `apps/server/src/sandbox/vm/VmSandboxService.ts` implementing the `SandboxService` interface from `apps/server/src/sandbox/SandboxService.ts`. Read `DockerSandboxService` in the same file as the pattern -- it implements the same interface. Key difference: instead of Docker containers, this service (a) starts virtiofsd + VMM via the adapter, (b) generates a vm-mount-setup.sh script that maps SandboxInitOptions.volumes to symlinks/copies inside the VM (see plan section 2 for the mapping logic and examples), (c) monitors the VMM child process for exit. The SandboxInitOptions type is already defined and stays unchanged. See plan section 2 for full lifecycle details."
-    status: pending
+    status: completed
   - id: vm-rootfs-build
     content: "Create `scripts/build-vm-rootfs.sh` and add `pnpm vm:build-rootfs` to root package.json. The script: (1) builds the Docker image from the existing Dockerfile, (2) docker export to get a rootfs tarball, (3) creates a raw ext4 disk image, (4) copies the exported filesystem into it, (5) adds the vm-init.sh script (from the vm-init-script todo) to /sbin/vm-init. Also downloads a pre-built kernel from https://github.com/cloud-hypervisor/linux/releases. See plan section 4 for full steps."
-    status: pending
+    status: completed
   - id: host-networking
     content: Create `scripts/setup-vm-networking.sh` for Linux host networking (bridge, NAT, IP forwarding). See plan section 5 for the exact commands. On macOS, vfkit handles networking via Virtualization.framework NAT -- no manual setup needed. This script is run once by the developer, not automated.
-    status: pending
+    status: completed
   - id: workflow-refactor
-    content: "Refactor `apps/server/src/workflow/WorkflowExecutionService.ts` to support both sandbox types. Read the current file first. Changes: (1) Replace the single `sandboxService: SandboxService` constructor param with `dockerSandboxService: DockerSandboxService` and `vmSandboxService: VmSandboxService` plus `sandboxTypeConfig: SandboxTypeConfigRepository`. (2) In prepare(), resolve sandbox type via sandboxTypeConfig.resolveSandboxType(project.id, project.workspaceId), then select the matching service. (3) Adjust MCP_SERVER_URL: Docker uses 'http://host.docker.internal:3050/mcp', VM uses the env var VM_HOST_BRIDGE_IP. (4) The rest of the flow (startSandbox, waitForSandboxToFinish, stopSandbox) stays the same since both services implement SandboxService. See plan section 7."
-    status: pending
+    content: "Refactor `apps/server/src/workflow/WorkflowExecutionService.ts` to support both sandbox types. Read the current file first. Changes: (1) Replace the single `sandboxService: SandboxService` constructor param with `dockerSandboxService: DockerSandboxService` and `vmSandboxService: VmSandboxService` plus `sandboxTypeConfig: SandboxTypeConfigRepository`. (2) In prepare(), resolve sandbox type via sandboxTypeConfig.resolveSandboxType(project.id, project.workspaceId), then select the matching service. (3) Adjust MCP_SERVER_URL: Docker uses 'http://host.docker.internal:3050/mcp', VM uses the env var VM_HOST_BRIDGE_IP. (4) The rest of the flow (startSandbox, waitForSandboxToFinish, stopSandbox) stays the same since both services implement SandboxService. See plan section 7. NOTE (executed): both services typed as the SandboxService interface (not concrete classes) for testability; options carry per-type mcpServerUrl AND driverHostApiBaseUrl since the in-VM driver also can't reach host.docker.internal."
+    status: completed
   - id: services-wiring
-    content: "Update `apps/server/src/services.ts` to wire the new services. Read the current file first -- it has all the DI wiring. Changes: (1) Import and instantiate VmSandboxService with the platform-appropriate adapter (process.platform === 'darwin' for VfkitAdapter, 'linux' for CloudHypervisorAdapter). (2) Instantiate DatabaseSandboxTypeConfigRepository. (3) Update WorkflowExecutionService constructor call to pass both sandbox services + config repo (matching the workflow-refactor changes). (4) Add sandboxTypeConfigRepository and vmSandboxService to the Services interface. (5) Ensure BackgroundWorkflowProcessor.shutdown() stops both sandbox services."
-    status: pending
+    content: "Update `apps/server/src/services.ts` to wire the new services. Read the current file first -- it has all the DI wiring. Changes: (1) Import and instantiate VmSandboxService with the platform-appropriate adapter (process.platform === 'darwin' for VfkitAdapter, 'linux' for CloudHypervisorAdapter). NOTE: VmSandboxService's constructor is (adapter, kernelPath, rootfsPath, initrdPath, logger, options?) -- pass env.VM_KERNEL_PATH, env.VM_ROOTFS_PATH, env.VM_INITRD_PATH (see the 'Validated Boot Recipe & Findings' section). (2) Instantiate DatabaseSandboxTypeConfigRepository. (3) Update WorkflowExecutionService constructor call to pass both sandbox services + config repo (matching the workflow-refactor changes). (4) Add sandboxTypeConfigRepository and vmSandboxService to the Services interface. (5) Ensure shutdown (in apps/server/src/index.ts, where stopAllSandboxes is currently called) stops BOTH the docker and vm sandbox services."
+    status: completed
   - id: sandbox-type-api
     content: Add HTTP API endpoints for sandbox type configuration. Read existing handler files to find where workspace and project routes are defined (look in apps/server/src/workspaces/ and apps/server/src/projects/ for handler files). Add GET/PUT endpoints for /api/workspaces/:id/sandbox-type and /api/projects/:id/sandbox-type. Require an authenticated Better Auth session, return `401` when no session is present, return `404` when the caller is not a member of the workspace, and return `404` when the caller cannot access the target project. These call SandboxTypeConfigRepository. Also add MCP tools -- read apps/server/src/projects/projects-mcp-handlers.ts for the MCP tool pattern (uses satisfies McpTool, getMcpServices(), withRequiredProjectId). Register new tools in apps/server/src/mcp.ts. The API package (packages/api) will need the SandboxType type exported -- read packages/api/AGENTS.md for cerato patterns.
-    status: pending
+    status: completed
   - id: frontend-api
-    content: Add sandbox type API integration to the frontend. (1) Add the SandboxType type and API endpoint types to packages/api (read packages/api/AGENTS.md for cerato codec patterns -- first param = wire type, second = app type). (2) Create a useSandboxType hook in apps/frontend/app/lib/sandbox/useSandboxType.ts. Read apps/frontend/app/lib/projects/useProjects.ts as the pattern -- it shows how to use React Query with cerato API calls, including queries and mutations with cache invalidation.
-    status: pending
+    content: Add sandbox type API integration to the frontend. (1) Add the SandboxType type and API endpoint types to packages/api (read packages/api/AGENTS.md for cerato codec patterns -- first param = wire type, second = app type). (2) Create a useSandboxType hook in apps/frontend/app/lib/sandbox/useSandboxType.ts. Read apps/frontend/app/lib/projects/useProjects.ts as the pattern -- it shows how to use React Query with cerato API calls, including queries and mutations with cache invalidation. NOTE (executed): part (1) was already completed in the sandbox-type-api TODO (packages/api/src/sandbox/sandbox-model.ts + endpoints on workspaces-api/projects-api). This TODO is just the frontend hook.
+    status: completed
   - id: frontend-ui
-    content: Add sandbox type UI components and integrate into existing pages. (1) Create SandboxTypeSelect component in apps/frontend/app/components/ui/SandboxTypeSelect.tsx -- read apps/frontend/app/components/ui/HarnessSelect.tsx as the pattern (it's a dropdown select for a similar config). Options are 'Docker' and 'VM'. (2) Add SandboxTypeSelect to workspace settings, behind the authenticated app shell and current-workspace context. (3) Add SandboxTypeSelect to apps/frontend/app/components/projects/ProjectDialog.tsx -- read the file to see how HarnessSelect is integrated there and follow the same pattern. Read apps/frontend/AGENTS.md for frontend conventions.
-    status: pending
+    content: Add sandbox type UI components and integrate into existing pages. (1) Create SandboxTypeSelect component in apps/frontend/app/components/ui/SandboxTypeSelect.tsx -- read apps/frontend/app/components/ui/HarnessSelect.tsx as the pattern (it's a dropdown select for a similar config). Options are 'Docker' and 'VM'. (2) Add SandboxTypeSelect to workspace settings, behind the authenticated app shell and current-workspace context. (3) Add SandboxTypeSelect to apps/frontend/app/components/projects/ProjectDialog.tsx -- read the file to see how HarnessSelect is integrated there and follow the same pattern. Read apps/frontend/AGENTS.md for frontend conventions. NOTE (executed): integrated into WorkspaceConfigDialog (workspace scope) and ProjectDialog (project scope, shown only in update mode since the project-scoped sandbox-type endpoint needs an existing project id).
+    status: completed
   - id: docs
     content: "Create `docs/decisions/vm-sandboxing.md` documenting: why VMs (isolation, future Docker-in-VM), why Cloud Hypervisor + vfkit (virtio-fs, REST API), architecture overview (VmPlatformAdapter abstraction), setup instructions for Linux (install binaries, run networking script, build rootfs) and macOS (install vfkit via Homebrew, build rootfs). Update `docs/00-index.md` to link to the new file. Read existing decisions docs (e.g., docs/decisions/forge-authentication.md) for the style."
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -460,6 +460,34 @@ Since VMs have their own kernel, Docker can run natively inside the VM. The root
 - **Networking not configured (Linux):** If the bridge is not set up, VM creation should fail with a descriptive error explaining how to run the setup script.
 - **Teardown on timeout:** For v1, if a VM run times out, the VMM process is killed directly. Teardown scripts do not run in this case (acceptable for v1; the Docker path has the same limitation when a container is force-killed). Future improvement: send a command into the VM via vsock or serial before killing.
 - **Concurrent VMs:** Each VM has its own VMM process, virtiofsd, and sockets. No shared state between VMs. Concurrency is bounded by the same BullMQ worker concurrency (currently 5).
+
+## Validated Boot Recipe & Findings (2026-06-08, macOS/vfkit)
+
+A VM now boots end to end on macOS/Apple Silicon and is verified by `pnpm vm:smoke-test`
+(kernel boot → initramfs → switch_root → `/sbin/vm-init` → virtio-fs mount → `vm-mount-setup.sh`,
+including a host↔guest virtio-fs write round-trip). Key learnings, already reflected in the code:
+
+- **An initramfs is required.** vfkit 0.6.3 (Homebrew stable) rejects the Linux bootloader without an
+  `initrd`, and Virtualization.framework does not mount the root disk itself. `build-vm-rootfs.sh`
+  now produces a tiny busybox `initramfs.cpio.gz` that mounts `/dev/vda` and `switch_root`s into
+  `/sbin/vm-init`. New env var `VM_INITRD_PATH`.
+- **vfkit CLI specifics** (the original spec-written `VfkitAdapter` was wrong): kernel goes via
+  `--bootloader linux,kernel=…,initrd=…,cmdline="console=hvc0"` (not `--kernel`); the disk and the
+  virtio-fs share are `--device virtio-blk,path=…` / `--device virtio-fs,…` (there is no `--disk`);
+  the guest console must be `--device virtio-serial,logFilePath=…` (stdio console needs a TTY and
+  fails when the VMM is spawned headless).
+- **The cloud-hypervisor `Image-arm64` kernel boots fine under Virtualization.framework**, so the
+  same kernel asset works for both backends; the build downloads it from the
+  `ch-release-v6.16.9-20260508` release (assets `Image-arm64` / `bzImage-x86_64`).
+- **Clean shutdown + exit code.** `vm-mount-setup.sh` must NOT `exec` lifecycle.sh — as PID 1, an
+  exit panics the kernel and hangs the VM. It now runs lifecycle.sh, writes the exit code to the
+  shared dir (`.vm-exit-code`), and powers off via magic sysrq. `VmSandboxService.waitForSandboxToFinish`
+  reads that file (the VMM exit code cannot carry the agent's status).
+- **`VmSandboxService` constructor now takes `initrdPath`** (after `rootfsPath`). The services-wiring
+  TODO must pass `env.VM_INITRD_PATH` and construct the service accordingly.
+- **Still unvalidated:** the Linux/cloud-hypervisor path (this project's dev machines are macOS) and
+  the full app-driven boot (needs the workflow/services wiring + driver/MCP context). The
+  `CloudHypervisorAdapter` mirrors the proven vfkit model but must be re-verified on a Linux/KVM host.
 
 ## Out of Scope
 

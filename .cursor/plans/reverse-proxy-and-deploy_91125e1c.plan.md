@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: verify
     content: Run pnpm typecheck and pnpm check, and smoke-test routing locally with Traefik in `--api.insecure=true` + a self-signed/staging ACME mode and a /etc/hosts override
-    status: pending
+    status: completed
 isProject: false
 ---
 

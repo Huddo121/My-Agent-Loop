@@ -82,8 +82,10 @@ iptables -w -A "$input_chain" -j DROP
 # host-gateway IPv6 resolution cannot bypass the IPv4 policy.
 ip6tables -w -N "$ipv6_forward_chain" 2>/dev/null || true
 ip6tables -w -F "$ipv6_forward_chain"
-ip6tables -w -C DOCKER-USER -i "$sandbox_bridge" -j "$ipv6_forward_chain" 2>/dev/null || \
-  ip6tables -w -I DOCKER-USER 1 -i "$sandbox_bridge" -j "$ipv6_forward_chain"
+# Docker may omit its IPv6 DOCKER-USER chain when IPv6 container networking is
+# disabled, so hook the kernel FORWARD chain directly for this defensive rule.
+ip6tables -w -C FORWARD -i "$sandbox_bridge" -j "$ipv6_forward_chain" 2>/dev/null || \
+  ip6tables -w -I FORWARD 1 -i "$sandbox_bridge" -j "$ipv6_forward_chain"
 ip6tables -w -A "$ipv6_forward_chain" -j DROP
 
 ip6tables -w -N "$ipv6_input_chain" 2>/dev/null || true

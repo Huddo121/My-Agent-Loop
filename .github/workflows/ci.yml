@@ -36,12 +36,23 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    # Guards against a hung run (e.g. the browser install stalling on an apt
+    # lock) rather than burning a full job timeout.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       # The frontend runs Storybook stories in a real Chromium via Playwright.
+      # ubuntu-latest already ships Chromium's system libraries, so we install
+      # only the browser binary (not `--with-deps`, whose apt step is slow and
+      # prone to hanging on the runner's background package locks) and cache it.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
-        run: pnpm --filter @mono/frontend exec playwright install --with-deps chromium
+        run: pnpm --filter @mono/frontend exec playwright install chromium
       - run: pnpm test
 
   native-builds:

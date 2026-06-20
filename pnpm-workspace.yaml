@@ -11,4 +11,13 @@ onlyBuiltDependencies:
   - protobufjs
   - ssh2
 
+# Dependencies that declare build scripts which we have reviewed and chosen NOT
+# to run. These are optional peer drivers/adapters pulled in by drizzle-orm and
+# better-auth for databases this project does not use (it runs on Postgres), so
+# their native builds are unnecessary. The check:native-builds guard fails CI if
+# any dependency with a build script is missing from both lists.
+ignoredBuiltDependencies:
+  - "@prisma/client"
+  - better-sqlite3
+
 linkWorkspacePackages: true

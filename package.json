@@ -8,6 +8,7 @@
   "scripts": {
     "check": "biome check .",
     "check:fix": "biome check . --write",
+    "check:native-builds": "pnpm --filter @mono/scripts check-native-builds",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "dev": "node scripts/dev-env.mjs",
@@ -40,7 +41,9 @@
     "shadcn": "pnpm --filter=@mono/frontend exec shadcn",
     "sync": "moon sync",
     "sync-agents": "pnpm --filter=@mono/scripts sync-agents",
-    "typecheck": "tsc --build"
+    "test": "pnpm typegen && pnpm -r run test",
+    "typecheck": "pnpm typegen && tsc --build",
+    "typegen": "pnpm --filter @mono/frontend exec react-router typegen"
   },
   "keywords": [],
   "author": "",

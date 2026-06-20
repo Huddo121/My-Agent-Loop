@@ -1,0 +1,66 @@
+name: CI
+
+# Fast, deterministic checks for every pull request and every push to main.
+# Production image publication (publish-production.yml) gates on main passing
+# here first.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, typecheck, migrations, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Committed migrations must match the schema. Regenerate and fail if the
+      # working tree changes, so a schema edit without `db:generate` is caught
+      # here rather than on the production host.
+      - name: Verify migrations are in sync with the schema
+        env:
+          # drizzle-kit generate does not connect, but the config reads this.
+          DATABASE_URL: postgres://placeholder:placeholder@localhost:5432/placeholder
+        run: |
+          pnpm --filter @mono/server db:generate
+          if ! git diff --quiet --exit-code apps/server/drizzle; then
+            echo "::error::Drizzle migrations are out of sync with src/db/schema.ts."
+            echo "Run 'pnpm --filter @mono/server db:generate' locally and commit the result."
+            git --no-pager diff apps/server/drizzle
+            exit 1
+          fi
+
+      - name: Format and lint
+        run: pnpm check
+
+      # The frontend's typecheck depends on React Router's generated route types
+      # (app/**/+types/*), which are produced by `react-router typegen`. Generate
+      # them before the workspace-wide `tsc --build`, which otherwise fails on the
+      # known missing ./+types/root import.
+      - name: Typecheck
+        run: |
+          pnpm --filter @mono/frontend exec react-router typegen
+          pnpm typecheck
+
+      - name: Test
+        run: pnpm -r --if-present test:run
+
+      # Build the packaging artifacts so a broken bundle is caught here, not at
+      # image publication time.
+      - name: Build server and frontend
+        run: |
+          pnpm --filter @mono/server build
+          pnpm --filter @mono/frontend build

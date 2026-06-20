@@ -84,18 +84,26 @@ docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml up -d my-agent-loop-db my-agent-loop-redis
 ```
 
-Push the Drizzle schema before starting the server. The one-off container joins
-the private database network without publishing Postgres. It reuses the
-workspace dependencies installed by the host-side build:
+Push the Drizzle schema before starting the server. The short-lived tunnel is
+published on loopback only, then attached to the private database network. This
+keeps Postgres off every external interface while the host's installed Drizzle
+tooling applies the schema:
 
 ```bash
-docker run --rm \
-  --network my-agent-loop_app-net \
-  --env-file .env \
-  -v "$PWD:/workspace" \
-  -w /workspace/apps/server \
-  node:24-slim \
-  sh -lc 'export DATABASE_URL="postgres://my_agent_loop:${POSTGRES_PASSWORD}@my-agent-loop-db:5432/my_agent_loop"; corepack pnpm exec drizzle-kit push'
+set -a
+. ./.env
+set +a
+
+docker run -d --rm --name mal-drizzle-tunnel \
+  -p 127.0.0.1:15432:15432 \
+  alpine/socat \
+  tcp-listen:15432,fork,reuseaddr tcp-connect:my-agent-loop-db:5432
+docker network connect my-agent-loop_app-net mal-drizzle-tunnel
+
+encoded_postgres_password=$(node -p 'encodeURIComponent(process.argv[1])' "$POSTGRES_PASSWORD")
+DATABASE_URL="postgres://my_agent_loop:${encoded_postgres_password}@127.0.0.1:15432/my_agent_loop" \
+  pnpm --filter @mono/server exec drizzle-kit push
+docker rm -f mal-drizzle-tunnel
 
 docker compose -f docker-compose.prod.yml up -d
 sudo ./scripts/configure-production-firewall.sh

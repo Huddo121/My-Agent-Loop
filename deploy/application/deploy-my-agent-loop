@@ -49,7 +49,9 @@ if [[ -f "${deploy_root}/.env" ]]; then
   source "${deploy_root}/.env"
   set +a
 fi
-readonly vm_enabled="${MAL_VM_ENABLED:-true}"
+# Off by default: the VM runtime is not wired yet (see docs/06-deimos-deployment.md),
+# so there is nothing to extract for until MAL_VM_ENABLED is set in the project .env.
+readonly vm_enabled="${MAL_VM_ENABLED:-false}"
 readonly vm_cache_root="${VM_CACHE_ROOT:-${deploy_root}/vm}"
 
 previous_version=""

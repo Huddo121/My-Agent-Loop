@@ -126,21 +126,21 @@ automatically — re-run the job after fixing the cause.
 
 VM sandboxes need the kernel, rootfs, and initramfs from the published
 `my-agent-loop-sandbox-vm:<sha>` image. This is handled **in-band by the deploy
-script** (when `MAL_VM_ENABLED=true`, the default): each deploy extracts the
+script** when `MAL_VM_ENABLED=true`: each deploy extracts the
 matching SHA into `/opt/my-agent-loop/vm/<sha>/` and atomically repoints
 `/opt/my-agent-loop/vm/current`, which `VM_KERNEL_PATH` / `VM_ROOTFS_PATH` /
 `VM_INITRD_PATH` in `server.env` reference. The VM base image is therefore
 versioned with the app — no separate command. The server copy-on-write clones
 the base per VM, so swapping `current` never disturbs a running sandbox. Prune
-old `vm/<sha>/` directories once no sandbox references them. Set
-`MAL_VM_ENABLED=false` on hosts that run only Docker sandboxes.
+old `vm/<sha>/` directories once no sandbox references them.
 
-> **Runtime requirement (not yet wired):** extracting the artifacts is necessary
-> but not sufficient. The server process runs Cloud Hypervisor + virtiofsd and
-> needs `/dev/kvm`, those binaries, the `vm/` cache mounted at the same path, and
-> `NET_ADMIN` for TAP networking. The current `compose.yaml` does not grant the
-> containerised server any of that, so VM sandboxes will not boot from it yet —
-> see the open question in the PR.
+> **Deferred — `MAL_VM_ENABLED` defaults to `false`.** Extracting the artifacts is
+> necessary but not sufficient: the server process runs Cloud Hypervisor +
+> virtiofsd and needs `/dev/kvm`, those binaries, the `vm/` cache mounted at the
+> same path, and `NET_ADMIN` for TAP networking. The current `compose.yaml` grants
+> the containerised server none of that, so VM sandboxes cannot boot yet. The
+> in-band extraction above is wired and ready but gated off until that runtime
+> follow-up lands; flip `MAL_VM_ENABLED=true` then.
 
 ## 7. Firewall
 

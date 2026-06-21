@@ -158,21 +158,30 @@ describe("LiveEventsService", () => {
   });
 
   it("sends heartbeats to idle subscribers", async () => {
-    const service = new LiveEventsService({ heartbeatIntervalMs: 50 });
-    const sendMock = vi.fn().mockResolvedValue(undefined);
-    const send = sendMock as unknown as SendSSE;
-    service.register({
-      workspaceId: ws1,
-      subscriptions: [{ type: "workspace-projects" }],
-      send,
-    });
+    // Fake timers keep this deterministic: with real timers under a loaded test
+    // run the interval slips and the assertion races the wall clock.
+    vi.useFakeTimers();
+    try {
+      const service = new LiveEventsService({ heartbeatIntervalMs: 50 });
+      const sendMock = vi.fn().mockResolvedValue(undefined);
+      const send = sendMock as unknown as SendSSE;
+      service.register({
+        workspaceId: ws1,
+        subscriptions: [{ type: "workspace-projects" }],
+        send,
+      });
 
-    await new Promise((r) => setTimeout(r, 120));
+      // The heartbeat fires every 50ms but only pings subscribers idle for at
+      // least 2x the interval (100ms), so advance past that threshold.
+      await vi.advanceTimersByTimeAsync(120);
 
-    expect(sendMock).toHaveBeenCalled();
-    const hasPing = sendMock.mock.calls.some(
-      (args) => (args[0] as { event?: string })?.event === "ping",
-    );
-    expect(hasPing).toBe(true);
+      expect(sendMock).toHaveBeenCalled();
+      const hasPing = sendMock.mock.calls.some(
+        (args) => (args[0] as { event?: string })?.event === "ping",
+      );
+      expect(hasPing).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

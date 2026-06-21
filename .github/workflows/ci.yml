@@ -21,7 +21,7 @@ jobs:
     name: Lint & format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm check
 
@@ -29,7 +29,7 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm typecheck
 
@@ -45,7 +45,7 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm test
 
@@ -53,7 +53,7 @@ jobs:
     name: Migrations in sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       # Committed migrations must match the schema. Regenerate and fail if the
       # working tree changes, so a schema edit without `db:generate` is caught
@@ -75,7 +75,7 @@ jobs:
     name: Native build allow-list
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm check:native-builds
 
@@ -83,7 +83,7 @@ jobs:
     name: Moon sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - uses: moonrepo/setup-toolchain@v0
         with:
@@ -109,7 +109,7 @@ jobs:
     steps:
       # moon compares against a base revision to find affected projects, so it
       # needs the full history rather than a shallow checkout.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # moon doesn't manage the Node toolchain here (no pinned version), so it

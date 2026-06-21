@@ -13,8 +13,10 @@ for command_name in docker iptables ip6tables; do
   fi
 done
 
-repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-compose_file="$repository_root/docker-compose.prod.yml"
+# On deimos the production Compose project is installed at /opt/my-agent-loop,
+# not in a repo checkout, so default to the installed path and allow an override
+# (e.g. when smoke-testing from a checkout).
+compose_file="${MAL_COMPOSE_FILE:-/opt/my-agent-loop/compose.yaml}"
 sandbox_network_name=mal-sandbox-net
 app_network_name=my-agent-loop_app-net
 

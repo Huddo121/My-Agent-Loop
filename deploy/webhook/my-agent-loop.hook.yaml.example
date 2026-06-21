@@ -1,0 +1,40 @@
+# Hook definition for My Agent Loop, to be added to the SHARED webhook listener's
+# hooks file (the adnanh/webhook service already running for the platform, e.g.
+# /etc/webhook/hooks.yaml). Append this entry alongside the existing hooks; the
+# listener exposes it at /hooks/my-agent-loop.
+#
+# GitHub Actions POSTs {"version":"<40-char sha>"} with an X-Deploy-Token header.
+# The token is matched here before the root-owned deploy script is invoked, and
+# the SHA is regex-checked both here and again inside the script.
+
+- id: my-agent-loop
+  execute-command: /usr/bin/sudo
+  command-working-directory: /
+  http-methods:
+    - POST
+  include-command-output-in-response: true
+  include-command-output-in-response-on-error: true
+  trigger-rule-mismatch-http-response-code: 404
+
+  pass-arguments-to-command:
+    - source: string
+      name: "-H"
+    - source: string
+      name: /usr/local/sbin/deploy-my-agent-loop
+    - source: payload
+      name: version
+
+  trigger-rule:
+    and:
+      - match:
+          type: value
+          value: REPLACE_WITH_LONG_RANDOM_TOKEN
+          parameter:
+            source: header
+            name: X-Deploy-Token
+      - match:
+          type: regex
+          regex: "^[0-9a-f]{40}$"
+          parameter:
+            source: payload
+            name: version

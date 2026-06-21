@@ -1,0 +1,65 @@
+# Traefik dynamic config for My Agent Loop.
+#
+# Install this into the SHARED host Traefik's dynamic directory (the same
+# `providers.file.directory` that already serves agent-first-forge and the
+# deployment webhook), e.g. /opt/<shared-traefik>/traefik/dynamic/my-agent-loop.yaml.
+# Traefik watches that directory, so dropping this file in is enough — MAL does
+# not run its own Traefik.
+#
+# The services point at the loopback ports published by deploy/application/compose.yaml
+# (server 23000, web 28080). Because the shared Traefik uses network_mode: host,
+# 127.0.0.1 is the host's loopback and reaches those bound ports directly.
+#
+# Replace loop.incredibleplatform.com if the public hostname changes. The /api
+# router must outrank the catch-all web router so API calls don't fall through to
+# the SPA. /api/internal stays private (driver-host API) via the deny middleware.
+
+http:
+  routers:
+    mal-internal-deny:
+      entryPoints:
+        - websecure
+      rule: Host(`loop.incredibleplatform.com`) && (Path(`/api/internal`) || PathPrefix(`/api/internal/`))
+      priority: 200
+      service: mal-server
+      middlewares:
+        - mal-deny-internal
+      tls:
+        certResolver: cloudflare
+
+    mal-api:
+      entryPoints:
+        - websecure
+      rule: Host(`loop.incredibleplatform.com`) && PathPrefix(`/api`)
+      priority: 100
+      service: mal-server
+      tls:
+        certResolver: cloudflare
+
+    mal-web:
+      entryPoints:
+        - websecure
+      rule: Host(`loop.incredibleplatform.com`)
+      priority: 1
+      service: mal-web
+      tls:
+        certResolver: cloudflare
+
+  services:
+    mal-server:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:23000
+    mal-web:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:28080
+
+  middlewares:
+    # The driver-host API (/api/internal/*) must never be reachable from the
+    # public hostname. Sandboxes reach the server over the private mal-sandbox-net,
+    # not through Traefik, so loopback-only is the entire allow-list.
+    mal-deny-internal:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32

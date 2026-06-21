@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Root-owned deployment for My Agent Loop. Invoked only by the webhook listener
+# through one narrow sudo rule; its single argument is a 40-char commit SHA that
+# is validated here before Docker is touched. Mirrors deploy-agent-first-forge.
+#
+# There is no migrate step here: the server applies committed forward-only
+# migrations itself on boot before serving, and aborts startup on failure. So
+# `up --wait` already gates on a fully migrated, healthy server; a failed
+# migration leaves the container unhealthy and triggers the rollback below.
+set -Eeuo pipefail
+
+readonly version="${1:-}"
+readonly deploy_root="${DEPLOY_ROOT:-/opt/my-agent-loop}"
+readonly compose_file="${deploy_root}/compose.yaml"
+readonly version_file="${deploy_root}/deployed-version"
+readonly lock_file="${DEPLOY_LOCK_FILE:-/run/lock/my-agent-loop-deploy.lock}"
+readonly vm_image_repo="${VM_IMAGE_REPO:-ghcr.io/huddo121/my-agent-loop-sandbox-vm}"
+
+log() {
+  local event="$1"
+  local detail="${2:-}"
+  printf '{"event":"%s","version":"%s","detail":"%s"}\n' \
+    "${event}" "${version}" "${detail}"
+}
+
+if [[ ! "${version}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "deployment_rejected" "invalid_version"
+  exit 64
+fi
+
+exec 9>"${lock_file}"
+if ! flock -n 9; then
+  log "deployment_rejected" "deployment_in_progress"
+  exit 75
+fi
+
+if [[ ! -f "${compose_file}" ]]; then
+  log "deployment_rejected" "compose_file_missing"
+  exit 66
+fi
+
+cd "${deploy_root}"
+
+# Load the non-secret project config (compose reads .env itself; we source it so
+# this script can branch on the same values, e.g. MAL_VM_ENABLED).
+if [[ -f "${deploy_root}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${deploy_root}/.env"
+  set +a
+fi
+# Off by default: the VM runtime is not wired yet (see docs/06-deimos-deployment.md),
+# so there is nothing to extract for until MAL_VM_ENABLED is set in the project .env.
+readonly vm_enabled="${MAL_VM_ENABLED:-false}"
+readonly vm_cache_root="${VM_CACHE_ROOT:-${deploy_root}/vm}"
+
+previous_version=""
+if [[ -f "${version_file}" ]]; then
+  previous_version="$(<"${version_file}")"
+fi
+
+# Extract the VM base rootfs + kernel + initramfs for a SHA into a version-pinned
+# directory and atomically repoint `current`, which VM_*_PATH references. Kept
+# in-band with the app deploy so the VM base image is versioned with the app, not
+# rotated out of band. The base is only read (the server copy-on-write clones it
+# per VM), so swapping `current` never disturbs a running sandbox.
+refresh_vm_artifacts() {
+  local target_version="$1"
+  local image="${vm_image_repo}:${target_version}"
+  local target_dir="${vm_cache_root}/${target_version}"
+
+  install -d -m 0755 "${vm_cache_root}" "${target_dir}"
+
+  if ! docker pull "${image}"; then
+    return 1
+  fi
+
+  # The image carries a default command (busybox base), so `docker create`
+  # succeeds; the container is only created + cp'd from, never started.
+  local container_id rc=0
+  container_id="$(docker create "${image}")" || return 1
+  docker cp "${container_id}:/artifacts/rootfs.raw" "${target_dir}/rootfs.raw" || rc=1
+  docker cp "${container_id}:/artifacts/bzImage-x86_64" "${target_dir}/bzImage-x86_64" || rc=1
+  docker cp "${container_id}:/artifacts/initramfs.cpio.gz" "${target_dir}/initramfs.cpio.gz" || rc=1
+  docker rm -f "${container_id}" >/dev/null 2>&1 || true
+  [[ "${rc}" -eq 0 ]] || return 1
+
+  ln -sfn "${target_dir}" "${vm_cache_root}/.current.tmp"
+  mv -T "${vm_cache_root}/.current.tmp" "${vm_cache_root}/current"
+}
+
+deploy() {
+  local target_version="$1"
+
+  # Pull all images up front so a missing tag fails before anything is replaced.
+  if ! MAL_IMAGE_TAG="${target_version}" docker compose --file "${compose_file}" pull; then
+    log "deployment_pull_failed" "${target_version}"
+    return 1
+  fi
+
+  # Refresh the VM base artifacts for this SHA before the server starts, so new
+  # VM sandboxes boot from the matching base image.
+  if [[ "${vm_enabled}" == "true" ]]; then
+    if ! refresh_vm_artifacts "${target_version}"; then
+      log "deployment_vm_refresh_failed" "${target_version}"
+      return 1
+    fi
+  fi
+
+  # The server migrates on boot before its healthcheck passes, so --wait blocks
+  # until the schema is migrated and every service is healthy. A failed migration
+  # keeps the server unhealthy and fails this step.
+  if ! MAL_IMAGE_TAG="${target_version}" docker compose --file "${compose_file}" up \
+    --detach --wait --wait-timeout 120 --remove-orphans; then
+    log "deployment_start_failed" "${target_version}"
+    return 1
+  fi
+
+  log "deployment_services_became_healthy" "${target_version}"
+}
+
+if deploy "${version}"; then
+  printf '%s\n' "${version}" >"${version_file}.tmp"
+  mv "${version_file}.tmp" "${version_file}"
+  log "deployment_succeeded" "${version}"
+  exit 0
+fi
+
+# Roll back the application only — never reverse the schema. Rolling back to an
+# older image re-runs its on-boot migrator, which is a no-op (those migrations
+# are already recorded), so this is safe across backward-compatible migrations.
+if [[ "${previous_version}" =~ ^[0-9a-f]{40}$ && "${previous_version}" != "${version}" ]]; then
+  if deploy "${previous_version}"; then
+    log "deployment_rolled_back" "${previous_version}"
+  else
+    log "deployment_rollback_failed" "${previous_version}"
+  fi
+else
+  log "deployment_rollback_skipped" "no_previous_version"
+fi
+
+exit 1

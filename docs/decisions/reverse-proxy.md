@@ -16,8 +16,22 @@ optional dynamic imports.
 
 ## Decision
 
-Traefik is the only service publishing host ports 80 and 443. Its file provider
-defines three routers: the exact `/api/internal` path and its descendants have
+> **Update (deimos deployment):** MAL no longer runs its *own* Traefik. The
+> homelab host already runs a single shared Traefik (`network_mode: host`, file
+> provider) that routes by hostname for several apps, so MAL instead publishes
+> its server/web containers on loopback ports (`127.0.0.1:23000` / `:28080`) and
+> contributes a routes file
+> (`deploy/application/traefik/dynamic/my-agent-loop.yaml`) to that shared
+> Traefik for `loop.incredibleplatform.com`. The routing policy below
+> (deny-internal, `/api` over the SPA), the DNS-01/Cloudflare choice, the network
+> isolation, and the esbuild packaging are all unchanged — only the Traefik
+> *instance* moved from per-app to shared, and images are pulled from GHCR by a
+> deploy webhook rather than built on the host. See
+> [Deimos deployment](../06-deimos-deployment.md).
+
+The routing intent (originally implemented as MAL's own Traefik, now expressed
+as a routes file for the shared Traefik) is a file provider with three routers:
+the exact `/api/internal` path and its descendants have
 highest priority and an IP allowlist containing loopback only; all other
 `/api*` requests go to the server; the lowest-priority router sends everything
 else to the static frontend. The policy intentionally maintains one denial

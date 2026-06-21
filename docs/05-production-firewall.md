@@ -47,8 +47,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now my-agent-loop-firewall.service
 ```
 
-Restart the unit after every `docker compose -f docker-compose.prod.yml up -d`
-that recreates the server:
+Restart the unit after every deployment that recreates the server (the deploy
+script runs `docker compose ... up`):
 
 ```bash
 sudo systemctl restart my-agent-loop-firewall.service

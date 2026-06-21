@@ -1,0 +1,5 @@
+# Installed to /etc/sudoers.d/my-agent-loop-deploy (mode 0440, validate with
+# `visudo --check --file`). Lets the unprivileged webhook user invoke only the
+# MAL deploy script as root, with no password. The script validates its single
+# SHA argument before touching Docker.
+webhook ALL=(root) NOPASSWD: /usr/local/sbin/deploy-my-agent-loop *

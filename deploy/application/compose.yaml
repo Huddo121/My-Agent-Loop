@@ -1,0 +1,126 @@
+# Production Compose project for My Agent Loop on the homelab host (deimos).
+#
+# Mirrors the agent-first-forge deployment shape: there is NO app-owned Traefik
+# here. A single shared Traefik already runs on the host (network_mode: host,
+# file provider) and routes loop.incredibleplatform.com to the loopback ports
+# this project publishes — see deploy/application/traefik/dynamic/my-agent-loop.yaml.
+#
+# Images are pulled from GHCR (a GitHub project keeps its artifacts in GHCR);
+# the host must be `sudo docker login ghcr.io`'d in addition to its GitLab login.
+# The deploy script (deploy-my-agent-loop) supplies MAL_IMAGE_TAG (the 40-char
+# commit SHA) per invocation; nothing here may run `latest`.
+#
+# Secrets are NOT in this file. Runtime secrets live in /etc/my-agent-loop/server.env
+# (mode 0600) and database credentials in /etc/my-agent-loop/db.env (mode 0600),
+# both injected via env_file. Only the non-secret MAL_RUNS_DIR is read from the
+# project .env for path interpolation.
+#
+# There is no separate migrate step: the server applies committed forward-only
+# migrations itself on boot (NODE_ENV=production) before it serves traffic, and
+# aborts startup on failure — so its healthcheck only goes green on a fully
+# migrated schema. A deploy is just `up --wait`.
+
+name: my-agent-loop
+
+networks:
+  # Server <-> Postgres/Redis only. internal: true keeps the datastores off every
+  # other bridge, so a misbehaving sandbox has no route to them.
+  app-net:
+    driver: bridge
+    internal: true
+
+  # Shared by the server and the agent sandbox containers it creates via the host
+  # Docker socket. The name must match DEFAULT_SANDBOX_NETWORK_NAME in
+  # SandboxService.ts so sandboxes attach by name and reach the server by DNS.
+  mal-sandbox-net:
+    name: mal-sandbox-net
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+
+services:
+  server:
+    image: ghcr.io/huddo121/my-agent-loop-server:${MAL_IMAGE_TAG:?set MAL_IMAGE_TAG}
+    restart: unless-stopped
+    env_file:
+      - path: ${SERVER_ENV_FILE:-/etc/my-agent-loop/server.env}
+        required: true
+    environment:
+      NODE_ENV: production
+      # Pin the sandbox runtime image to the same SHA as the server. Interpolated
+      # here (not in server.env) because it must track the deployed tag.
+      MAL_SANDBOX_IMAGE: ghcr.io/huddo121/my-agent-loop-sandbox:${MAL_IMAGE_TAG:?set MAL_IMAGE_TAG}
+    # Loopback only — the shared host Traefik (network_mode: host) reaches this
+    # via 127.0.0.1. Nothing is exposed off the host directly.
+    ports:
+      - "127.0.0.1:23000:3000"
+    volumes:
+      # The server creates sibling sandbox containers through the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Identical host:container path so per-sandbox bind mounts resolve on the host.
+      - ${MAL_RUNS_DIR}:${MAL_RUNS_DIR}
+    networks:
+      - app-net # reach Postgres/Redis
+      - mal-sandbox-net # be reachable by sandboxes + outbound internet
+    depends_on:
+      my-agent-loop-db:
+        condition: service_healthy
+      my-agent-loop-redis:
+        condition: service_started
+    # Node 24 has global fetch and the slim image has no curl; probe the
+    # unauthenticated liveness route so `up --wait` can gate on real readiness.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  web:
+    image: ghcr.io/huddo121/my-agent-loop-frontend:${MAL_IMAGE_TAG:?set MAL_IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:28080:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  my-agent-loop-db:
+    image: postgres:18.1
+    restart: unless-stopped
+    env_file:
+      - path: ${DB_ENV_FILE:-/etc/my-agent-loop/db.env}
+        required: true
+    networks:
+      - app-net
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    # No `ports:` — reachable only on app-net.
+
+  my-agent-loop-redis:
+    image: redis:8.2.0
+    restart: unless-stopped
+    networks:
+      - app-net
+    volumes:
+      - redis-data:/data
+    # No `ports:` — reachable only on app-net.

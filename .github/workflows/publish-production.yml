@@ -24,6 +24,11 @@ permissions:
 
 env:
   IMAGE_BASE: ghcr.io/huddo121
+  # The sandbox/VM jobs build the driver via `moon` (pnpm driver:build:linux ->
+  # moon driver:build-linux), so they need the CLI installed. Pin it to the
+  # version CI uses; setup-toolchain otherwise grabs the latest, whose config
+  # schema rejects this repo's moon.yml files.
+  MOON_VERSION: "1.38.3"
 
 jobs:
   # Resolve the commit to build and decide whether to run at all. workflow_run
@@ -122,6 +127,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - uses: moonrepo/setup-toolchain@v0
+        with:
+          moon-version: ${{ env.MOON_VERSION }}
+          auto-install: false
       # The root Dockerfile copies the prebuilt Linux driver; build it first.
       - name: Build Linux driver binary
         run: pnpm driver:build:linux
@@ -153,6 +162,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - uses: moonrepo/setup-toolchain@v0
+        with:
+          moon-version: ${{ env.MOON_VERSION }}
+          auto-install: false
       # Builds the Linux driver + sandbox image, exports the ext4 rootfs, and
       # downloads the matching amd64 kernel into .vm/. Needs privileged Docker
       # (loopback mount + mkfs.ext4), which GitHub-hosted runners allow.

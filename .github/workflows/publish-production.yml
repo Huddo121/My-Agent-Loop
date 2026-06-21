@@ -174,17 +174,26 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_BASE }}/my-agent-loop-sandbox-vm:${{ needs.meta.outputs.sha }}
 
-  # The deployment notification is owned by the deploy-notification work: it
-  # constructs the signed, canonical payload and POSTs it to the webhook receiver
-  # only after every image above exists. It must `needs` all image jobs and run
-  # in the GitHub `production` environment so the shared secret is scoped. Left as
-  # a placeholder so the publish set is complete before notification is wired in.
-  #
-  #   notify:
-  #     needs: [meta, server, frontend, sandbox, vm]
-  #     environment: production
-  #     ...
-  #
-  # Still to add alongside the webhook/host work, not buildable here yet:
-  #   - my-agent-loop-webhook image (needs apps/deploy-webhook)
-  #   - my-agent-loop-deployment bundle image (needs deploy/ host scripts + systemd)
+  # Notify the homelab deploy webhook only after every image for this SHA exists.
+  # The shared adnanh/webhook listener on deimos validates the token and invokes
+  # the root-owned deploy-my-agent-loop script, which pulls these exact GHCR tags.
+  # Gated on the DEPLOY_ENABLED repo variable so publishing can run without
+  # auto-deploying; runs in the `production` environment to scope the secret.
+  notify:
+    name: Notify deploy webhook
+    needs: [meta, server, frontend, sandbox, vm]
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger deployment
+        env:
+          WEBHOOK_URL: ${{ secrets.MAL_DEPLOY_WEBHOOK_URL }}
+          DEPLOY_TOKEN: ${{ secrets.MAL_DEPLOY_WEBHOOK_TOKEN }}
+          SHA: ${{ needs.meta.outputs.sha }}
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --header "Content-Type: application/json" \
+            --header "X-Deploy-Token: ${DEPLOY_TOKEN}" \
+            --data "{\"version\":\"${SHA}\"}" \
+            "${WEBHOOK_URL}"

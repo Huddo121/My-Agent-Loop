@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Root-owned deployment for My Agent Loop. Invoked only by the webhook listener
+# through one narrow sudo rule; its single argument is a 40-char commit SHA that
+# is validated here before Docker is touched. Mirrors deploy-agent-first-forge.
+#
+# There is no migrate step here: the server applies committed forward-only
+# migrations itself on boot before serving, and aborts startup on failure. So
+# `up --wait` already gates on a fully migrated, healthy server; a failed
+# migration leaves the container unhealthy and triggers the rollback below.
+set -Eeuo pipefail
+
+readonly version="${1:-}"
+readonly deploy_root="${DEPLOY_ROOT:-/opt/my-agent-loop}"
+readonly compose_file="${deploy_root}/compose.yaml"
+readonly version_file="${deploy_root}/deployed-version"
+readonly lock_file="${DEPLOY_LOCK_FILE:-/run/lock/my-agent-loop-deploy.lock}"
+
+log() {
+  local event="$1"
+  local detail="${2:-}"
+  printf '{"event":"%s","version":"%s","detail":"%s"}\n' \
+    "${event}" "${version}" "${detail}"
+}
+
+if [[ ! "${version}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "deployment_rejected" "invalid_version"
+  exit 64
+fi
+
+exec 9>"${lock_file}"
+if ! flock -n 9; then
+  log "deployment_rejected" "deployment_in_progress"
+  exit 75
+fi
+
+if [[ ! -f "${compose_file}" ]]; then
+  log "deployment_rejected" "compose_file_missing"
+  exit 66
+fi
+
+cd "${deploy_root}"
+
+previous_version=""
+if [[ -f "${version_file}" ]]; then
+  previous_version="$(<"${version_file}")"
+fi
+
+deploy() {
+  local target_version="$1"
+
+  # Pull all images up front so a missing tag fails before anything is replaced.
+  if ! MAL_IMAGE_TAG="${target_version}" docker compose --file "${compose_file}" pull; then
+    log "deployment_pull_failed" "${target_version}"
+    return 1
+  fi
+
+  # The server migrates on boot before its healthcheck passes, so --wait blocks
+  # until the schema is migrated and every service is healthy. A failed migration
+  # keeps the server unhealthy and fails this step.
+  if ! MAL_IMAGE_TAG="${target_version}" docker compose --file "${compose_file}" up \
+    --detach --wait --wait-timeout 120 --remove-orphans; then
+    log "deployment_start_failed" "${target_version}"
+    return 1
+  fi
+
+  log "deployment_services_became_healthy" "${target_version}"
+}
+
+if deploy "${version}"; then
+  printf '%s\n' "${version}" >"${version_file}.tmp"
+  mv "${version_file}.tmp" "${version_file}"
+  log "deployment_succeeded" "${version}"
+  exit 0
+fi
+
+# Roll back the application only — never reverse the schema. Rolling back to an
+# older image re-runs its on-boot migrator, which is a no-op (those migrations
+# are already recorded), so this is safe across backward-compatible migrations.
+if [[ "${previous_version}" =~ ^[0-9a-f]{40}$ && "${previous_version}" != "${version}" ]]; then
+  if deploy "${previous_version}"; then
+    log "deployment_rolled_back" "${previous_version}"
+  else
+    log "deployment_rollback_failed" "${previous_version}"
+  fi
+else
+  log "deployment_rollback_skipped" "no_previous_version"
+fi
+
+exit 1

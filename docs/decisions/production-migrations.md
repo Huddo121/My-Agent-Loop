@@ -40,9 +40,10 @@ itself on boot, before it begins serving.
 - `build.mjs` copies the `drizzle/` tree into `dist/` next to `dist/index.js`, so
   the production image carries the migrations with no raw TypeScript or Drizzle
   CLI.
-- A deploy is therefore just `docker compose -f docker-compose.prod.yml up -d`:
-  the operator runs no migrate step, and there is no second image or one-shot
-  container to keep in sync. This assumes a single server instance, which the
+- A deploy is therefore just a `docker compose up` of the production project
+  (`deploy/application/compose.yaml`, driven by the deploy script): the operator
+  runs no migrate step, and there is no second image or one-shot container to
+  keep in sync. This assumes a single server instance, which the
   deployment already is (it manages sandboxes through the host Docker socket);
   Drizzle's migrator is not coordinated across replicas, so scaling the server
   horizontally would require reintroducing a dedicated migrate step that runs

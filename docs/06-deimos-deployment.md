@@ -68,9 +68,8 @@ sudo install -m 0644 deploy/application/deployment.env.example /opt/my-agent-loo
 sudo install -m 0600 deploy/application/server.env.example   /etc/my-agent-loop/server.env
 sudo install -m 0600 deploy/application/db.env.example       /etc/my-agent-loop/db.env
 
-# Root-owned host commands
+# Root-owned host command
 sudo install -m 0755 deploy/application/deploy-my-agent-loop /usr/local/sbin/deploy-my-agent-loop
-sudo install -m 0755 deploy/application/refresh-vm-image     /usr/local/sbin/refresh-vm-image
 
 # Shared Traefik route (drop into the shared Traefik's dynamic directory)
 sudo install -m 0644 deploy/application/traefik/dynamic/my-agent-loop.yaml.example \
@@ -125,18 +124,23 @@ automatically — re-run the job after fixing the cause.
 
 ## 6. VM sandbox artifact
 
-VM sandboxes need the rootfs + kernel extracted from the published
-`my-agent-loop-sandbox-vm:<sha>` image. This rotates independently of the app:
+VM sandboxes need the kernel, rootfs, and initramfs from the published
+`my-agent-loop-sandbox-vm:<sha>` image. This is handled **in-band by the deploy
+script** (when `MAL_VM_ENABLED=true`, the default): each deploy extracts the
+matching SHA into `/opt/my-agent-loop/vm/<sha>/` and atomically repoints
+`/opt/my-agent-loop/vm/current`, which `VM_KERNEL_PATH` / `VM_ROOTFS_PATH` /
+`VM_INITRD_PATH` in `server.env` reference. The VM base image is therefore
+versioned with the app — no separate command. The server copy-on-write clones
+the base per VM, so swapping `current` never disturbs a running sandbox. Prune
+old `vm/<sha>/` directories once no sandbox references them. Set
+`MAL_VM_ENABLED=false` on hosts that run only Docker sandboxes.
 
-```sh
-sudo /usr/local/sbin/refresh-vm-image <40-char-commit-sha>
-```
-
-It extracts into `/opt/my-agent-loop/vm/<sha>/` and atomically repoints
-`/opt/my-agent-loop/vm/current`, which `VM_KERNEL_PATH` / `VM_ROOTFS_PATH` in
-`server.env` reference. New VM sandboxes use `current`; sandboxes already running
-keep the file they booted from. Prune old `vm/<sha>/` directories once no sandbox
-references them.
+> **Runtime requirement (not yet wired):** extracting the artifacts is necessary
+> but not sufficient. The server process runs Cloud Hypervisor + virtiofsd and
+> needs `/dev/kvm`, those binaries, the `vm/` cache mounted at the same path, and
+> `NET_ADMIN` for TAP networking. The current `compose.yaml` does not grant the
+> containerised server any of that, so VM sandboxes will not boot from it yet —
+> see the open question in the PR.
 
 ## 7. Firewall
 

@@ -7,14 +7,16 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "sync-agents": "tsx src/sync-agents.ts"
+    "sync-agents": "tsx src/sync-agents.ts",
+    "check-native-builds": "tsx src/check-native-builds.ts"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.8.0",
   "dependencies": {
-    "gray-matter": "4.0.3"
+    "gray-matter": "4.0.3",
+    "yaml": "2.8.2"
   },
   "devDependencies": {
     "@types/node": "25.6.0",

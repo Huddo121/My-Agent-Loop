@@ -106,15 +106,12 @@ docker build -t ghcr.io/huddo121/my-agent-loop-sandbox:local .
 
 </details>
 
-Apply the committed migrations before starting the server. The one-shot
-`migrate` service runs inside the private `app-net` using the same server image
-(it bundles the migrations), so Postgres never needs to be exposed and the host
-needs no Drizzle tooling or socat tunnel. It is gated behind the `tools` profile,
-so a plain `up` never reruns it:
+Start the stack. The server applies the committed migrations itself on boot,
+before it begins serving — it bundles the migrations, so Postgres never needs to
+be exposed and the host needs no Drizzle tooling or socat tunnel. A deploy is
+just `up -d`; there is no separate migrate step:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm migrate
-
 docker compose -f docker-compose.prod.yml up -d
 sudo ./scripts/configure-production-firewall.sh
 ```
@@ -122,7 +119,8 @@ sudo ./scripts/configure-production-firewall.sh
 Migrations are forward-only and follow an expand/contract policy; see
 [the production migrations decision](docs/decisions/production-migrations.md). A
 database created earlier with `drizzle-kit push` needs an explicit one-time
-baseline before the first migration — do not run the migrator blindly against it.
+baseline before the server's first boot — do not point the auto-migrator at it
+blindly.
 
 The firewall script must be reapplied whenever Compose recreates the server;
 [the production firewall guide](docs/05-production-firewall.md) includes a

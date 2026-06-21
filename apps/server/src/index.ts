@@ -9,6 +9,7 @@ import { createHonoServer } from "cerato";
 import { adminHandlers } from "./admin/admin-handlers";
 import { auth } from "./auth/auth";
 import { ensureMalCliClient } from "./auth/oauth-client-seed";
+import { runMigrations } from "./db/run-migrations";
 import { driverApiHandlers } from "./driver-api/driver-api-handlers";
 import { env } from "./env";
 import { handleLiveEvents } from "./live-events/live-events-route";
@@ -87,6 +88,22 @@ app.get("/.well-known/openid-configuration", async (ctx) => {
 app.get("/api/workspaces/:workspaceId/live-events", async (ctx) => {
   return handleLiveEvents(ctx, services);
 });
+
+// Production owns its schema through committed forward-only migrations, applied
+// here before the server serves any traffic — so a deploy needs no separate
+// migrate step. Development is deliberately excluded: it manages schema with
+// `drizzle-kit push`, and running these migrations against a push-built database
+// would fail (the tables already exist with no `__drizzle_migrations` ledger).
+if (env.NODE_ENV === "production") {
+  try {
+    await runMigrations(services.db, services.logger);
+  } catch (error) {
+    services.logger.error("Database migrations failed; aborting startup.", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
+}
 
 await ensureMalCliClient();
 

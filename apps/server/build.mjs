@@ -22,12 +22,8 @@ const workspaceSrc = (pkg) =>
 // pulls in native .node addons (ssh2, cpu-features) and some validation
 // libraries dynamically import optional packages that aren't installed.
 await esbuild.build({
-  // Two entrypoints: the server (index.js) and the standalone one-shot DB
-  // migrator (migrate.js). The migrate container reuses this same image and
-  // runs `node dist/migrate.js`, so the migrator must be bundled here too.
   entryPoints: {
     index: path.join(here, "src", "index.ts"),
-    migrate: path.join(here, "src", "db", "migrate.ts"),
   },
   bundle: true,
   platform: "node",
@@ -55,9 +51,10 @@ fs.copyFileSync(
   path.join(outdir, "lifecycle.sh"),
 );
 
-// The committed SQL migrations are read at runtime by dist/migrate.js relative
-// to its own URL, so copy the whole drizzle/ tree (SQL + meta) next to it. This
-// keeps raw TypeScript and the drizzle-kit CLI out of the production image.
+// The committed SQL migrations are read at runtime by dist/index.js (it applies
+// them on boot) relative to its own URL, so copy the whole drizzle/ tree
+// (SQL + meta) next to it. This keeps raw TypeScript and the drizzle-kit CLI out
+// of the production image.
 fs.cpSync(path.join(here, "drizzle"), path.join(outdir, "drizzle"), {
   recursive: true,
 });

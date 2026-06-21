@@ -15,8 +15,7 @@
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
     "drizzle": "drizzle-kit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "node dist/migrate.js"
+    "db:generate": "drizzle-kit generate"
   },
   "keywords": [],
   "author": "",

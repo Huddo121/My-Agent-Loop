@@ -20,25 +20,33 @@ image as a reviewed artifact, not be recomputed on the host.
 
 ## Decision
 
-Schema changes are committed, forward-only SQL migrations applied by a dedicated
-one-shot process.
+Schema changes are committed, forward-only SQL migrations that the server applies
+itself on boot, before it begins serving.
 
 - `drizzle-kit generate` produces SQL + metadata under `apps/server/drizzle/`,
   which is committed and code-reviewed. `pnpm --filter @mono/server db:generate`
   wraps it. `drizzle-kit push` is no longer used for production.
-- `apps/server/src/db/migrate.ts` is a standalone entrypoint that reads only
-  `DATABASE_URL` — it deliberately does not import the server `envSchema`, so the
-  migrator holds none of the application's runtime secrets. It runs Drizzle's
-  runtime migrator against the bundled migrations folder and exits non-zero on
-  failure.
-- `build.mjs` emits `dist/migrate.js` alongside `dist/index.js` and copies the
-  `drizzle/` tree into `dist/`, so the production image carries the migrations
-  with no raw TypeScript or Drizzle CLI.
-- `docker-compose.prod.yml` exposes a `migrate` service that reuses the exact
-  server image on the internal `app-net`. It is gated behind the `tools` profile
-  so a normal `up` never reruns it; the deployer runs it once, after Postgres is
-  healthy and before replacing the app containers, and aborts the rollout on
-  failure.
+- `apps/server/src/db/run-migrations.ts` runs Drizzle's runtime migrator against
+  the bundled migrations folder. `index.ts` calls it on startup — but only when
+  `NODE_ENV=production`, and before any code touches the database — then aborts
+  the process (exit 1) if it fails, so the container never serves traffic against
+  a half-migrated schema and the rollout's healthcheck never goes green. It is
+  idempotent: Drizzle skips migrations already recorded in `__drizzle_migrations`,
+  so a restart re-runs it harmlessly.
+- Development is deliberately excluded from the on-boot path. It manages schema
+  with `drizzle-kit push`, and running these migrations against a push-built
+  database would fail (the tables already exist with no `__drizzle_migrations`
+  ledger). The gate keeps the two workflows from colliding.
+- `build.mjs` copies the `drizzle/` tree into `dist/` next to `dist/index.js`, so
+  the production image carries the migrations with no raw TypeScript or Drizzle
+  CLI.
+- A deploy is therefore just `docker compose -f docker-compose.prod.yml up -d`:
+  the operator runs no migrate step, and there is no second image or one-shot
+  container to keep in sync. This assumes a single server instance, which the
+  deployment already is (it manages sandboxes through the host Docker socket);
+  Drizzle's migrator is not coordinated across replicas, so scaling the server
+  horizontally would require reintroducing a dedicated migrate step that runs
+  once before the replicas start.
 
 Migrations are **forward-only** and follow an **expand/contract** discipline:
 add new columns/tables first, migrate reads/writes, then remove the old shape in
@@ -51,9 +59,10 @@ from a bad schema change is a restore from backup, not an automatic reversal.
 
 The initial migration assumes a **fresh** production database. A database that
 was previously created with `drizzle-kit push` must be given an explicit one-time
-baseline (marking the initial migration as already applied) before the migrator
-runs against it — never run the migrator blindly against a pushed database and
-never mark a migration applied just because the tables happen to exist.
+baseline (marking the initial migration as already applied) before the server
+first boots against it — never let the migrator run blindly against a pushed
+database and never mark a migration applied just because the tables happen to
+exist.
 
 ## Consequences
 

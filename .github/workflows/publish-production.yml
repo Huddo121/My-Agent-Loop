@@ -1,0 +1,190 @@
+name: Publish production
+
+# Build and publish immutable, SHA-tagged linux/amd64 images to GHCR after CI
+# passes on main. The host deploys by pulling these exact SHA tags; nothing here
+# touches the host directly. A separate notification step (owned by the
+# deploy-notification work) tells the host a full set of images now exists.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Only the newest main build should win. Cancelling obsolete in-progress runs
+# stops an older build from publishing (and later notifying) after a newer one
+# has started.
+concurrency:
+  group: publish-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_BASE: ghcr.io/huddo121
+
+jobs:
+  # Resolve the commit to build and decide whether to run at all. workflow_run
+  # fires even on CI failure, so gate on conclusion == success here; manual
+  # dispatch always proceeds.
+  meta:
+    name: Resolve commit
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  server:
+    name: Server image
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Packaging-only Dockerfile: prepare the bundle outside Docker first.
+      - name: Prepare server deploy bundle
+        run: |
+          pnpm --filter @mono/server build
+          rm -rf apps/server/deploy
+          pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: apps/server/deploy
+          file: apps/server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/my-agent-loop-server:${{ needs.meta.outputs.sha }}
+
+  frontend:
+    name: Frontend image
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build static SPA
+        run: pnpm --filter @mono/frontend build
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: apps/frontend
+          file: apps/frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/my-agent-loop-frontend:${{ needs.meta.outputs.sha }}
+
+  sandbox:
+    name: Docker sandbox image
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The root Dockerfile copies the prebuilt Linux driver; build it first.
+      - name: Build Linux driver binary
+        run: pnpm driver:build:linux
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/my-agent-loop-sandbox:${{ needs.meta.outputs.sha }}
+
+  vm:
+    name: VM sandbox image
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Builds the Linux driver + sandbox image, exports the ext4 rootfs, and
+      # downloads the matching amd64 kernel into .vm/. Needs privileged Docker
+      # (loopback mount + mkfs.ext4), which GitHub-hosted runners allow.
+      - name: Build VM rootfs and kernel
+        run: pnpm vm:build-rootfs
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Wrap the rootfs + kernel in a FROM scratch image (deploy/vm-image). The
+      # build context is the artifact output dir .vm.
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .vm
+          file: deploy/vm-image/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/my-agent-loop-sandbox-vm:${{ needs.meta.outputs.sha }}
+
+  # The deployment notification is owned by the deploy-notification work: it
+  # constructs the signed, canonical payload and POSTs it to the webhook receiver
+  # only after every image above exists. It must `needs` all image jobs and run
+  # in the GitHub `production` environment so the shared secret is scoped. Left as
+  # a placeholder so the publish set is complete before notification is wired in.
+  #
+  #   notify:
+  #     needs: [meta, server, frontend, sandbox, vm]
+  #     environment: production
+  #     ...
+  #
+  # Still to add alongside the webhook/host work, not buildable here yet:
+  #   - my-agent-loop-webhook image (needs apps/deploy-webhook)
+  #   - my-agent-loop-deployment bundle image (needs deploy/ host scripts + systemd)

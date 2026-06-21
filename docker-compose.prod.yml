@@ -65,20 +65,20 @@ services:
       - /etc/traefik/render-static-config.sh
 
   frontend-static:
-    build:
-      context: apps/frontend
+    # Immutable, SHA-tagged image pulled from GHCR. MAL_IMAGE_TAG is required
+    # (`:?` fails fast if unset) so production can never accidentally run an
+    # untagged or `latest` image. The host pulls; it never builds from source.
+    # For a local smoke test, build and tag these refs first — see README.
+    image: ghcr.io/huddo121/my-agent-loop-frontend:${MAL_IMAGE_TAG:?}
     restart: unless-stopped
     networks:
       - mal-sandbox-net
 
   server:
-    # The build context is the prepared pnpm deploy bundle, not the repo root.
-    # Prepare it on the host before `docker compose -f docker-compose.prod.yml build`:
-    #   pnpm --filter @mono/server build
-    #   pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
-    build:
-      context: apps/server/deploy
-      dockerfile: ../Dockerfile
+    # Immutable, SHA-tagged GHCR image. Pulled, never built, on the host. The
+    # server applies the committed migrations itself on boot (it bundles the
+    # drizzle/ tree), so a deploy is just `up -d` with no separate migrate step.
+    image: ghcr.io/huddo121/my-agent-loop-server:${MAL_IMAGE_TAG:?}
     restart: unless-stopped
     depends_on:
       my-agent-loop-db:
@@ -97,6 +97,10 @@ services:
       # compose service DNS — no host.docker.internal in prod.
       DRIVER_HOST_API_BASE_URL: ${DRIVER_HOST_API_BASE_URL}
       MCP_SERVER_URL: ${MCP_SERVER_URL}
+      # The image the server creates agent sandbox containers from. Pinned to the
+      # same SHA so the sandbox runtime is versioned alongside the app rather than
+      # whatever `my-agent-loop` happens to be tagged locally.
+      MAL_SANDBOX_IMAGE: ghcr.io/huddo121/my-agent-loop-sandbox:${MAL_IMAGE_TAG:?}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       FORGE_ENCRYPTION_KEY: ${FORGE_ENCRYPTION_KEY}
       OAUTH_CREDENTIALS_ENCRYPTION_KEY: ${OAUTH_CREDENTIALS_ENCRYPTION_KEY}
@@ -114,6 +118,23 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Identical host:container path so per-sandbox bind mounts line up (DinD).
       - ${MAL_RUNS_DIR}:${MAL_RUNS_DIR}
+    # Node 24 has global fetch, and the slim image has no curl/wget, so probe the
+    # unauthenticated liveness route with node itself. The deployer waits on this
+    # before switching traffic. The server applies migrations on boot before it
+    # starts serving, so this only goes green once the schema is up to date;
+    # start_period covers migrations plus the server process coming up.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   my-agent-loop-db:
     image: postgres:18.1

@@ -14,7 +14,8 @@
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
-    "drizzle": "drizzle-kit"
+    "drizzle": "drizzle-kit",
+    "db:generate": "drizzle-kit generate"
   },
   "keywords": [],
   "author": "",

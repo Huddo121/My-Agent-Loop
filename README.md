@@ -48,11 +48,11 @@ Create the production environment file and replace every placeholder:
 
 ```bash
 cp .env.example .env
-mkdir -p /srv/my-agent-loop/runs
-chmod 700 /srv/my-agent-loop/runs
+mkdir -p /home/services/mal/runs
+chmod 700 /home/services/mal/runs
 ```
 
-Required values are `APP_BASE_URL`, `MCP_SERVER_URL`,
+Required values are `MAL_IMAGE_TAG`, `APP_BASE_URL`, `MCP_SERVER_URL`,
 `DRIVER_HOST_API_BASE_URL`, `MAL_RUNS_DIR`, `POSTGRES_PASSWORD`,
 `BETTER_AUTH_SECRET`, `FORGE_ENCRYPTION_KEY`,
 `OAUTH_CREDENTIALS_ENCRYPTION_KEY`, `ACME_EMAIL`, and `CF_DNS_API_TOKEN`.
@@ -60,54 +60,67 @@ Keep the two encryption keys distinct. The example uses service DNS for MCP and
 driver-host traffic; do not replace those production URLs with
 `host.docker.internal`.
 
-### Build and start
+### Deploy (pull prebuilt images)
 
-Production Dockerfiles package prebuilt artifacts; they do not compile source.
-From the repository root:
+The host runs immutable images pulled from GHCR; it never builds from source.
+The `Publish production` workflow builds linux/amd64 images tagged with the
+commit SHA. Set `MAL_IMAGE_TAG` in `.env` to that SHA, then pull and start the
+datastores:
 
 ```bash
-pnpm install --frozen-lockfile
-
-# The server image copies a production pnpm deploy bundle.
-pnpm --filter @mono/server build
-rm -rf apps/server/deploy
-pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
-
-# The frontend image copies the static SPA output.
-pnpm --filter @mono/frontend build
-
-# Sandboxes are created from this separate host image through docker.sock.
-pnpm docker:build
-
-docker compose -f docker-compose.prod.yml config
-docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml config   # validates required env
+docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d my-agent-loop-db my-agent-loop-redis
 ```
 
-Push the Drizzle schema before starting the server. The short-lived tunnel is
-published on loopback only, then attached to the private database network. This
-keeps Postgres off every external interface while the host's installed Drizzle
-tooling applies the schema:
+The server creates agent sandboxes from `MAL_SANDBOX_IMAGE`, which the compose
+file pins to the same SHA. VM sandboxes additionally need the rootfs and kernel
+from `my-agent-loop-sandbox-vm:<sha>` extracted into the host VM cache directory
+that `VM_ROOTFS_PATH` / `VM_KERNEL_PATH` point at.
+
+<details>
+<summary>Local smoke test without GHCR</summary>
+
+To exercise the production compose against locally built images, build and tag
+the image refs and point `MAL_IMAGE_TAG` at that tag (then skip `pull`):
 
 ```bash
-set -a
-. ./.env
-set +a
+pnpm install --frozen-lockfile
+export MAL_IMAGE_TAG=local
 
-docker run -d --rm --name mal-drizzle-tunnel \
-  -p 127.0.0.1:15432:15432 \
-  alpine/socat \
-  tcp-listen:15432,fork,reuseaddr tcp-connect:my-agent-loop-db:5432
-docker network connect my-agent-loop_app-net mal-drizzle-tunnel
+# Server: packaging-only image over a prepared pnpm deploy bundle.
+pnpm --filter @mono/server build
+rm -rf apps/server/deploy
+pnpm --filter=@mono/server deploy --prod --legacy apps/server/deploy
+docker build -f apps/server/Dockerfile \
+  -t ghcr.io/huddo121/my-agent-loop-server:local apps/server/deploy
 
-encoded_postgres_password=$(node -p 'encodeURIComponent(process.argv[1])' "$POSTGRES_PASSWORD")
-DATABASE_URL="postgres://my_agent_loop:${encoded_postgres_password}@127.0.0.1:15432/my_agent_loop" \
-  pnpm --filter @mono/server exec drizzle-kit push
-docker rm -f mal-drizzle-tunnel
+# Frontend: static SPA over nginx.
+pnpm --filter @mono/frontend build
+docker build -t ghcr.io/huddo121/my-agent-loop-frontend:local apps/frontend
 
+# Docker sandbox image (prebuilt Linux driver first).
+pnpm driver:build:linux
+docker build -t ghcr.io/huddo121/my-agent-loop-sandbox:local .
+```
+
+</details>
+
+Start the stack. The server applies the committed migrations itself on boot,
+before it begins serving — it bundles the migrations, so Postgres never needs to
+be exposed and the host needs no Drizzle tooling or socat tunnel. A deploy is
+just `up -d`; there is no separate migrate step:
+
+```bash
 docker compose -f docker-compose.prod.yml up -d
 sudo ./scripts/configure-production-firewall.sh
 ```
+
+Migrations are forward-only and follow an expand/contract policy; see
+[the production migrations decision](docs/decisions/production-migrations.md). A
+database created earlier with `drizzle-kit push` needs an explicit one-time
+baseline before the server's first boot — do not point the auto-migrator at it
+blindly.
 
 The firewall script must be reapplied whenever Compose recreates the server;
 [the production firewall guide](docs/05-production-firewall.md) includes a

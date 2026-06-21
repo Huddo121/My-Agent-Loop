@@ -4,7 +4,7 @@ overview: Replace production schema pushes with committed migrations, publish im
 todos:
   - id: production_migrations
     content: Generate and commit the initial Drizzle migration, add a bundled migration entrypoint to the server image, add a one-shot Compose migration service, and remove drizzle push from production instructions
-    status: pending
+    status: completed
   - id: immutable_images
     content: Publish commit-SHA-tagged amd64 server, frontend, sandbox, webhook, and deployment-bundle images to GHCR; convert production Compose to image references; and make the runtime sandbox image configurable
     status: pending

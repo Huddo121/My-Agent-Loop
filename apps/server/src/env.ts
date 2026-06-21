@@ -81,6 +81,12 @@ const envSchema = z
     // OAuth credential blobs at rest (32-byte key; distinct from FORGE_ENCRYPTION_KEY)
     OAUTH_CREDENTIALS_ENCRYPTION_KEY: z.string().nonempty(),
 
+    // Docker sandbox runtime image. Agent containers are created from this image.
+    // Defaults to the locally built `my-agent-loop` tag for development; production
+    // sets it to the published GHCR ref (or digest) so the host runs an immutable,
+    // versioned sandbox image rather than whatever happens to be tagged locally.
+    MAL_SANDBOX_IMAGE: z.string().nonempty().default("my-agent-loop"),
+
     // VM sandbox configuration
     VM_KERNEL_PATH: z.string().optional(),
     VM_ROOTFS_PATH: z.string().optional(),

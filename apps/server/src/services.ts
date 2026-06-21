@@ -112,6 +112,7 @@ const gitService = new SimpleGitService();
 const sandboxService = new DockerSandboxService(
   new Dockerode(),
   new DockerLoggingService(console),
+  env.MAL_SANDBOX_IMAGE,
 );
 
 const taskQueue = new DatabaseTaskQueue();

@@ -1,5 +1,10 @@
 $schema: "https://moonrepo.dev/schemas/workspace.json"
 
+# This repo's trunk is `main`. Moon otherwise assumes `master`, so `moon ci`
+# diffs affected projects against a base revision that doesn't exist and fails.
+vcs:
+  defaultBranch: "main"
+
 projects:
   - "apps/*"
   - "packages/*"

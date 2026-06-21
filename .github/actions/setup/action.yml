@@ -4,9 +4,9 @@ description: Install pnpm, Node, and the project's dependencies from a frozen lo
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version-file: .nvmrc
         cache: pnpm

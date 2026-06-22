@@ -84,6 +84,10 @@ drivers/adapters pulled in by drizzle-orm and better-auth for databases this
 project doesn't use (it runs on Postgres). They're now explicitly listed under
 `ignoredBuiltDependencies`.
 
+Which of these jobs must pass before a PR can merge — and how that's wired so
+the ruleset doesn't have to be hand-maintained — is covered separately in
+[Required Checks and the CI Merge Gate](./ci-required-checks-and-merge-gate.md).
+
 ## Consequences
 
 - New deterministic rules should be added as CI jobs (or folded into Biome /

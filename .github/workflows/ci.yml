@@ -119,3 +119,24 @@ jobs:
         with:
           moon-version: ${{ env.MOON_VERSION }}
       - run: moon ci
+
+  # Single aggregate gate so branch protection only has to require one check.
+  # To make a new job required, add it to `needs` below rather than editing the
+  # ruleset — this list is the source of truth for what must pass to merge.
+  ci-gate:
+    name: CI gate
+    # Must run even when a dependency fails or is cancelled: a job with `needs`
+    # is otherwise skipped, and a skipped required check never reports a status,
+    # which wedges the PR on "Expected — Waiting for status to be reported".
+    if: ${{ always() }}
+    needs: [lint, typecheck, test, migrations, native-builds, moon-sync, build]
+    runs-on: ubuntu-latest
+    steps:
+      # `needs.*.result` is the list of dependency outcomes. A cancelled run
+      # (e.g. superseded via the concurrency group) is treated as a failure so
+      # it can't pass as green.
+      - name: Verify all required jobs succeeded
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::One or more required CI jobs did not succeed."
+          exit 1

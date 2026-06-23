@@ -3,6 +3,7 @@ import * as path from "node:path";
 import simpleGit, { type SimpleGit } from "simple-git";
 import { match } from "ts-pattern";
 import type { AbsoluteFilePath } from "../file-system/FilePath";
+import { buildHttpsRepositoryUrl } from "../forge";
 import type { ForgeType } from "../forge/types";
 import { ProtectedString } from "../utils/ProtectedString";
 import type { Result } from "../utils/Result";
@@ -10,33 +11,48 @@ import type { GitBranch, GitRepository } from "./GitRepository";
 
 export interface ForgeGitCredentials {
   forgeType: ForgeType;
+  forgeBaseUrl: string;
   token: ProtectedString;
+}
+
+export interface RepositoryAuthentication {
+  repositoryUrl: string;
+  credentials: ForgeGitCredentials;
+}
+
+function safeGitError(error: unknown, token: ProtectedString): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  const secret = token.getSecretValue();
+  return new Error(
+    message
+      .replaceAll(secret, "[redacted]")
+      .replaceAll(encodeURIComponent(secret), "[redacted]"),
+  );
 }
 
 /**
  * Builds an authenticated HTTPS URL for clone/push/fetch.
  * GitLab: https://oauth2:TOKEN@host/path.git
  * GitHub: https://x-access-token:TOKEN@host/path.git
+ * SSH repository URLs are converted to HTTPS because forge credentials are
+ * access tokens, not SSH keys.
  * Returns a ProtectedString; use getSecretValue() only at the point of use (e.g. passing to git).
  */
 export function buildAuthenticatedUrl(
   repositoryUrl: string,
+  forgeBaseUrl: string,
   forgeType: ForgeType,
   token: ProtectedString,
 ): ProtectedString {
-  try {
-    const url = new URL(repositoryUrl);
-    const secret = token.getSecretValue();
-    const username = match(forgeType)
-      .with("gitlab", () => "oauth2" as const)
-      .with("github", () => "x-access-token" as const)
-      .exhaustive();
-    url.username = username;
-    url.password = secret;
-    return new ProtectedString(url.toString());
-  } catch {
-    return new ProtectedString(repositoryUrl);
-  }
+  const url = new URL(buildHttpsRepositoryUrl(forgeBaseUrl, repositoryUrl));
+  const secret = token.getSecretValue();
+  const username = match(forgeType)
+    .with("gitlab", () => "oauth2" as const)
+    .with("github", () => "x-access-token" as const)
+    .exhaustive();
+  url.username = username;
+  url.password = secret;
+  return new ProtectedString(url.toString());
 }
 
 export interface CheckoutOptions {
@@ -52,6 +68,9 @@ export interface GitService {
    * The caller supplies the branch name (see `buildTaskBranchName` in the workflow layer).
    */
   checkoutRepository(options: CheckoutOptions): Promise<Result<GitRepository>>;
+  testRepositoryAccess(
+    authentication: RepositoryAuthentication,
+  ): Promise<Result<void>>;
   detectMainBranch(repository: GitRepository): Promise<Result<GitBranch>>;
   getRepositoryMetadata(
     targetDirectory: AbsoluteFilePath,
@@ -61,7 +80,10 @@ export interface GitService {
     repository: GitRepository,
     message: string,
   ): Promise<Result<void>>;
-  pushRepository(repository: GitRepository): Promise<Result<void>>;
+  pushRepository(
+    repository: GitRepository,
+    authentication: RepositoryAuthentication,
+  ): Promise<Result<void>>;
   mergeBranchInToCurrentBranch(
     repository: GitRepository,
     branch: GitBranch,
@@ -92,6 +114,20 @@ export class SimpleGitService implements GitService {
       fs.mkdirSync(repoPath, { recursive: true });
     }
     return simpleGit(repoPath);
+  }
+
+  private async withAuthenticatedRemote<T>(
+    repoGit: SimpleGit,
+    authenticatedUrl: string,
+    plainUrl: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    await repoGit.remote(["set-url", "origin", authenticatedUrl]);
+    try {
+      return await operation();
+    } finally {
+      await repoGit.remote(["set-url", "origin", plainUrl]);
+    }
   }
 
   /**
@@ -132,13 +168,18 @@ export class SimpleGitService implements GitService {
     options: CheckoutOptions,
   ): Promise<Result<GitRepository>> {
     const { repositoryUrl, targetDirectory, branch, credentials } = options;
-    const authenticatedUrl = buildAuthenticatedUrl(
-      repositoryUrl,
-      credentials.forgeType,
-      credentials.token,
-    ).getSecretValue();
-
     try {
+      const plainUrl = buildHttpsRepositoryUrl(
+        credentials.forgeBaseUrl,
+        repositoryUrl,
+      );
+      const authenticatedUrl = buildAuthenticatedUrl(
+        repositoryUrl,
+        credentials.forgeBaseUrl,
+        credentials.forgeType,
+        credentials.token,
+      ).getSecretValue();
+
       // Ensure parent directory exists
       const parentDir = path.dirname(targetDirectory);
       if (!fs.existsSync(parentDir)) {
@@ -158,61 +199,88 @@ export class SimpleGitService implements GitService {
 
       const repoGit = this.getGitForPath(targetDirectory);
 
-      if (isExistingRepo) {
-        await repoGit.fetch();
-        console.info(
-          "Fetched latest changes from repository to ",
-          targetDirectory,
-        );
-      }
+      return await this.withAuthenticatedRemote(
+        repoGit,
+        authenticatedUrl,
+        plainUrl,
+        async () => {
+          if (isExistingRepo) {
+            await repoGit.fetch();
+            console.info(
+              "Fetched latest changes from repository to ",
+              targetDirectory,
+            );
+          }
 
-      // Detect the primary branch (main or master)
-      const primaryBranch = await this.detectPrimaryBranch(repoGit);
-      console.info(`Detected primary branch: ${primaryBranch}`);
+          // Detect the primary branch (main or master)
+          const primaryBranch = await this.detectPrimaryBranch(repoGit);
+          console.info(`Detected primary branch: ${primaryBranch}`);
 
-      // Checkout the primary branch and pull latest changes
-      const localBranches = await repoGit.branchLocal();
-      if (localBranches.current !== primaryBranch) {
-        await repoGit.checkout(primaryBranch);
-      }
-      try {
-        await repoGit.pull();
-      } catch (err) {
-        // Ignore pulls with no remote tracking info
-        if (
-          !(
-            err instanceof Error &&
-            err.message.includes(
-              "There is no tracking information for the current branch.",
-            )
-          )
-        ) {
-          throw err;
-        }
-      }
+          // Checkout the primary branch and pull latest changes
+          const localBranches = await repoGit.branchLocal();
+          if (localBranches.current !== primaryBranch) {
+            await repoGit.checkout(primaryBranch);
+          }
+          try {
+            await repoGit.pull();
+          } catch (err) {
+            // Ignore pulls with no remote tracking info
+            if (
+              !(
+                err instanceof Error &&
+                err.message.includes(
+                  "There is no tracking information for the current branch.",
+                )
+              )
+            ) {
+              throw err;
+            }
+          }
 
-      // Create a new branch from the primary branch for this task run
-      // Always create a fresh branch to ensure we start from the latest primary branch
-      const branchesAfterPull = await repoGit.branchLocal();
-      if (branchesAfterPull.all.includes(branch)) {
-        // Branch already exists, delete it first to ensure fresh start
-        await repoGit.deleteLocalBranch(branch, true);
-        console.info(`Deleted existing branch ${branch} for fresh start`);
-      }
-      await repoGit.checkout(["-b", branch]);
-      console.info(`Created new branch ${branch} from ${primaryBranch}`);
+          // Create a new branch from the primary branch for this task run
+          // Always create a fresh branch to ensure we start from the latest primary branch
+          const branchesAfterPull = await repoGit.branchLocal();
+          if (branchesAfterPull.all.includes(branch)) {
+            // Branch already exists, delete it first to ensure fresh start
+            await repoGit.deleteLocalBranch(branch, true);
+            console.info(`Deleted existing branch ${branch} for fresh start`);
+          }
+          await repoGit.checkout(["-b", branch]);
+          console.info(`Created new branch ${branch} from ${primaryBranch}`);
 
-      return {
-        success: true,
-        value: {
-          branch,
-          path: targetDirectory,
+          return {
+            success: true,
+            value: {
+              branch,
+              path: targetDirectory,
+            },
+          };
         },
-      };
+      );
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: safeGitError(error, credentials.token),
+      };
+    }
+  }
+
+  async testRepositoryAccess(
+    authentication: RepositoryAuthentication,
+  ): Promise<Result<void>> {
+    try {
+      const authenticatedUrl = buildAuthenticatedUrl(
+        authentication.repositoryUrl,
+        authentication.credentials.forgeBaseUrl,
+        authentication.credentials.forgeType,
+        authentication.credentials.token,
+      ).getSecretValue();
+      await simpleGit().listRemote([authenticatedUrl]);
+      return { success: true, value: undefined };
+    } catch (error) {
+      return {
+        success: false,
+        error: safeGitError(error, authentication.credentials.token),
       };
     }
   }
@@ -260,7 +328,10 @@ export class SimpleGitService implements GitService {
     }
   }
 
-  async pushRepository(repository: GitRepository): Promise<Result<void>> {
+  async pushRepository(
+    repository: GitRepository,
+    authentication: RepositoryAuthentication,
+  ): Promise<Result<void>> {
     const repoPath = repository.path;
 
     if (!fs.existsSync(repoPath)) {
@@ -285,13 +356,29 @@ export class SimpleGitService implements GitService {
       };
     }
 
+    const plainUrl = buildHttpsRepositoryUrl(
+      authentication.credentials.forgeBaseUrl,
+      authentication.repositoryUrl,
+    );
+    const authenticatedUrl = buildAuthenticatedUrl(
+      authentication.repositoryUrl,
+      authentication.credentials.forgeBaseUrl,
+      authentication.credentials.forgeType,
+      authentication.credentials.token,
+    ).getSecretValue();
+
     try {
-      await repoGit.push("origin", currentBranch, ["--set-upstream"]);
+      await this.withAuthenticatedRemote(
+        repoGit,
+        authenticatedUrl,
+        plainUrl,
+        () => repoGit.push("origin", currentBranch, ["--set-upstream"]),
+      );
       return { success: true, value: undefined };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: safeGitError(error, authentication.credentials.token),
       };
     }
   }

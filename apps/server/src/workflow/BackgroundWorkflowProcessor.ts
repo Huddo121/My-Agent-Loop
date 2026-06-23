@@ -1,10 +1,7 @@
 import type { ProjectId } from "@mono/api";
 import { type Job, Worker } from "bullmq";
 import type { Database } from "../db";
-import {
-  createGitForgeService,
-  getProjectPathFromRepositoryUrl,
-} from "../forge";
+import { createGitForgeService, getForgeProjectPath } from "../forge";
 import type { ForgeSecretRepository } from "../forge-secrets";
 import type { GitService } from "../git/GitService";
 import type { AgentHarnessConfigRepository } from "../harness/AgentHarnessConfigRepository";
@@ -193,7 +190,8 @@ export class BackgroundWorkflowProcessor {
               };
             }
 
-            const projectPath = getProjectPathFromRepositoryUrl(
+            const projectPath = getForgeProjectPath(
+              project.forgeBaseUrl,
               project.repositoryUrl,
             );
             const gitForgeService = createGitForgeService({
@@ -208,6 +206,14 @@ export class BackgroundWorkflowProcessor {
               {
                 gitService: this.gitService,
                 gitForgeService,
+                repositoryAuthentication: {
+                  repositoryUrl: project.repositoryUrl,
+                  credentials: {
+                    forgeType: project.forgeType,
+                    forgeBaseUrl: project.forgeBaseUrl,
+                    token: secret,
+                  },
+                },
               },
             );
 

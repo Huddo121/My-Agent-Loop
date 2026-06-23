@@ -35,12 +35,9 @@ const HomePage = () => {
     }
   }, [projects, isLoadingProjects]);
 
-  const handleCreateProject = (request: CreateProjectRequest) => {
-    createProject.mutate(request, {
-      onSuccess: (newProject) => {
-        navigate(`/projects/${newProject.id}`, { replace: true });
-      },
-    });
+  const handleCreateProject = async (request: CreateProjectRequest) => {
+    const newProject = await createProject.mutateAsync(request);
+    navigate(`/projects/${newProject.id}`, { replace: true });
   };
 
   // Show loading or redirecting state

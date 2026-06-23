@@ -7,7 +7,10 @@ import {
   type WorkflowConfigurationDto,
   type WorkspaceId,
 } from "@mono/api";
+import { CheckCircle2Icon, CircleAlertIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -17,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "~/components/ui/field";
 import {
   HarnessSelect,
   INHERIT_VALUE,
@@ -36,12 +46,18 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Spinner } from "~/components/ui/spinner";
+import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { useTestForgeConnectionWithCredentials } from "~/lib/projects/useProjects";
+import {
+  useTestForgeConnectionWithCredentials,
+  useTestStoredForgeConnection,
+} from "~/lib/projects/useProjects";
 import {
   useProjectSandboxTypeQuery,
   useSetProjectSandboxType,
@@ -70,13 +86,13 @@ type BaseProjectDialogPropsShared = {
 type BaseProjectDialogPropsCreate = BaseProjectDialogPropsShared & {
   mode: "create";
   initialProjectId?: never;
-  onSubmit: (request: CreateProjectRequest) => void;
+  onSubmit: (request: CreateProjectRequest) => Promise<void>;
 };
 
 type BaseProjectDialogPropsUpdate = BaseProjectDialogPropsShared & {
   mode: "update";
   initialProjectId?: ProjectId;
-  onSubmit: (request: UpdateProjectRequest) => void;
+  onSubmit: (request: UpdateProjectRequest) => Promise<void>;
 };
 
 type BaseProjectDialogProps =
@@ -88,14 +104,14 @@ export type CreateProjectDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** When false, dialog cannot be dismissed (e.g. first project setup). Default true. */
   dismissable?: boolean;
-  onSubmit: (request: CreateProjectRequest) => void;
+  onSubmit: (request: CreateProjectRequest) => Promise<void>;
 };
 
 export type EditProjectDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: Project;
-  onSubmit: (request: UpdateProjectRequest) => void;
+  onSubmit: (request: UpdateProjectRequest) => Promise<void>;
 };
 
 const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
@@ -105,6 +121,93 @@ const defaultWorkflowConfiguration: WorkflowConfigurationDto = {
 
 const defaultForgeBaseUrl = (forgeType: ForgeTypeDto) =>
   forgeType === "gitlab" ? "https://gitlab.com" : "https://github.com";
+
+function validateHttpsUrl(value: string, label: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return `${label} must use HTTPS.`;
+    if (
+      label === "Repository URL" &&
+      url.pathname.split("/").filter(Boolean).length < 2
+    ) {
+      return "Repository URL must include an owner and repository path.";
+    }
+    return null;
+  } catch {
+    return `Enter a valid ${label.toLowerCase()}.`;
+  }
+}
+
+function repositoryUrlPlaceholder(forgeType: ForgeTypeDto): string {
+  return forgeType === "gitlab"
+    ? "https://gitlab.com/group/repository.git"
+    : "https://github.com/owner/repository.git";
+}
+
+function getProjectPathFromRepositoryUrl(repositoryUrl: string): string {
+  const trimmed = repositoryUrl.trim();
+
+  if (trimmed.startsWith("git@")) {
+    const colonIndex = trimmed.indexOf(":");
+    if (colonIndex !== -1) {
+      return trimmed
+        .slice(colonIndex + 1)
+        .replace(/^\/+/, "")
+        .replace(/\.git$/i, "");
+    }
+  }
+
+  if (trimmed.startsWith("ssh://")) {
+    try {
+      const url = new URL(trimmed);
+      return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+    } catch {
+      const withoutScheme = trimmed.slice("ssh://".length);
+      const firstSlash = withoutScheme.indexOf("/");
+      if (firstSlash !== -1) {
+        return withoutScheme
+          .slice(firstSlash + 1)
+          .replace(/^\/+/, "")
+          .replace(/\.git$/i, "");
+      }
+    }
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+  } catch {
+    return trimmed.replace(/^\/+/, "").replace(/\.git$/i, "");
+  }
+}
+
+function repositoryUrlForDisplay(
+  forgeBaseUrl: string,
+  repositoryUrl: string,
+): string {
+  if (repositoryUrl.trim().length === 0) return repositoryUrl;
+
+  try {
+    const url = new URL(forgeBaseUrl);
+    let projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const forgeBasePath = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (
+      forgeBasePath.length > 0 &&
+      projectPath.startsWith(`${forgeBasePath}/`)
+    ) {
+      projectPath = projectPath.slice(forgeBasePath.length + 1);
+    }
+    if (projectPath.length === 0) return repositoryUrl;
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/${projectPath}.git`;
+    return url.toString();
+  } catch {
+    return repositoryUrl;
+  }
+}
 
 type ProjectSandboxTypeSelectProps = {
   workspaceId: WorkspaceId;
@@ -175,13 +278,19 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
-  const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
   const [workflowConfiguration, setWorkflowConfiguration] =
     useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
   const effectiveForgeType = initialForgeType ?? "gitlab";
+  const effectiveForgeBaseUrl =
+    initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType);
   const [forgeType, setForgeType] = useState<ForgeTypeDto>(effectiveForgeType);
-  const [forgeBaseUrl, setForgeBaseUrl] = useState(
-    initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType),
+  const [forgeBaseUrl, setForgeBaseUrl] = useState(effectiveForgeBaseUrl);
+  const [repositoryUrl, setRepositoryUrl] = useState(
+    repositoryUrlForDisplay(effectiveForgeBaseUrl, initialRepositoryUrl),
+  );
+  const [usesCustomForgeHost, setUsesCustomForgeHost] = useState(
+    initialForgeBaseUrl !== undefined &&
+      initialForgeBaseUrl !== defaultForgeBaseUrl(effectiveForgeType),
   );
   const [forgeToken, setForgeToken] = useState("");
   const [harnessValue, setHarnessValue] = useState<string>(
@@ -193,8 +302,11 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   const [testResult, setTestResult] = useState<
     { success: true } | { success: false; error: string } | null
   >(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const testForgeConnection = useTestForgeConnectionWithCredentials();
+  const testStoredForgeConnection = useTestStoredForgeConnection();
 
   const modelsForSelectedHarness = useMemo(() => {
     if (harnessValue === INHERIT_VALUE) return [];
@@ -208,17 +320,25 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     if (open) {
       setName(initialName);
       setShortCode(initialShortCode);
-      setRepositoryUrl(initialRepositoryUrl);
       setWorkflowConfiguration(initialWorkflowConfiguration);
       const resetForgeType = initialForgeType ?? "gitlab";
+      const resetForgeBaseUrl =
+        initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType);
       setForgeType(resetForgeType);
-      setForgeBaseUrl(
-        initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType),
+      setForgeBaseUrl(resetForgeBaseUrl);
+      setRepositoryUrl(
+        repositoryUrlForDisplay(resetForgeBaseUrl, initialRepositoryUrl),
+      );
+      setUsesCustomForgeHost(
+        initialForgeBaseUrl !== undefined &&
+          initialForgeBaseUrl !== defaultForgeBaseUrl(resetForgeType),
       );
       setForgeToken("");
       setHarnessValue(initialAgentConfig?.harnessId ?? INHERIT_VALUE);
       setModelValue(initialAgentConfig?.modelId ?? HARNESS_DEFAULT_VALUE);
       setTestResult(null);
+      setSubmitError(null);
+      setIsSubmitting(false);
     }
   }, [
     open,
@@ -248,12 +368,50 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     );
   };
 
-  const canTestConnection =
-    forgeToken.trim().length > 0 && repositoryUrl.trim().length > 0;
+  const handleTestStoredConnection = () => {
+    if (initialProjectId === undefined) return;
+    setTestResult(null);
+    testStoredForgeConnection.mutate(
+      {
+        projectId: initialProjectId,
+        forgeType,
+        forgeBaseUrl: forgeBaseUrl.trim(),
+        repositoryUrl: repositoryUrl.trim(),
+      },
+      {
+        onSuccess: (result) => setTestResult(result),
+        onError: (error) =>
+          setTestResult({ success: false, error: error.message }),
+      },
+    );
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const repositoryUrlError = repositoryUrl.trim()
+    ? validateHttpsUrl(repositoryUrl.trim(), "Repository URL")
+    : "Repository URL is required.";
+  const forgeBaseUrlError = forgeBaseUrl.trim()
+    ? validateHttpsUrl(forgeBaseUrl.trim(), "Hosting URL")
+    : "Hosting URL is required.";
+  const showRepositoryUrlError =
+    repositoryUrl.length > 0 && repositoryUrlError !== null;
+  const showForgeBaseUrlError =
+    forgeBaseUrl.length > 0 && forgeBaseUrlError !== null;
+  const canTestConnection =
+    forgeToken.trim().length > 0 &&
+    repositoryUrlError === null &&
+    forgeBaseUrlError === null;
+  const isTestingConnection =
+    testForgeConnection.isPending || testStoredForgeConnection.isPending;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && shortCode.trim() && repositoryUrl.trim()) {
+    setSubmitError(null);
+    if (
+      name.trim() &&
+      shortCode.trim() &&
+      repositoryUrlError === null &&
+      forgeBaseUrlError === null
+    ) {
       const parsedHarnessId = parseHarnessValue(harnessValue);
       const agentConfig: AgentConfig | null =
         parsedHarnessId === null
@@ -263,47 +421,58 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
               modelId: parseModelValue(modelValue),
             };
 
-      if (props.mode === "create") {
-        props.onSubmit({
-          name: name.trim(),
-          shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
-          repositoryUrl,
-          workflowConfiguration,
-          forgeType,
-          forgeBaseUrl: forgeBaseUrl.trim(),
-          forgeToken: forgeToken.trim(),
-          agentConfig,
-        });
-      } else {
-        const update: UpdateProjectRequest = {
-          name: name.trim(),
-          shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
-          repositoryUrl,
-          workflowConfiguration,
-          forgeType,
-          forgeBaseUrl: forgeBaseUrl.trim(),
-          agentConfig,
-        };
-        if (forgeToken.trim()) {
-          update.forgeToken = forgeToken.trim();
+      setIsSubmitting(true);
+      try {
+        if (props.mode === "create") {
+          await props.onSubmit({
+            name: name.trim(),
+            shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+            repositoryUrl: repositoryUrl.trim(),
+            workflowConfiguration,
+            forgeType,
+            forgeBaseUrl: forgeBaseUrl.trim(),
+            forgeToken: forgeToken.trim(),
+            agentConfig,
+          });
+        } else {
+          const update: UpdateProjectRequest = {
+            name: name.trim(),
+            shortCode: shortCodeCodec.decode(shortCode.trim().toUpperCase()),
+            repositoryUrl: repositoryUrl.trim(),
+            workflowConfiguration,
+            forgeType,
+            forgeBaseUrl: forgeBaseUrl.trim(),
+            agentConfig,
+          };
+          if (forgeToken.trim()) {
+            update.forgeToken = forgeToken.trim();
+          }
+          await props.onSubmit(update);
         }
-        props.onSubmit(update);
+        onOpenChange(false);
+      } catch (error) {
+        setSubmitError(
+          error instanceof Error ? error.message : "Failed to save project.",
+        );
+      } finally {
+        setIsSubmitting(false);
       }
-      onOpenChange(false);
     }
   };
 
   const canSubmit =
     name.trim() &&
     shortCode.trim() &&
-    repositoryUrl.trim() &&
-    (mode === "update" || forgeToken.trim());
+    repositoryUrlError === null &&
+    forgeBaseUrlError === null &&
+    (mode === "update" || forgeToken.trim()) &&
+    !isSubmitting;
 
   const title = mode === "create" ? "Create Project" : "Update Project";
   const description =
     mode === "create"
-      ? "Enter a name and short code for your new project."
-      : "Enter a new name and short code for this project.";
+      ? "Configure the project, repository access, and agent harness."
+      : "Update the project, repository access, and agent harness.";
   const submitLabel = mode === "create" ? "Create" : "Update";
 
   return (
@@ -321,7 +490,7 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
           <Tabs defaultValue="project" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="project">Project</TabsTrigger>
-              <TabsTrigger value="git">Git</TabsTrigger>
+              <TabsTrigger value="repository">Repository</TabsTrigger>
               <TabsTrigger value="harness">Harness</TabsTrigger>
             </TabsList>
             <TabsContent value="project" className="space-y-4 py-4">
@@ -338,21 +507,6 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="repository-url"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Repository URL
-                </label>
-                <Input
-                  id="repository-url"
-                  placeholder="git@github.com/something/amazing.git"
-                  value={repositoryUrl}
-                  onChange={(e) => setRepositoryUrl(e.target.value)}
                   className="mt-1"
                 />
               </div>
@@ -376,89 +530,178 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
                 />
               </div>
             </TabsContent>
-            <TabsContent value="git" className="space-y-4 py-4">
-              <h2 className="text-lg font-medium mb-1">Git Forge</h2>
-              <div>
-                <label
-                  htmlFor="forge-type"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Forge type
-                </label>
-                <Select
-                  value={forgeType}
-                  onValueChange={(value: ForgeTypeDto) => {
-                    setForgeType(value);
-                    setForgeBaseUrl(defaultForgeBaseUrl(value));
-                  }}
-                >
-                  <SelectTrigger id="forge-type" className="mt-1 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gitlab">GitLab</SelectItem>
-                    <SelectItem value="github">GitHub</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label
-                  htmlFor="forge-base-url"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Base URL
-                </label>
-                <Input
-                  id="forge-base-url"
-                  placeholder="https://gitlab.com"
-                  value={forgeBaseUrl}
-                  onChange={(e) => setForgeBaseUrl(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="forge-token"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Token
-                </label>
-                <Input
-                  id="forge-token"
-                  type="password"
-                  placeholder={
-                    mode === "update" && initialHasForgeToken
-                      ? "Token configured"
-                      : "Personal access token"
-                  }
-                  value={forgeToken}
-                  onChange={(e) => setForgeToken(e.target.value)}
-                  className="mt-1"
-                />
-                {canTestConnection && (
-                  <div className="mt-2 flex items-center gap-2">
+            <TabsContent value="repository" className="py-4">
+              <FieldGroup className="gap-5">
+                <Field>
+                  <FieldLabel htmlFor="forge-type">Provider</FieldLabel>
+                  <FieldDescription>
+                    The service hosting this Git repository.
+                  </FieldDescription>
+                  <Select
+                    value={forgeType}
+                    onValueChange={(value: ForgeTypeDto) => {
+                      setForgeType(value);
+                      setForgeBaseUrl(defaultForgeBaseUrl(value));
+                      setUsesCustomForgeHost(false);
+                      setTestResult(null);
+                    }}
+                  >
+                    <SelectTrigger id="forge-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="gitlab">GitLab</SelectItem>
+                        <SelectItem value="github">GitHub</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field data-invalid={showRepositoryUrlError}>
+                  <FieldLabel htmlFor="repository-url">
+                    HTTPS repository URL
+                  </FieldLabel>
+                  <FieldDescription>
+                    Use the HTTPS clone URL. SSH URLs are not supported by MAL.
+                  </FieldDescription>
+                  <Input
+                    id="repository-url"
+                    type="url"
+                    inputMode="url"
+                    placeholder={repositoryUrlPlaceholder(forgeType)}
+                    value={repositoryUrl}
+                    onChange={(event) => {
+                      setRepositoryUrl(event.target.value);
+                      setTestResult(null);
+                    }}
+                    aria-invalid={showRepositoryUrlError}
+                  />
+                  {showRepositoryUrlError && (
+                    <FieldError>{repositoryUrlError}</FieldError>
+                  )}
+                </Field>
+
+                <Field orientation="horizontal">
+                  <div>
+                    <FieldLabel htmlFor="custom-forge-host">
+                      Enterprise or self-hosted
+                    </FieldLabel>
+                    <FieldDescription>
+                      Configure a hosting URL other than the public service.
+                    </FieldDescription>
+                  </div>
+                  <Switch
+                    id="custom-forge-host"
+                    checked={usesCustomForgeHost}
+                    onCheckedChange={(checked) => {
+                      setUsesCustomForgeHost(checked);
+                      if (!checked) {
+                        setForgeBaseUrl(defaultForgeBaseUrl(forgeType));
+                      }
+                      setTestResult(null);
+                    }}
+                  />
+                </Field>
+
+                {usesCustomForgeHost && (
+                  <Field data-invalid={showForgeBaseUrlError}>
+                    <FieldLabel htmlFor="forge-base-url">
+                      Hosting URL
+                    </FieldLabel>
+                    <FieldDescription>
+                      The HTTPS web URL for your GitHub Enterprise or GitLab
+                      instance.
+                    </FieldDescription>
+                    <Input
+                      id="forge-base-url"
+                      type="url"
+                      inputMode="url"
+                      placeholder={defaultForgeBaseUrl(forgeType)}
+                      value={forgeBaseUrl}
+                      onChange={(event) => {
+                        setForgeBaseUrl(event.target.value);
+                        setTestResult(null);
+                      }}
+                      aria-invalid={showForgeBaseUrlError}
+                    />
+                    {showForgeBaseUrlError && (
+                      <FieldError>{forgeBaseUrlError}</FieldError>
+                    )}
+                  </Field>
+                )}
+
+                <Field>
+                  <div className="flex items-center gap-2">
+                    <FieldLabel htmlFor="forge-token">
+                      Personal access token
+                    </FieldLabel>
+                    {mode === "update" && initialHasForgeToken && (
+                      <Badge variant="outline">Configured</Badge>
+                    )}
+                  </div>
+                  <FieldDescription>
+                    {mode === "update" && initialHasForgeToken
+                      ? "Leave blank to keep the stored token, or enter a replacement."
+                      : "Provide repository read/write and API permissions required by the selected workflow."}
+                  </FieldDescription>
+                  <Input
+                    id="forge-token"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={initialHasForgeToken ? "••••••••" : "Token"}
+                    value={forgeToken}
+                    onChange={(event) => {
+                      setForgeToken(event.target.value);
+                      setTestResult(null);
+                    }}
+                  />
+                  <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={handleTestConnection}
-                      disabled={testForgeConnection.isPending}
+                      onClick={
+                        forgeToken.trim()
+                          ? handleTestConnection
+                          : handleTestStoredConnection
+                      }
+                      disabled={
+                        isTestingConnection ||
+                        (forgeToken.trim()
+                          ? !canTestConnection
+                          : !initialHasForgeToken ||
+                            initialProjectId === undefined ||
+                            repositoryUrlError !== null ||
+                            forgeBaseUrlError !== null)
+                      }
                     >
-                      {testForgeConnection.isPending
-                        ? "Testing…"
-                        : "Test Connection"}
+                      {isTestingConnection && (
+                        <Spinner data-icon="inline-start" />
+                      )}
+                      {isTestingConnection ? "Testing…" : "Test connection"}
                     </Button>
-                    {testResult !== null &&
-                      (testResult.success ? (
-                        <span className="text-sm text-green-600">Success</span>
-                      ) : (
-                        <span className="text-sm text-destructive">
-                          {testResult.error}
-                        </span>
-                      ))}
                   </div>
-                )}
-              </div>
+                </Field>
+
+                {testResult !== null &&
+                  (testResult.success ? (
+                    <Alert>
+                      <CheckCircle2Icon />
+                      <AlertTitle>Connection successful</AlertTitle>
+                      <AlertDescription>
+                        MAL can access the repository through both the forge API
+                        and Git over HTTPS.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert variant="destructive">
+                      <CircleAlertIcon />
+                      <AlertTitle>Connection failed</AlertTitle>
+                      <AlertDescription>{testResult.error}</AlertDescription>
+                    </Alert>
+                  ))}
+              </FieldGroup>
             </TabsContent>
             <TabsContent value="harness" className="space-y-4 py-4">
               <h2 className="text-lg font-medium mb-1">Agent Harness</h2>
@@ -573,18 +816,27 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
               </div>
             </TabsContent>
           </Tabs>
+          {submitError !== null && (
+            <Alert variant="destructive">
+              <CircleAlertIcon />
+              <AlertTitle>Could not save project</AlertTitle>
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
+          )}
           <DialogFooter className="mt-4">
             {dismissable && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
             )}
             <Button type="submit" disabled={!canSubmit}>
-              {submitLabel}
+              {isSubmitting && <Spinner data-icon="inline-start" />}
+              {isSubmitting ? "Saving…" : submitLabel}
             </Button>
           </DialogFooter>
         </form>

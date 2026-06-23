@@ -727,6 +727,9 @@ function createTaskQueue(): TaskQueue {
 
 function createGitService(): GitService {
   return {
+    async testRepositoryAccess() {
+      return { success: true, value: undefined };
+    },
     async checkoutRepository(options): Promise<Result<GitRepository>> {
       fs.mkdirSync(options.targetDirectory, { recursive: true });
       return {

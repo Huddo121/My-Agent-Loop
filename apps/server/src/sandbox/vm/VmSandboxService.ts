@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -49,6 +50,133 @@ export interface VmSandboxServiceOptions {
 
 const DEFAULT_MEMORY_SIZE_MB = 2048;
 const DEFAULT_CPU_COUNT = 2;
+
+export interface GitWorktreeEntry {
+  path: string;
+  branch?: string;
+}
+
+export interface VmImagePathResolution {
+  path: string;
+  checkedPaths: string[];
+}
+
+export function parseGitWorktreeListPorcelain(
+  output: string,
+): GitWorktreeEntry[] {
+  const entries: GitWorktreeEntry[] = [];
+  let current: GitWorktreeEntry | undefined;
+
+  for (const line of output.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      if (current !== undefined) entries.push(current);
+      current = { path: line.slice("worktree ".length) };
+      continue;
+    }
+    if (line.startsWith("branch ") && current !== undefined) {
+      current.branch = line.slice("branch ".length);
+    }
+  }
+
+  if (current !== undefined) entries.push(current);
+  return entries;
+}
+
+function readGitWorktrees(): GitWorktreeEntry[] {
+  try {
+    return parseGitWorktreeListPorcelain(
+      execFileSync("git", ["worktree", "list", "--porcelain"], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+      }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function pathContains(root: string, candidate: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return (
+    relative === "" ||
+    (relative.length > 0 &&
+      !relative.startsWith("..") &&
+      !path.isAbsolute(relative))
+  );
+}
+
+function findOwningWorktree(
+  candidatePath: string,
+  worktrees: GitWorktreeEntry[],
+): GitWorktreeEntry | undefined {
+  return worktrees
+    .filter((entry) => pathContains(entry.path, candidatePath))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+}
+
+function findMainCheckout(
+  worktrees: GitWorktreeEntry[],
+): GitWorktreeEntry | undefined {
+  return (
+    worktrees.find((entry) => entry.branch === "refs/heads/main") ??
+    worktrees[0]
+  );
+}
+
+export function resolveVmImagePath(
+  configuredPath: string,
+  options: {
+    exists?: (path: string) => boolean;
+    worktrees?: GitWorktreeEntry[];
+  } = {},
+): VmImagePathResolution {
+  const exists = options.exists ?? fs.existsSync;
+  const checkedPaths = [configuredPath];
+  if (exists(configuredPath)) {
+    return { path: configuredPath, checkedPaths };
+  }
+
+  const worktrees = options.worktrees ?? readGitWorktrees();
+  const owningWorktree = findOwningWorktree(configuredPath, worktrees);
+  const mainCheckout = findMainCheckout(worktrees);
+  if (
+    owningWorktree === undefined ||
+    mainCheckout === undefined ||
+    path.resolve(owningWorktree.path) === path.resolve(mainCheckout.path)
+  ) {
+    return { path: configuredPath, checkedPaths };
+  }
+
+  const relativePath = path.relative(owningWorktree.path, configuredPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    return { path: configuredPath, checkedPaths };
+  }
+
+  const fallbackPath = path.join(mainCheckout.path, relativePath);
+  if (!checkedPaths.includes(fallbackPath)) {
+    checkedPaths.push(fallbackPath);
+  }
+  if (exists(fallbackPath)) {
+    return { path: fallbackPath, checkedPaths };
+  }
+
+  return { path: configuredPath, checkedPaths };
+}
+
+function requireResolvedVmImagePath(
+  label: string,
+  configuredPath: string,
+  worktrees: GitWorktreeEntry[],
+): string {
+  const resolution = resolveVmImagePath(configuredPath, { worktrees });
+  if (fs.existsSync(resolution.path)) {
+    return resolution.path;
+  }
+
+  throw new Error(
+    `${label} not found. Checked: ${resolution.checkedPaths.join(", ")}`,
+  );
+}
 
 /**
  * Single-quote-escapes a shell value so it can be safely embedded in an export statement.
@@ -295,9 +423,22 @@ export class VmSandboxService implements SandboxService {
 
     // After the guard above, TypeScript still sees the fields as string | undefined because they
     // are instance properties. Shadow them as narrowed locals so the rest of the method is typed.
-    const kernelPath: string = this.kernelPath;
-    const rootfsPath: string = this.rootfsPath;
-    const initrdPath: string = this.initrdPath;
+    const worktrees = readGitWorktrees();
+    const kernelPath = requireResolvedVmImagePath(
+      "VM kernel image",
+      this.kernelPath,
+      worktrees,
+    );
+    const rootfsPath = requireResolvedVmImagePath(
+      "VM rootfs image",
+      this.rootfsPath,
+      worktrees,
+    );
+    const initrdPath = requireResolvedVmImagePath(
+      "VM initrd image",
+      this.initrdPath,
+      worktrees,
+    );
 
     const volumes = options.volumes ?? [];
 

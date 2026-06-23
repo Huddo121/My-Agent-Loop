@@ -182,8 +182,8 @@ export function TaskQueue({
   };
 
   const handleUpdateProject = useCallback(
-    (updateProjectRequest: UpdateProjectRequest) => {
-      updateProject.mutate({
+    async (updateProjectRequest: UpdateProjectRequest) => {
+      await updateProject.mutateAsync({
         projectId: project.id,
         updateProjectRequest,
       });

@@ -24,6 +24,7 @@
     "driver:build:linux": "moon driver:build-linux",
     "driver:build:sea": "moon driver:build-sea",
     "drizzle": "pnpm run --filter @mono/server drizzle",
+    "link-env": "node scripts/link-env.mjs",
     "mal": "pnpm --filter @mono/mal-cli exec tsx src/index.ts",
     "mal:build": "moon mal-cli:build",
     "mal:build:bundle": "moon mal-cli:build-bundle",

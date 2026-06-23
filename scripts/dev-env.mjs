@@ -18,8 +18,13 @@ import { existsSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { promisify } from "node:util";
+import { linkEnvFiles } from "./link-env.mjs";
 
 const execFileAsync = promisify(execFile);
+
+// Linked worktrees don't get the gitignored secret dotenv files, so symlink
+// them in from the primary checkout before anything reads them.
+await linkEnvFiles();
 
 const isolated = process.argv.includes("--isolated");
 const tearDown = process.argv.includes("--down");

@@ -23,7 +23,9 @@ export type ProjectSidebarProps = {
   projects: Project[];
   currentProject: Project | null;
   onSelectProject: (project: Project) => void;
-  onCreateProject: (createProjectRequest: CreateProjectRequest) => void;
+  onCreateProject: (
+    createProjectRequest: CreateProjectRequest,
+  ) => Promise<void>;
   workspace: Workspace;
   isLoading?: boolean;
 };
@@ -44,10 +46,8 @@ export const ProjectSidebar = ({
     setDialogOpen(true);
   };
 
-  const handleDialogSubmit = (request: CreateProjectRequest) => {
-    // TODO: Wait for that to complete before returning
+  const handleDialogSubmit = (request: CreateProjectRequest) =>
     onCreateProject(request);
-  };
 
   return (
     <Sidebar className="border-r-0" collapsible="icon">
@@ -164,12 +164,9 @@ export const ConnectedProjectSidebar = () => {
   );
 
   const handleCreateProject = useCallback(
-    (createProjectRequest: CreateProjectRequest) => {
-      createProject.mutate(createProjectRequest, {
-        onSuccess: (newProject) => {
-          navigate(`/projects/${newProject.id}`);
-        },
-      });
+    async (createProjectRequest: CreateProjectRequest) => {
+      const newProject = await createProject.mutateAsync(createProjectRequest);
+      navigate(`/projects/${newProject.id}`);
     },
     [createProject, navigate],
   );

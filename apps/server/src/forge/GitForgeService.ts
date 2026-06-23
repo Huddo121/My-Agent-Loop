@@ -394,6 +394,39 @@ export function getProjectPathFromRepositoryUrl(repositoryUrl: string): string {
   }
 }
 
+/**
+ * Builds the canonical HTTPS clone URL from the configured forge host and the
+ * project path. The forge host is authoritative because SSH clone hostnames and
+ * ports do not necessarily match the forge's web endpoint.
+ */
+export function buildHttpsRepositoryUrl(
+  forgeBaseUrl: string,
+  repositoryUrl: string,
+): string {
+  const url = new URL(forgeBaseUrl);
+  if (url.protocol !== "https:") {
+    throw new Error("Forge hosting URL must use HTTPS.");
+  }
+
+  let projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+  const forgeBasePath = url.pathname.replace(/^\/+|\/+$/g, "");
+  if (forgeBasePath.length > 0 && projectPath.startsWith(`${forgeBasePath}/`)) {
+    projectPath = projectPath.slice(forgeBasePath.length + 1);
+  }
+  if (projectPath.length === 0) {
+    throw new Error(
+      "Repository URL must include an owner and repository path.",
+    );
+  }
+
+  url.username = "";
+  url.password = "";
+  url.search = "";
+  url.hash = "";
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/${projectPath}.git`;
+  return url.toString();
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------

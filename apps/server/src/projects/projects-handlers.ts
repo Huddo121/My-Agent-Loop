@@ -124,20 +124,43 @@ export const projectsHandlers: HonoHandlersFor<
     });
   },
   "test-forge-connection": async (ctx) => {
+    const { workspaceId } = ctx.hono.req.param();
+    const authSession = await requireAuthSession(ctx.hono.req.raw);
+    if (authSession === null) {
+      return unauthenticated();
+    }
+    const canAccess =
+      await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+        authSession.user.id,
+        workspaceId as WorkspaceId,
+      );
+    if (!canAccess) {
+      return notFound();
+    }
     const { forgeType, forgeBaseUrl, forgeToken, repositoryUrl } = ctx.body;
     const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const token = new ProtectedString(forgeToken);
     const credential = {
       forgeType,
       forgeBaseUrl,
-      token: new ProtectedString(forgeToken),
+      token,
       projectPath,
     };
     const gitForgeService = createGitForgeService(credential);
     const result = await gitForgeService.testConnection();
-    if (result.success) {
-      return ok({ success: true as const });
+    if (result.success === false) {
+      return badUserInput(`Forge API access failed: ${result.error.message}`);
     }
-    return badUserInput(result.error.message);
+    const gitResult = await ctx.services.gitService.testRepositoryAccess({
+      repositoryUrl,
+      credentials: { forgeType, forgeBaseUrl, token },
+    });
+    if (gitResult.success === false) {
+      return badUserInput(
+        `Git repository access failed: ${gitResult.error.message}`,
+      );
+    }
+    return ok({ success: true as const });
   },
   ":projectId": {
     GET: async (ctx) => {
@@ -285,6 +308,7 @@ export const projectsHandlers: HonoHandlersFor<
     "sandbox-type": projectSandboxTypeHandlers,
     "test-forge-connection": async (ctx) => {
       const { workspaceId, projectId } = ctx.hono.req.param();
+      const { forgeType, forgeBaseUrl, repositoryUrl } = ctx.body;
       const authSession = await requireAuthSession(ctx.hono.req.raw);
       if (authSession === null) {
         return unauthenticated();
@@ -311,20 +335,33 @@ export const projectsHandlers: HonoHandlersFor<
         if (secret === undefined) {
           return badUserInput("No forge token configured for this project.");
         }
-        const projectPath = getProjectPathFromRepositoryUrl(
-          project.repositoryUrl,
-        );
+        const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
         const gitForgeService = createGitForgeService({
-          forgeType: project.forgeType,
-          forgeBaseUrl: project.forgeBaseUrl,
+          forgeType,
+          forgeBaseUrl,
           token: secret,
           projectPath,
         });
         const result = await gitForgeService.testConnection();
-        if (result.success) {
-          return ok({ success: true as const });
+        if (result.success === false) {
+          return badUserInput(
+            `Forge API access failed: ${result.error.message}`,
+          );
         }
-        return badUserInput(result.error.message);
+        const gitResult = await ctx.services.gitService.testRepositoryAccess({
+          repositoryUrl,
+          credentials: {
+            forgeType,
+            forgeBaseUrl,
+            token: secret,
+          },
+        });
+        if (gitResult.success === false) {
+          return badUserInput(
+            `Git repository access failed: ${gitResult.error.message}`,
+          );
+        }
+        return ok({ success: true as const });
       });
     },
     run: async (ctx) => {

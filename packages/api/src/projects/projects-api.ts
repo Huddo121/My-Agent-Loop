@@ -39,6 +39,17 @@ export type QueueStateDto = z.infer<typeof queueStateDtoSchema>;
 
 export const forgeTypeSchema = z.enum(["gitlab", "github"]);
 
+const httpsUrlSchema = z.url().refine((value) => value.startsWith("https://"), {
+  message: "URL must use HTTPS",
+});
+const httpsRepositoryUrlSchema = httpsUrlSchema.refine((value) => {
+  try {
+    return new URL(value).pathname.split("/").filter(Boolean).length >= 2;
+  } catch {
+    return false;
+  }
+}, "Repository URL must include an owner and repository path");
+
 export const projectDtoSchema = z.object({
   id: projectIdSchema,
   workspaceId: workspaceIdSchema,
@@ -57,11 +68,11 @@ export type ProjectDto = z.infer<typeof projectDtoSchema>;
 export const createProjectRequestSchema = z.object({
   name: z.string(),
   shortCode: shortCodeCodec,
-  repositoryUrl: z.string(),
+  repositoryUrl: httpsRepositoryUrlSchema,
   workflowConfiguration: workflowConfigurationDtoSchema,
   forgeType: forgeTypeSchema,
-  forgeBaseUrl: z.string().url().optional(),
-  forgeToken: z.string(),
+  forgeBaseUrl: httpsUrlSchema.optional(),
+  forgeToken: z.string().min(1),
   agentConfig: agentConfigSchema.nullable().optional(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
@@ -69,11 +80,11 @@ export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export const updateProjectRequestSchema = z.object({
   name: z.string().optional(),
   shortCode: shortCodeCodec.optional(),
-  repositoryUrl: z.string().optional(),
+  repositoryUrl: httpsRepositoryUrlSchema.optional(),
   workflowConfiguration: workflowConfigurationDtoSchema.optional(),
   forgeType: forgeTypeSchema.optional(),
-  forgeBaseUrl: z.string().url().optional(),
-  forgeToken: z.string().optional(),
+  forgeBaseUrl: httpsUrlSchema.optional(),
+  forgeToken: z.string().min(1).optional(),
   agentConfig: agentConfigSchema.nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
@@ -128,13 +139,16 @@ export type TestForgeConnectionSuccess = z.infer<
 /** Request body to test forge connection with provided credentials (e.g. from project dialog). */
 export const testForgeConnectionRequestSchema = z.object({
   forgeType: forgeTypeSchema,
-  forgeBaseUrl: z.string().url(),
-  forgeToken: z.string(),
-  repositoryUrl: z.string(),
+  forgeBaseUrl: httpsUrlSchema,
+  forgeToken: z.string().min(1),
+  repositoryUrl: httpsRepositoryUrlSchema,
 });
 export type TestForgeConnectionRequest = z.infer<
   typeof testForgeConnectionRequestSchema
 >;
+
+export const testStoredForgeConnectionRequestSchema =
+  testForgeConnectionRequestSchema.omit({ forgeToken: true });
 
 export const projectsApi = Endpoint.multi({
   GET: Endpoint.get()
@@ -152,6 +166,7 @@ export const projectsApi = Endpoint.multi({
       .input(testForgeConnectionRequestSchema)
       .output(200, testForgeConnectionSuccessSchema)
       .output(401, unauthenticatedSchema)
+      .output(404, notFoundSchema)
       .output(400, badUserInputSchema),
     ":projectId": Endpoint.multi({
       GET: Endpoint.get()
@@ -195,6 +210,7 @@ export const projectsApi = Endpoint.multi({
           .output(400, stopQueueFailureResponseSchema)
           .output(404, notFoundSchema),
         "test-forge-connection": Endpoint.post()
+          .input(testStoredForgeConnectionRequestSchema)
           .output(200, testForgeConnectionSuccessSchema)
           .output(401, unauthenticatedSchema)
           .output(400, badUserInputSchema)

@@ -266,7 +266,48 @@ export function useTestForgeConnectionWithCredentials() {
           error: response.responseBody.message,
         };
       }
+      if (response.status === 404) {
+        throw new Error("Workspace not found");
+      }
       throw new Error("Failed to test forge connection");
+    },
+  });
+}
+
+/** Tests the repository connection using the token already stored for a project. */
+export function useTestStoredForgeConnection() {
+  const workspace = useCurrentWorkspace();
+
+  return useMutation({
+    mutationFn: async (params: {
+      projectId: ProjectId;
+      forgeType: "gitlab" | "github";
+      forgeBaseUrl: string;
+      repositoryUrl: string;
+    }): Promise<{ success: true } | { success: false; error: string }> => {
+      const response = await apiClient.workspaces[":workspaceId"].projects[
+        ":projectId"
+      ]["test-forge-connection"].POST({
+        pathParams: {
+          workspaceId: workspace.id,
+          projectId: params.projectId,
+        },
+        body: {
+          forgeType: params.forgeType,
+          forgeBaseUrl: params.forgeBaseUrl,
+          repositoryUrl: params.repositoryUrl,
+        },
+      });
+      if (response.status === 200) return response.responseBody;
+      if (response.status === 401) return handleUnauthenticated();
+      if (response.status === 400) {
+        return {
+          success: false as const,
+          error: response.responseBody.message,
+        };
+      }
+      if (response.status === 404) throw new Error("Project not found");
+      throw new Error("Failed to test repository connection");
     },
   });
 }

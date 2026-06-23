@@ -12,7 +12,7 @@ The application needs to perform git operations (clone, push, fetch) and forge A
 - **Encryption**: AES-256-GCM with a server-side master key (`FORGE_ENCRYPTION_KEY`). Tokens are encrypted at rest in a separate `project_forge_secrets` table.
 - **Storage**: Hybrid. Forge *configuration* (type, base URL) lives on the `projects` table so it can be returned in API responses. Forge *secrets* (encrypted token) live in `project_forge_secrets` (1:1 with projects) and are never returned in responses.
 - **API**: Forge config and `hasForgeToken` are exposed; `forgeToken` is write-only on create/update. A `POST /projects/:projectId/test-forge-connection` endpoint verifies credentials.
-- **Git auth**: When credentials are present, clone and push/fetch use token-in-URL HTTPS auth (e.g. `https://oauth2:TOKEN@host/repo.git` for GitLab).
+- **Git auth**: Clone, fetch, pull, and push use token-in-URL HTTPS auth (e.g. `https://oauth2:TOKEN@host/repo.git` for GitLab). Repository paths are combined with the configured forge web URL so SSH-style input and SSH-only hostnames are never used as the transport. The authenticated remote is temporary; MAL restores a credential-free HTTPS `origin` after every operation so tokens are not persisted in `.git/config`.
 - **Forge API layer**: Two-layer design. Platform-specific services (e.g. `GitLabService`) return rich types; a generic `GitForgeService` delegates and maps to common types (`MergeRequest`, `Pipeline`, `PipelineJob`) for MCP tools and workflows.
 - **Workflow**: An optional `push-branch-and-create-mr` workflow commits, pushes the branch, and creates a merge request via the forge API. It requires the project to have forge credentials configured.
 

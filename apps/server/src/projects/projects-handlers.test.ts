@@ -19,10 +19,22 @@ import { projectsHandlers } from "./projects-handlers";
 const { requireAuthSession } = vi.hoisted(() => ({
   requireAuthSession: vi.fn(),
 }));
+const { forgeTestConnection } = vi.hoisted(() => ({
+  forgeTestConnection: vi.fn(),
+}));
 
 vi.mock(import("../auth/session"), () => ({
   requireAuthSession,
 }));
+vi.mock(import("../forge"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createGitForgeService: () => ({
+      testConnection: forgeTestConnection,
+    }),
+  } as unknown as Awaited<typeof import("../forge")>;
+});
 
 const projectRouteHandlers = projectsHandlers[":projectId"];
 type ProjectGetContext = Parameters<typeof projectRouteHandlers.GET>[0];
@@ -37,6 +49,14 @@ function createCtx(overrides?: {
   const projectsService = new FakeProjectsService();
   const forgeSecretRepository = new FakeForgeSecretRepository();
   const liveEventsService = new RecordingLiveEventsService();
+  const testRepositoryAccess = vi.fn(
+    async (): Promise<
+      { success: true; value: undefined } | { success: false; error: Error }
+    > => ({
+      success: true,
+      value: undefined,
+    }),
+  );
   const harnessAvailability = overrides?.harnessAvailability ?? {
     isAvailable: false,
     source: "none",
@@ -58,6 +78,7 @@ function createCtx(overrides?: {
       projectsService,
       forgeSecretRepository,
       liveEventsService,
+      gitService: { testRepositoryAccess },
       harnessAuthService: {
         getAvailability: vi.fn(async () => harnessAvailability),
         isAvailable: vi.fn(() => harnessAvailability.isAvailable),
@@ -111,6 +132,88 @@ function grantProjectAccess(ctx: ReturnType<typeof createCtx>) {
 describe("projects handlers", () => {
   beforeEach(() => {
     requireAuthSession.mockReset();
+    forgeTestConnection.mockReset();
+    forgeTestConnection.mockResolvedValue({
+      success: true,
+      value: undefined,
+    });
+  });
+
+  it("tests forge API and Git HTTPS access with provided credentials", async () => {
+    requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
+    const ctx = createCtx({
+      body: {
+        forgeType: "github",
+        forgeBaseUrl: "https://github.com",
+        forgeToken: "secret-token",
+        repositoryUrl: "https://github.com/owner/repo.git",
+      },
+    });
+    grantProjectAccess(ctx);
+
+    const response = await projectsHandlers["test-forge-connection"](
+      ctx as never,
+    );
+
+    expect(response[0]).toBe(200);
+    expect(forgeTestConnection).toHaveBeenCalledOnce();
+    expect(ctx.services.gitService.testRepositoryAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repositoryUrl: "https://github.com/owner/repo.git",
+        credentials: expect.objectContaining({
+          forgeType: "github",
+          forgeBaseUrl: "https://github.com",
+        }),
+      }),
+    );
+  });
+
+  it("does not test provided credentials for a non-member", async () => {
+    requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
+    const ctx = createCtx({
+      body: {
+        forgeType: "github",
+        forgeBaseUrl: "https://github.com",
+        forgeToken: "secret-token",
+        repositoryUrl: "https://github.com/owner/repo.git",
+      },
+    });
+
+    const response = await projectsHandlers["test-forge-connection"](
+      ctx as never,
+    );
+
+    expect(response[0]).toBe(404);
+    expect(forgeTestConnection).not.toHaveBeenCalled();
+    expect(ctx.services.gitService.testRepositoryAccess).not.toHaveBeenCalled();
+  });
+
+  it("reports Git access failures separately from forge API failures", async () => {
+    requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
+    const ctx = createCtx({
+      body: {
+        forgeType: "github",
+        forgeBaseUrl: "https://github.com",
+        forgeToken: "secret-token",
+        repositoryUrl: "https://github.com/owner/repo.git",
+      },
+    });
+    grantProjectAccess(ctx);
+    ctx.services.gitService.testRepositoryAccess.mockResolvedValueOnce({
+      success: false,
+      error: new Error("repository could not be read"),
+    });
+
+    const response = await projectsHandlers["test-forge-connection"](
+      ctx as never,
+    );
+
+    expect(response).toEqual([
+      400,
+      expect.objectContaining({
+        message: "Git repository access failed: repository could not be read",
+      }),
+    ]);
   });
 
   it("returns 404 when the project is outside the caller membership", async () => {

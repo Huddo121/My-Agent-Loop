@@ -208,6 +208,14 @@ export class BackgroundWorkflowProcessor {
               {
                 gitService: this.gitService,
                 gitForgeService,
+                repositoryAuthentication: {
+                  repositoryUrl: project.repositoryUrl,
+                  credentials: {
+                    forgeType: project.forgeType,
+                    forgeBaseUrl: project.forgeBaseUrl,
+                    token: secret,
+                  },
+                },
               },
             );
 

@@ -167,6 +167,7 @@ export class WorkflowExecutionService {
 
     const credentials: ForgeGitCredentials = {
       forgeType: project.forgeType,
+      forgeBaseUrl: project.forgeBaseUrl,
       token: secret,
     };
 

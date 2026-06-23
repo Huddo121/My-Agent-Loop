@@ -33,18 +33,5 @@ services:
     image: redis:8.2.0
     ports:
       - ${MAL_REDIS_PORT:-6379}:6379
-    # Dev Redis stores BullMQ queue/cache state only. Disable persistence so a
-    # stale or unwritable bind-mounted data directory cannot make Redis reject
-    # writes during local startup.
-    command:
-      [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--stop-writes-on-bgsave-error",
-        "no",
-      ]
     volumes:
       - ./.devloop/volumes/${MAL_STACK:-my_agent_loop}/redis:/data

@@ -39,6 +39,7 @@ vi.mock(import("../forge"), async (importOriginal) => {
 const projectRouteHandlers = projectsHandlers[":projectId"];
 type ProjectGetContext = Parameters<typeof projectRouteHandlers.GET>[0];
 type ProjectPatchContext = Parameters<typeof projectRouteHandlers.PATCH>[0];
+type ProjectsGetContext = Parameters<typeof projectsHandlers.GET>[0];
 
 function createCtx(overrides?: {
   body?: unknown;
@@ -97,7 +98,10 @@ function createCtx(overrides?: {
   return ctx;
 }
 
-function seedProject(ctx: ReturnType<typeof createCtx>) {
+function seedProject(
+  ctx: ReturnType<typeof createCtx>,
+  overrides: Partial<Parameters<FakeProjectsService["seed"]>[0]> = {},
+) {
   const projects = ctx.services.projectsService as FakeProjectsService;
   projects.seed({
     id: "project-1" as ProjectId,
@@ -113,6 +117,7 @@ function seedProject(ctx: ReturnType<typeof createCtx>) {
     forgeType: "github",
     forgeBaseUrl: "https://github.com",
     agentConfig: null,
+    ...overrides,
   });
 }
 
@@ -216,6 +221,27 @@ describe("projects handlers", () => {
     ]);
   });
 
+  it("normalizes legacy SSH repository URLs in project list responses", async () => {
+    requireAuthSession.mockResolvedValueOnce({ user: { id: "user-1" } });
+    const ctx = createCtx();
+    grantProjectAccess(ctx);
+    seedProject(ctx, {
+      repositoryUrl: "git@github.com:owner/repo.git",
+      forgeBaseUrl: "https://github.com",
+    });
+
+    const response = await projectsHandlers.GET(
+      ctx as unknown as ProjectsGetContext,
+    );
+
+    expect(response[0]).toBe(200);
+    expect(response[1]).toEqual([
+      expect.objectContaining({
+        repositoryUrl: "https://github.com/owner/repo.git",
+      }),
+    ]);
+  });
+
   it("returns 404 when the project is outside the caller membership", async () => {
     requireAuthSession.mockResolvedValueOnce({
       user: { id: "user-1" },
@@ -260,6 +286,34 @@ describe("projects handlers", () => {
         }),
       }),
     ]);
+  });
+
+  it("stores canonical HTTPS repository URLs when updating a legacy SSH project", async () => {
+    requireAuthSession.mockResolvedValueOnce({
+      user: { id: "user-1" },
+    });
+    const ctx = createCtx({
+      body: { repositoryUrl: "https://github.com/owner/repo.git" },
+    });
+    grantProjectAccess(ctx);
+    seedProject(ctx, {
+      repositoryUrl: "git@github.com:owner/repo.git",
+      forgeBaseUrl: "https://github.com",
+    });
+
+    const response = await projectsHandlers[":projectId"].PATCH(
+      ctx as unknown as ProjectPatchContext,
+    );
+
+    expect(response[0]).toBe(200);
+    expect(response[1]).toMatchObject({
+      repositoryUrl: "https://github.com/owner/repo.git",
+    });
+    await expect(
+      ctx.services.projectsService.getProject("project-1" as ProjectId),
+    ).resolves.toMatchObject({
+      repositoryUrl: "https://github.com/owner/repo.git",
+    });
   });
 
   it("accepts Codex project config when workspace-scoped auth is available", async () => {

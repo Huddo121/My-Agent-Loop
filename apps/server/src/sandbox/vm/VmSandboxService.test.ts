@@ -10,7 +10,9 @@ import type { VmPlatformAdapter } from "./VmPlatformAdapter";
 import {
   findCommonParentDir,
   generateVmMountSetupScript,
+  parseGitWorktreeListPorcelain,
   readGuestExitCode,
+  resolveVmImagePath,
   shellQuote,
   VmSandboxService,
 } from "./VmSandboxService";
@@ -434,6 +436,63 @@ describe("readGuestExitCode", () => {
 });
 
 // ---------------------------------------------------------------------------
+// VM image path resolution
+// ---------------------------------------------------------------------------
+
+describe("resolveVmImagePath", () => {
+  it("uses the configured path when it exists", () => {
+    const result = resolveVmImagePath("/worktrees/feature/.vm/rootfs.raw", {
+      exists: (candidate) => candidate === "/worktrees/feature/.vm/rootfs.raw",
+      worktrees: [
+        { path: "/repo/main", branch: "refs/heads/main" },
+        { path: "/worktrees/feature", branch: "refs/heads/feature" },
+      ],
+    });
+
+    expect(result).toEqual({
+      path: "/worktrees/feature/.vm/rootfs.raw",
+      checkedPaths: ["/worktrees/feature/.vm/rootfs.raw"],
+    });
+  });
+
+  it("falls back from a linked worktree image path to the main checkout", () => {
+    const result = resolveVmImagePath("/worktrees/feature/.vm/rootfs.raw", {
+      exists: (candidate) => candidate === "/repo/main/.vm/rootfs.raw",
+      worktrees: [
+        { path: "/repo/main", branch: "refs/heads/main" },
+        { path: "/worktrees/feature", branch: "refs/heads/feature" },
+      ],
+    });
+
+    expect(result).toEqual({
+      path: "/repo/main/.vm/rootfs.raw",
+      checkedPaths: [
+        "/worktrees/feature/.vm/rootfs.raw",
+        "/repo/main/.vm/rootfs.raw",
+      ],
+    });
+  });
+});
+
+describe("parseGitWorktreeListPorcelain", () => {
+  it("parses worktree paths and branches", () => {
+    expect(
+      parseGitWorktreeListPorcelain(`worktree /repo/main
+HEAD abc
+branch refs/heads/main
+
+worktree /worktrees/feature
+HEAD def
+branch refs/heads/feature
+`),
+    ).toEqual([
+      { path: "/repo/main", branch: "refs/heads/main" },
+      { path: "/worktrees/feature", branch: "refs/heads/feature" },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // VmSandboxService.createNewSandbox — missing-path guard
 // ---------------------------------------------------------------------------
 
@@ -631,12 +690,16 @@ describe("VmSandboxService lifecycle", () => {
     const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-base-"));
     tmpDirs.push(baseDir);
     const baseRootfs = path.join(baseDir, "rootfs.raw");
+    const kernelPath = path.join(baseDir, "Image-arm64");
+    const initrdPath = path.join(baseDir, "initrd.cpio.gz");
     fs.writeFileSync(baseRootfs, "dummy-rootfs-contents");
+    fs.writeFileSync(kernelPath, "dummy-kernel-contents");
+    fs.writeFileSync(initrdPath, "dummy-initrd-contents");
     const service = new VmSandboxService(
       adapter,
-      "/kernel",
+      kernelPath,
       baseRootfs,
-      "/initrd.cpio.gz",
+      initrdPath,
       noopLogger,
     );
     return { service, vmmProcesses, virtiofsdProcesses, calls, baseDir };

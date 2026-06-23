@@ -144,6 +144,71 @@ function repositoryUrlPlaceholder(forgeType: ForgeTypeDto): string {
     : "https://github.com/owner/repository.git";
 }
 
+function getProjectPathFromRepositoryUrl(repositoryUrl: string): string {
+  const trimmed = repositoryUrl.trim();
+
+  if (trimmed.startsWith("git@")) {
+    const colonIndex = trimmed.indexOf(":");
+    if (colonIndex !== -1) {
+      return trimmed
+        .slice(colonIndex + 1)
+        .replace(/^\/+/, "")
+        .replace(/\.git$/i, "");
+    }
+  }
+
+  if (trimmed.startsWith("ssh://")) {
+    try {
+      const url = new URL(trimmed);
+      return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+    } catch {
+      const withoutScheme = trimmed.slice("ssh://".length);
+      const firstSlash = withoutScheme.indexOf("/");
+      if (firstSlash !== -1) {
+        return withoutScheme
+          .slice(firstSlash + 1)
+          .replace(/^\/+/, "")
+          .replace(/\.git$/i, "");
+      }
+    }
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.pathname.replace(/^\/+/, "").replace(/\.git$/i, "");
+  } catch {
+    return trimmed.replace(/^\/+/, "").replace(/\.git$/i, "");
+  }
+}
+
+function repositoryUrlForDisplay(
+  forgeBaseUrl: string,
+  repositoryUrl: string,
+): string {
+  if (repositoryUrl.trim().length === 0) return repositoryUrl;
+
+  try {
+    const url = new URL(forgeBaseUrl);
+    let projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const forgeBasePath = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (
+      forgeBasePath.length > 0 &&
+      projectPath.startsWith(`${forgeBasePath}/`)
+    ) {
+      projectPath = projectPath.slice(forgeBasePath.length + 1);
+    }
+    if (projectPath.length === 0) return repositoryUrl;
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/${projectPath}.git`;
+    return url.toString();
+  } catch {
+    return repositoryUrl;
+  }
+}
+
 type ProjectSandboxTypeSelectProps = {
   workspaceId: WorkspaceId;
   projectId: ProjectId;
@@ -213,13 +278,15 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
   // TODO: Switch to using react-hook-form
   const [name, setName] = useState(initialName);
   const [shortCode, setShortCode] = useState(initialShortCode);
-  const [repositoryUrl, setRepositoryUrl] = useState(initialRepositoryUrl);
   const [workflowConfiguration, setWorkflowConfiguration] =
     useState<WorkflowConfigurationDto>(initialWorkflowConfiguration);
   const effectiveForgeType = initialForgeType ?? "gitlab";
+  const effectiveForgeBaseUrl =
+    initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType);
   const [forgeType, setForgeType] = useState<ForgeTypeDto>(effectiveForgeType);
-  const [forgeBaseUrl, setForgeBaseUrl] = useState(
-    initialForgeBaseUrl ?? defaultForgeBaseUrl(effectiveForgeType),
+  const [forgeBaseUrl, setForgeBaseUrl] = useState(effectiveForgeBaseUrl);
+  const [repositoryUrl, setRepositoryUrl] = useState(
+    repositoryUrlForDisplay(effectiveForgeBaseUrl, initialRepositoryUrl),
   );
   const [usesCustomForgeHost, setUsesCustomForgeHost] = useState(
     initialForgeBaseUrl !== undefined &&
@@ -253,12 +320,14 @@ function BaseProjectDialog(props: BaseProjectDialogProps) {
     if (open) {
       setName(initialName);
       setShortCode(initialShortCode);
-      setRepositoryUrl(initialRepositoryUrl);
       setWorkflowConfiguration(initialWorkflowConfiguration);
       const resetForgeType = initialForgeType ?? "gitlab";
+      const resetForgeBaseUrl =
+        initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType);
       setForgeType(resetForgeType);
-      setForgeBaseUrl(
-        initialForgeBaseUrl ?? defaultForgeBaseUrl(resetForgeType),
+      setForgeBaseUrl(resetForgeBaseUrl);
+      setRepositoryUrl(
+        repositoryUrlForDisplay(resetForgeBaseUrl, initialRepositoryUrl),
       );
       setUsesCustomForgeHost(
         initialForgeBaseUrl !== undefined &&

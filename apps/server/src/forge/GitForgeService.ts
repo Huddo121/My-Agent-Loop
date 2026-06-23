@@ -408,6 +408,29 @@ export function buildHttpsRepositoryUrl(
     throw new Error("Forge hosting URL must use HTTPS.");
   }
 
+  const projectPath = getForgeProjectPath(forgeBaseUrl, repositoryUrl);
+  url.username = "";
+  url.password = "";
+  url.search = "";
+  url.hash = "";
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/${projectPath}.git`;
+  return url.toString();
+}
+
+/**
+ * Extracts the repository project path as understood by the forge API. For
+ * self-hosted forges mounted under a sub-path, the web base path is not part of
+ * the project namespace and must be stripped.
+ */
+export function getForgeProjectPath(
+  forgeBaseUrl: string,
+  repositoryUrl: string,
+): string {
+  const url = new URL(forgeBaseUrl);
+  if (url.protocol !== "https:") {
+    throw new Error("Forge hosting URL must use HTTPS.");
+  }
+
   let projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
   const forgeBasePath = url.pathname.replace(/^\/+|\/+$/g, "");
   if (forgeBasePath.length > 0 && projectPath.startsWith(`${forgeBasePath}/`)) {
@@ -418,13 +441,7 @@ export function buildHttpsRepositoryUrl(
       "Repository URL must include an owner and repository path.",
     );
   }
-
-  url.username = "";
-  url.password = "";
-  url.search = "";
-  url.hash = "";
-  url.pathname = `${url.pathname.replace(/\/$/, "")}/${projectPath}.git`;
-  return url.toString();
+  return projectPath;
 }
 
 // ---------------------------------------------------------------------------

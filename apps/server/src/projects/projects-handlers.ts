@@ -13,9 +13,10 @@ import type { HonoHandlersFor, ResponsesForEndpoint } from "cerato";
 import { match } from "ts-pattern";
 import { requireAuthSession } from "../auth/session";
 import {
+  buildHttpsRepositoryUrl,
   createGitForgeService,
   defaultForgeBaseUrl,
-  getProjectPathFromRepositoryUrl,
+  getForgeProjectPath,
 } from "../forge";
 import {
   resolveWorkspaceHarnessAuthContext,
@@ -25,6 +26,7 @@ import type { Services } from "../services";
 import { tasksHandlers } from "../tasks/tasks-handlers";
 import { ProtectedString } from "../utils/ProtectedString";
 import { withNewTransaction } from "../utils/transaction-context";
+import type { Project } from "./ProjectsService";
 import { projectSandboxTypeHandlers } from "./project-sandbox-type-handlers";
 
 type WorkspaceProjectsApi =
@@ -33,6 +35,24 @@ type WorkspaceProjectsApi =
 type RunProjectResponse = ResponsesForEndpoint<
   WorkspaceProjectsApi["children"][":projectId"]["children"]["run"]
 >;
+
+function toProjectDto(project: Project, hasForgeToken: boolean): ProjectDto {
+  return {
+    ...project,
+    repositoryUrl: normalizeRepositoryUrlForDto(project),
+    hasForgeToken,
+  };
+}
+
+function normalizeRepositoryUrlForDto(project: Project): string {
+  try {
+    return buildHttpsRepositoryUrl(project.forgeBaseUrl, project.repositoryUrl);
+  } catch {
+    // Existing rows may contain values older than current validation rules.
+    // Preserve readability rather than making project list/read endpoints fail.
+    return project.repositoryUrl;
+  }
+}
 
 export const projectsHandlers: HonoHandlersFor<
   ["workspaces", ":workspaceId", "projects"],
@@ -58,11 +78,12 @@ export const projectsHandlers: HonoHandlersFor<
         workspaceId as WorkspaceId,
       );
       const withHasForgeToken = await Promise.all(
-        projects.map(async (p) => ({
-          ...p,
-          hasForgeToken:
+        projects.map(async (p) =>
+          toProjectDto(
+            p,
             await ctx.services.forgeSecretRepository.hasForgeSecret(p.id),
-        })),
+          ),
+        ),
       );
       return ok(withHasForgeToken);
     });
@@ -96,12 +117,16 @@ export const projectsHandlers: HonoHandlersFor<
       const forgeType = ctx.body.forgeType;
       const forgeBaseUrl =
         ctx.body.forgeBaseUrl ?? defaultForgeBaseUrl(forgeType);
+      const repositoryUrl = buildHttpsRepositoryUrl(
+        forgeBaseUrl,
+        ctx.body.repositoryUrl,
+      );
 
       const project = await ctx.services.projectsService.createProject({
         workspaceId: workspaceId as WorkspaceId,
         name: ctx.body.name,
         shortCode: ctx.body.shortCode,
-        repositoryUrl: ctx.body.repositoryUrl,
+        repositoryUrl,
         workflowConfiguration: ctx.body.workflowConfiguration,
         forgeType,
         forgeBaseUrl,
@@ -117,10 +142,7 @@ export const projectsHandlers: HonoHandlersFor<
         ctx.body.forgeToken,
       );
       const hasForgeToken = true;
-      return ok({
-        ...project,
-        hasForgeToken,
-      });
+      return ok(toProjectDto(project, hasForgeToken));
     });
   },
   "test-forge-connection": async (ctx) => {
@@ -138,7 +160,7 @@ export const projectsHandlers: HonoHandlersFor<
       return notFound();
     }
     const { forgeType, forgeBaseUrl, forgeToken, repositoryUrl } = ctx.body;
-    const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+    const projectPath = getForgeProjectPath(forgeBaseUrl, repositoryUrl);
     const token = new ProtectedString(forgeToken);
     const credential = {
       forgeType,
@@ -189,10 +211,7 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-        return ok({
-          ...project,
-          hasForgeToken,
-        });
+        return ok(toProjectDto(project, hasForgeToken));
       });
     },
     PATCH: async (ctx) => {
@@ -225,20 +244,37 @@ export const projectsHandlers: HonoHandlersFor<
         if (validationError !== null) {
           return badUserInput(validationError);
         }
+        const existingProject = await ctx.services.projectsService.getProject(
+          projectId as ProjectId,
+        );
+        if (existingProject === undefined) {
+          return notFound();
+        }
         const updatePayload: Parameters<
           typeof ctx.services.projectsService.updateProject
         >[1] = {};
         if (ctx.body.name !== undefined) updatePayload.name = ctx.body.name;
         if (ctx.body.shortCode !== undefined)
           updatePayload.shortCode = ctx.body.shortCode;
-        if (ctx.body.repositoryUrl !== undefined)
-          updatePayload.repositoryUrl = ctx.body.repositoryUrl;
         if (ctx.body.workflowConfiguration !== undefined)
           updatePayload.workflowConfiguration = ctx.body.workflowConfiguration;
         if (ctx.body.forgeType !== undefined)
           updatePayload.forgeType = ctx.body.forgeType;
         if (ctx.body.forgeBaseUrl !== undefined)
           updatePayload.forgeBaseUrl = ctx.body.forgeBaseUrl;
+        if (
+          ctx.body.repositoryUrl !== undefined ||
+          ctx.body.forgeBaseUrl !== undefined
+        ) {
+          const nextForgeBaseUrl =
+            ctx.body.forgeBaseUrl ?? existingProject.forgeBaseUrl;
+          const nextRepositoryUrl =
+            ctx.body.repositoryUrl ?? existingProject.repositoryUrl;
+          updatePayload.repositoryUrl = buildHttpsRepositoryUrl(
+            nextForgeBaseUrl,
+            nextRepositoryUrl,
+          );
+        }
         if (ctx.body.agentConfig !== undefined) {
           updatePayload.agentConfig =
             ctx.body.agentConfig === null
@@ -266,7 +302,7 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-        const projectDto = { ...project, hasForgeToken };
+        const projectDto = toProjectDto(project, hasForgeToken);
         await ctx.services.liveEventsService.publish(
           workspaceId as WorkspaceId,
           { type: "project.updated", project: projectDto },
@@ -301,7 +337,7 @@ export const projectsHandlers: HonoHandlersFor<
           await ctx.services.forgeSecretRepository.hasForgeSecret(
             projectId as ProjectId,
           );
-        return ok({ ...project, hasForgeToken: hadForgeToken });
+        return ok(toProjectDto(project, hadForgeToken));
       });
     },
     tasks: tasksHandlers,
@@ -335,7 +371,7 @@ export const projectsHandlers: HonoHandlersFor<
         if (secret === undefined) {
           return badUserInput("No forge token configured for this project.");
         }
-        const projectPath = getProjectPathFromRepositoryUrl(repositoryUrl);
+        const projectPath = getForgeProjectPath(forgeBaseUrl, repositoryUrl);
         const gitForgeService = createGitForgeService({
           forgeType,
           forgeBaseUrl,

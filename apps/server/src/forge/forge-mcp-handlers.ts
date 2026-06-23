@@ -5,10 +5,7 @@ import type { McpTools } from "../utils/mcp-tool";
 import { withRequiredProjectId } from "../utils/mcp-tool";
 import type { Result } from "../utils/Result";
 import { withNewTransaction } from "../utils/transaction-context";
-import {
-  createGitForgeService,
-  getProjectPathFromRepositoryUrl,
-} from "./GitForgeService";
+import { createGitForgeService, getForgeProjectPath } from "./GitForgeService";
 import {
   forgeIdSchema,
   type JobId,
@@ -118,7 +115,10 @@ async function getGitForgeServiceOrError(
     };
   }
 
-  const projectPath = getProjectPathFromRepositoryUrl(project.repositoryUrl);
+  const projectPath = getForgeProjectPath(
+    project.forgeBaseUrl,
+    project.repositoryUrl,
+  );
   const service = createGitForgeService({
     forgeType: project.forgeType,
     forgeBaseUrl: project.forgeBaseUrl,

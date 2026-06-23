@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHttpsRepositoryUrl } from "../forge";
+import { buildHttpsRepositoryUrl, getForgeProjectPath } from "../forge";
 import { ProtectedString } from "../utils/ProtectedString";
 import { buildAuthenticatedUrl } from "./GitService";
 
@@ -84,5 +84,16 @@ describe("buildHttpsRepositoryUrl", () => {
         "https://forge.example.com/group/repo.git",
       ),
     ).toThrow("Forge hosting URL must use HTTPS");
+  });
+});
+
+describe("getForgeProjectPath", () => {
+  it("strips a self-hosted base path for forge API calls", () => {
+    expect(
+      getForgeProjectPath(
+        "https://forge.example.com/gitlab/",
+        "https://forge.example.com/gitlab/group/repo.git",
+      ),
+    ).toBe("group/repo");
   });
 });

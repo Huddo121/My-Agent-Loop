@@ -14,6 +14,7 @@ import {
   FakeWorkspaceMembershipsService,
   RecordingLiveEventsService,
 } from "../test-fakes";
+import { getTransaction } from "../utils/transaction-context";
 import { projectsHandlers } from "./projects-handlers";
 
 const { requireAuthSession } = vi.hoisted(() => ({
@@ -134,6 +135,25 @@ function grantProjectAccess(ctx: ReturnType<typeof createCtx>) {
   );
 }
 
+function requireTransactionForWorkspaceMembership(
+  ctx: ReturnType<typeof createCtx>,
+) {
+  const memberships = ctx.services
+    .workspaceMembershipsService as FakeWorkspaceMembershipsService;
+  ctx.services.workspaceMembershipsService = new Proxy(memberships, {
+    get(target, prop, receiver) {
+      if (prop === "isWorkspaceMember") {
+        return async (userId: UserId, workspaceId: WorkspaceId) => {
+          getTransaction();
+          return target.isWorkspaceMember(userId, workspaceId);
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 describe("projects handlers", () => {
   beforeEach(() => {
     requireAuthSession.mockReset();
@@ -155,6 +175,7 @@ describe("projects handlers", () => {
       },
     });
     grantProjectAccess(ctx);
+    requireTransactionForWorkspaceMembership(ctx);
 
     const response = await projectsHandlers["test-forge-connection"](
       ctx as never,

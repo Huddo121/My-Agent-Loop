@@ -151,11 +151,12 @@ export const projectsHandlers: HonoHandlersFor<
     if (authSession === null) {
       return unauthenticated();
     }
-    const canAccess =
-      await ctx.services.workspaceMembershipsService.isWorkspaceMember(
+    const canAccess = await withNewTransaction(ctx.services.db, async () =>
+      ctx.services.workspaceMembershipsService.isWorkspaceMember(
         authSession.user.id,
         workspaceId as WorkspaceId,
-      );
+      ),
+    );
     if (!canAccess) {
       return notFound();
     }
